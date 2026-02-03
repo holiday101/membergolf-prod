@@ -1,0 +1,148 @@
+.calendar {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    color: #111;
+  }
+  
+.cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  
+  .cal-header h2 {
+    font-size: 14px;
+    margin: 0;
+    font-weight: 600;
+  }
+  
+  .cal-btn {
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 10px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  
+  .cal-btn:hover {
+    background: #f7f7f7;
+  }
+  
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border: 1px solid #e5e5e5;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  
+  .cal-dow {
+    background: #fafafa;
+    border-bottom: 1px solid #eee;
+    padding: 6px 8px;
+    font-size: 11px;
+    color: #444;
+  }
+  
+  .day {
+    min-height: 78px;
+    border-right: 1px solid #eee;
+    border-bottom: 1px solid #eee;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .day.in-month { background: #ffffff; }
+  .day.out-month { background: #f9fafb; }
+  
+  .day:nth-child(7n) { border-right: none; }
+  
+  .day-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #444;
+  }
+  
+  .day-muted {
+    color: #aaa;
+  }
+  
+  .event {
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    padding: 4px 6px;
+    font-size: 11px;
+    line-height: 1.2;
+    background: #fff;
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: clip;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+  }
+.event.event-cont {
+  color: transparent;
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  border-radius: 0;
+  margin-left: -6px;
+  margin-right: -6px;
+  border-left: 0;
+  border-right: 0;
+}
+.event.event-start {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  border-radius: 8px 0 0 8px;
+  margin-right: -6px;
+  border-right: 0;
+}
+.event-color-0.event-start,
+.event-color-0.event-cont { background: #e0f2fe; border-color: #bae6fd; }
+.event-color-1.event-start,
+.event-color-1.event-cont { background: #e0e7ff; border-color: #c7d2fe; }
+.event-color-2.event-start,
+.event-color-2.event-cont { background: #ecfdf3; border-color: #bbf7d0; }
+.event-color-3.event-start,
+.event-color-3.event-cont { background: #dcfce7; border-color: #86efac; }
+.event-color-4.event-start,
+.event-color-4.event-cont { background: #fef3c7; border-color: #fcd34d; }
+.event-color-5.event-start,
+.event-color-5.event-cont { background: #fee2e2; border-color: #fecaca; }
+.event-color-6.event-start,
+.event-color-6.event-cont { background: #f3e8ff; border-color: #e9d5ff; }
+.event-color-7.event-start,
+.event-color-7.event-cont { background: #dbeafe; border-color: #bfdbfe; }
+.event.event-end {
+  border-radius: 0 8px 8px 0;
+  margin-left: -6px;
+  border-left: 0;
+}
+.event.event-start.event-end {
+  border-radius: 8px;
+}
+.event:hover {
+  background: #f0f9ff;
+  border-color: #93c5fd;
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.18);
+  transform: translateY(-1px);
+}
+  
+  .event .meta {
+    display: block;
+    margin-top: 3px;
+    color: #777;
+    font-size: 10px;
+  }
+  
+  .loading {
+    font-size: 12px;
+    color: #555;
+  }
+  

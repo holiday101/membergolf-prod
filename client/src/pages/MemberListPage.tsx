@@ -1,0 +1,199 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../auth";
+
+type Member = {
+  member_id: number;
+  firstname: string | null;
+  lastname: string | null;
+  handicap: number | null;
+};
+
+function formatHandicap(value: number | null) {
+  if (value === null || value === undefined) return "—";
+  if (Number.isNaN(Number(value))) return "—";
+  return Number(value).toFixed(2);
+}
+
+export default function MemberListPage() {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [handicap, setHandicap] = useState("");
+  const [handicap18, setHandicap18] = useState("");
+  const navigate = useNavigate();
+
+  const loadMembers = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await apiFetch("/members");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setMembers(data);
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load members");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, []);
+
+  const submit = async () => {
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch("/members", {
+        method: "POST",
+        body: JSON.stringify({
+          firstname: firstName.trim(),
+          lastname: lastName.trim(),
+          handicap: handicap ? Number(handicap) : null,
+          handicap18: handicap18 ? Number(handicap18) : null,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setFirstName("");
+      setLastName("");
+      setHandicap("");
+      setHandicap18("");
+      await loadMembers();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to add member");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="page">
+      {error ? <div className="error">{error}</div> : null}
+      <div className="grid">
+        <section className="card listCard">
+          <h2>Members</h2>
+          {loading ? <div>Loading…</div> : null}
+          <div className="list">
+            <div className="row header">
+              <div className="name">Member</div>
+              <div className="handicap">Handicap</div>
+              <div className="actionsCol"></div>
+            </div>
+            {members.map((m) => (
+              <div
+                key={m.member_id}
+                className="row clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/members/${m.member_id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    navigate(`/members/${m.member_id}`);
+                  }
+                }}
+              >
+                <div className="name">
+                  {(m.lastname || "").trim()}, {(m.firstname || "").trim()}
+                </div>
+                <div className="handicap">{formatHandicap(m.handicap)}</div>
+                <div className="actionsCol">
+                  <button
+                    className="iconBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/members/${m.member_id}`);
+                    }}
+                    aria-label="Edit member"
+                  >
+                    ✎
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="card">
+          <h2>Add Member</h2>
+          <div className="form">
+            <div className="rowInputs">
+              <label className="formLabel">
+                First Name
+                <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+              </label>
+              <label className="formLabel">
+                Last Name
+                <input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+              </label>
+            </div>
+
+            <div className="rowInputs">
+              <label className="formLabel">
+                Handicap (9)
+                <input value={handicap} onChange={(e) => setHandicap(e.target.value)} />
+              </label>
+              <label className="formLabel">
+                Handicap (18)
+                <input value={handicap18} onChange={(e) => setHandicap18(e.target.value)} />
+              </label>
+            </div>
+
+            <div className="actions">
+              <button className="btn primary" onClick={submit} disabled={busy}>
+                {busy ? "Saving…" : "Add member"}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <style>{`
+        .page { display: grid; gap: 14px; }
+        .grid { display: grid; gap: 14px; grid-template-columns: 1.2fr 1fr; align-items: start; }
+        @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+        h2 { margin: 0 0 10px; font-size: 16px; }
+        .form { display: grid; gap: 10px; }
+        .formLabel { color: #6b7280; display: grid; gap: 6px; font-weight: 600; font-size: 12px; }
+        input { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
+        .rowInputs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+        .actions { display: flex; gap: 8px; }
+        .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+        .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .list { display: grid; gap: 2px; }
+        .listCard { padding-bottom: 10px; }
+        .row { display: grid; grid-template-columns: 1fr 70px 28px; align-items: center; padding: 2px 6px; line-height: 1.1; color: #6b7280; }
+        .row:nth-child(even) { background: #f0f7ff; }
+        .row.clickable { cursor: pointer; }
+        .row.clickable:hover { background: #e0f2fe; }
+        .row.header { font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: 0.05em; }
+        .name { font-weight: 600; font-size: 11px; }
+        .handicap { font-size: 10px; }
+        .actionsCol { display: flex; justify-content: flex-end; }
+        .iconBtn {
+          width: 22px; height: 22px;
+          border-radius: 7px;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          cursor: pointer;
+          font-size: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .iconBtn:hover { background: #f7f8fb; }
+        .error { color: #a00; font-size: 12px; }
+      `}</style>
+    </div>
+  );
+}
