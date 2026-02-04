@@ -13,7 +13,7 @@ export function clearToken() {
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
-  const base = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
+  const base = import.meta.env.VITE_API_BASE ?? "/api";
   const token = getToken();
 
   const headers = new Headers(options.headers || {});
