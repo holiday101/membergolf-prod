@@ -115,9 +115,6 @@ export default function PublicCalendarPage() {
       )}
       {loading && status === "idle" && <div className="loading">Loading…</div>}
       {error && <div className="loading" style={{ color: "#a00" }}>{error}</div>}
-      {lastUpdated ? (
-        <div className="loading">Last updated: {new Date(lastUpdated).toLocaleString()}</div>
-      ) : null}
 
       <div className="cal-grid" role="grid" aria-label="Month calendar">
         {"Sun Mon Tue Wed Thu Fri Sat".split(" ").map((d) => (
