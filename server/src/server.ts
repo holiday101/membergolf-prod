@@ -1361,10 +1361,11 @@ app.delete("/members/:id", authMiddleware, async (req, res) => {
 
 app.get("/rosters", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
   const [rows] = await pool.query<any[]>(
-    "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC",
-    [payload.courseId]
+    payload?.courseId
+      ? "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC"
+      : "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain ORDER BY rostername ASC",
+    payload?.courseId ? [payload.courseId] : []
   );
   res.json(rows);
 });
