@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../auth";
 
@@ -58,7 +58,6 @@ export default function CourseListPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isGlobal, setIsGlobal] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [uploading, setUploading] = useState(false);
   const leagueInfoRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
@@ -73,7 +72,6 @@ export default function CourseListPage() {
       if (!meRes.ok) throw new Error(await meRes.text());
       const me = await meRes.json();
       setIsGlobal(!me?.user?.courseId);
-      setIsAdmin(Boolean(me?.user?.isAdmin));
       if (!me?.user?.isAdmin) {
         navigate("/calendar", { replace: true });
         return;

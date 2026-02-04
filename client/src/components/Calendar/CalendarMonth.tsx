@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchEvents } from "../../api/events";
 import type { CalendarEvent } from "../../types/event";
@@ -187,7 +187,7 @@ export default function CalendarMonth() {
                 <span className={cell.inMonth ? "" : "day-muted"}>{dayNum}</span>
               </div>
 
-              {dayEvents.map((ev, idx) => (
+              {dayEvents.map((ev) => (
                 (() => {
                   const isStart = ymd(new Date(ev.start_dt)) === cell.key;
                   const isEnd = ymd(new Date(ev.end_dt)) === cell.key;

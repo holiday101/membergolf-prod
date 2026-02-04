@@ -1,4 +1,3 @@
-import React from "react";
 import CalendarMonth from "../components/Calendar/CalendarMonth";
 
 export default function CalendarPage() {
