@@ -12,7 +12,6 @@ export default function PublicCalendarPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "refreshing" | "waking">("idle");
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const monthStart = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth(), 1), [cursor]);
   const monthEnd = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0), [cursor]);
@@ -52,7 +51,6 @@ export default function PublicCalendarPage() {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed?.events)) {
           setEvents(parsed.events);
-          setLastUpdated(parsed?.updatedAt ?? null);
           setStatus("refreshing");
         }
       } catch {
@@ -71,7 +69,6 @@ export default function PublicCalendarPage() {
         );
         setEvents(data);
         const updatedAt = new Date().toISOString();
-        setLastUpdated(updatedAt);
         localStorage.setItem(cacheKey, JSON.stringify({ updatedAt, events: data }));
         setStatus("idle");
       } catch (e: any) {
