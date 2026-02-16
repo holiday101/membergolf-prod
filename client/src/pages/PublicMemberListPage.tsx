@@ -20,6 +20,7 @@ export default function PublicMemberListPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const run = async () => {
@@ -37,9 +38,28 @@ export default function PublicMemberListPage() {
     run();
   }, [courseId]);
 
+  const filteredMembers = members.filter((m) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    const first = (m.firstname || "").toLowerCase();
+    const last = (m.lastname || "").toLowerCase();
+    const full = `${first} ${last}`.trim();
+    const rev = `${last}, ${first}`.trim();
+    return full.includes(q) || rev.includes(q) || last.includes(q) || first.includes(q);
+  });
+
   return (
     <div className="card">
-      <h2>Members</h2>
+      <div className="listHeader">
+        <h2>Members</h2>
+        <input
+          className="search"
+          placeholder="Search members…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
       {loading ? <div>Loading…</div> : null}
       {error ? <div style={{ color: "#a00" }}>{error}</div> : null}
       <div className="list">
@@ -47,7 +67,7 @@ export default function PublicMemberListPage() {
           <div className="name">Member</div>
           <div className="handicap">Handicap</div>
         </div>
-        {members.map((m) => (
+        {filteredMembers.map((m) => (
           <Link
             key={m.member_id}
             className="row linkRow"
@@ -62,7 +82,15 @@ export default function PublicMemberListPage() {
       </div>
       <style>{`
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        h2 { margin: 0 0 10px; font-size: 16px; }
+        h2 { margin: 0; font-size: 16px; }
+        .listHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .search {
+          padding: 6px 10px;
+          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          font-size: 12px;
+          min-width: 220px;
+        }
         .list { display: grid; gap: 2px; }
         .row { display: flex; justify-content: space-between; padding: 2px 6px; line-height: 1.2; color: #6b7280; }
         .row:nth-child(even) { background: #f0f7ff; }

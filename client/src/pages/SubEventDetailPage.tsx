@@ -171,9 +171,6 @@ export default function SubEventDetailPage() {
               <button className="btn" type="button">
                 Calculate Winnings
               </button>
-              <button className="btn" type="button">
-                Calculate Skins
-              </button>
             </div>
             <div className="actionsRight">
               <button className="btn primary" onClick={save} disabled={busy}>

@@ -54,6 +54,8 @@ export default function CourseListPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
+  const successTimer = useRef<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -67,6 +69,7 @@ export default function CourseListPage() {
   async function loadData() {
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       const meRes = await apiFetch("/me");
       if (!meRes.ok) throw new Error(await meRes.text());
@@ -136,6 +139,7 @@ export default function CourseListPage() {
   async function submit() {
     setBusy(true);
     setError("");
+    setSuccess("");
     try {
       const payload: any = {
         coursename: form.coursename.trim(),
@@ -167,6 +171,9 @@ export default function CourseListPage() {
 
       await loadData();
       if (isGlobal && !isEditing) resetForm();
+      if (successTimer.current) window.clearTimeout(successTimer.current);
+      setSuccess("Changes saved.");
+      successTimer.current = window.setTimeout(() => setSuccess(""), 1000);
     } catch (err: any) {
       setError(String(err?.message || "Request failed"));
     } finally {
@@ -178,6 +185,7 @@ export default function CourseListPage() {
     if (!editingId) return;
     setUploading(true);
     setError("");
+    setSuccess("");
     try {
       const presignRes = await apiFetch(`/courses/manage/${editingId}/assets/presign`, {
         method: "POST",
@@ -203,6 +211,9 @@ export default function CourseListPage() {
       if (!res.ok) throw new Error(await res.text());
       setForm((prev) => ({ ...prev, [field]: fileKey }));
       await loadData();
+      if (successTimer.current) window.clearTimeout(successTimer.current);
+      setSuccess("Asset uploaded.");
+      successTimer.current = window.setTimeout(() => setSuccess(""), 1000);
     } catch (err: any) {
       setError(String(err?.message || "Upload failed"));
     } finally {
@@ -214,6 +225,7 @@ export default function CourseListPage() {
     if (!editingId) return;
     setUploading(true);
     setError("");
+    setSuccess("");
     try {
       const res = await apiFetch(`/courses/manage/${editingId}/assets/${field}`, {
         method: "DELETE",
@@ -221,12 +233,21 @@ export default function CourseListPage() {
       if (!res.ok) throw new Error(await res.text());
       setForm((prev) => ({ ...prev, [field]: "" }));
       await loadData();
+      if (successTimer.current) window.clearTimeout(successTimer.current);
+      setSuccess("Asset deleted.");
+      successTimer.current = window.setTimeout(() => setSuccess(""), 1000);
     } catch (err: any) {
       setError(String(err?.message || "Delete failed"));
     } finally {
       setUploading(false);
     }
   }
+
+  useEffect(() => {
+    return () => {
+      if (successTimer.current) window.clearTimeout(successTimer.current);
+    };
+  }, []);
 
   return (
     <div className="page">
@@ -433,6 +454,7 @@ export default function CourseListPage() {
               New course
             </button>
           )}
+          {success && <div className="toast success">{success}</div>}
         </div>
 
         {isGlobal ? (
@@ -552,11 +574,14 @@ export default function CourseListPage() {
         .checkbox { display: flex; align-items: center; gap: 8px; font-weight: 600; }
         .checkbox input { width: 16px; height: 16px; padding: 0; }
         .checkboxLabel { font-size: 12px; color: #374151; }
-        .actions { display: flex; gap: 8px; }
+        .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
         .btn.small { padding: 5px 8px; font-size: 11px; }
         .alert { padding: 10px 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; color: #991b1b; }
+        .alert.success { border-color: #bbf7d0; background: #ecfdf3; color: #166534; }
+        .toast { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .toast.success { border: 1px solid #bbf7d0; background: #ecfdf3; color: #166534; }
         .muted { color: #6b7280; font-size: 12px; }
         .filterRow { display: grid; gap: 6px; justify-items: center; margin: 0 0 6px; }
         .filterTitle { font-size: 15px; color: #6b7280; font-weight: 600; }

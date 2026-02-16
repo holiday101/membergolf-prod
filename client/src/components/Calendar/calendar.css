@@ -1,6 +1,7 @@
 .calendar {
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
     color: #111;
+    width: 100%;
   }
   
 .cal-header {

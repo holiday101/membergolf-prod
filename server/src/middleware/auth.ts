@@ -13,8 +13,9 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     const payload = jwt.verify(token, JWT_SECRET) as {
       userId: number;
       courseId?: number | null;
+      memberId?: number | null;
     };
-    req.user = { id: payload.userId, courseId: payload.courseId ?? null };
+    req.user = { id: payload.userId, courseId: payload.courseId ?? null, memberId: payload.memberId ?? null };
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

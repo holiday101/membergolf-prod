@@ -43,9 +43,6 @@ export default function AppShell() {
   const [isDesktop, setIsDesktop] = useState(desktopInit);
   const [userToggled, setUserToggled] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
-  const [subEvents, setSubEvents] = useState<
-    Array<{ subevent_id: number; eventtypename: string | null; eventtype_id: number | null }>
-  >([]);
 
   const firstName = useMemo(() => getFirstNameFromMe(me), [me]);
 
@@ -86,6 +83,15 @@ export default function AppShell() {
   const [subEventEventId, setSubEventEventId] = useState<string | null>(null);
   const isEditEvent = Boolean(eventId || subEventEventId || eventQuery);
   const fromCalendar = Boolean((location as any)?.state?.fromCalendar);
+  const isCalendarRoute = location.pathname === "/calendar";
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("calendar-full", isCalendarRoute);
+    return () => {
+      document.body.classList.remove("calendar-full");
+    };
+  }, [isCalendarRoute]);
 
   useEffect(() => {
     if (!token) return;
@@ -121,23 +127,6 @@ export default function AppShell() {
     loadSubEventEvent();
   }, [subeventId]);
 
-  useEffect(() => {
-    const loadSubEvents = async () => {
-      const effectiveEventId = eventId || subEventEventId;
-      if (!effectiveEventId) {
-        setSubEvents([]);
-        return;
-      }
-      try {
-        const res = await apiFetch(`/subevents?event=${effectiveEventId}`);
-        if (!res.ok) throw new Error(await res.text());
-        setSubEvents(await res.json());
-      } catch {
-        setSubEvents([]);
-      }
-    };
-    loadSubEvents();
-  }, [eventId, subEventEventId]);
 
   if (!token) return <Navigate to="/login" replace />;
 
@@ -155,37 +144,55 @@ export default function AppShell() {
   const helloText = fullName ? `Hello ${fullName}` : welcomeText ? `Hello ${welcomeText}` : null;
 
   const effectiveEventId = eventId || subEventEventId || eventQuery;
+  const eventActions: Array<{
+    to?: string;
+    label: string;
+    icon: "calendar" | "plus" | "users" | "list";
+    disabled?: boolean;
+  }> = [
+    effectiveEventId
+      ? { to: `/events/${effectiveEventId}/scores`, label: "Enter Scores", icon: "list" }
+      : { label: "Enter Scores", icon: "list", disabled: true },
+    effectiveEventId
+      ? { to: `/events/${effectiveEventId}/handicaps`, label: "Post Handicaps", icon: "list" }
+      : { label: "Post Handicaps", icon: "list", disabled: true },
+    effectiveEventId
+      ? { to: `/events/${effectiveEventId}/winnings`, label: "Add Event Winnings", icon: "list" }
+      : { label: "Add Event Winnings", icon: "list", disabled: true },
+    effectiveEventId
+      ? { to: `/events/${effectiveEventId}/uploads`, label: "Upload Results", icon: "list" }
+      : { label: "Upload Results", icon: "list", disabled: true },
+  ];
+
   const navItems: Array<{
     to?: string;
     label: string;
     icon: "calendar" | "plus" | "users" | "list";
     disabled?: boolean;
-  }> = isEditEvent
-    ? [
-        { to: "/calendar", label: "Back to Calendar", icon: "calendar" },
-        { to: "/events", label: "Back to Event List", icon: "list" },
-        effectiveEventId
-          ? { to: `/events/${effectiveEventId}/scores`, label: "Enter Scores", icon: "list" }
-          : { label: "Enter Scores", icon: "list", disabled: true },
-        effectiveEventId
-          ? { to: `/events/${effectiveEventId}/handicaps`, label: "Post Handicaps", icon: "list" }
-          : { label: "Post Handicaps", icon: "list", disabled: true },
-        effectiveEventId
-          ? { to: `/events/${effectiveEventId}/winnings`, label: "Add Event Winnings", icon: "list" }
-          : { label: "Add Event Winnings", icon: "list", disabled: true },
-        effectiveEventId
-          ? { to: `/events/${effectiveEventId}/uploads`, label: "Upload Results", icon: "list" }
-          : { label: "Upload Results", icon: "list", disabled: true },
-        { label: "Sub Events", icon: "list", disabled: true },
-      ]
-    : [
-        { to: "/calendar", label: "Calendar", icon: "calendar" },
-        { to: "/events", label: "Event List", icon: "list" },
-        { to: "/members", label: "Members", icon: "users" },
-        { to: "/rosters", label: "Rosters", icon: "list" },
-      ];
-  if (!isEditEvent && me?.user.isAdmin) navItems.push({ to: "/users", label: "Users", icon: "users" });
-  if (!isEditEvent && me?.user.isAdmin) {
+    children?: Array<{
+      to?: string;
+      label: string;
+      icon: "calendar" | "plus" | "users" | "list";
+      disabled?: boolean;
+    }>;
+  }> = [
+    {
+      to: "/calendar",
+      label: "Calendar",
+      icon: "calendar",
+      children: isEditEvent && fromCalendar ? eventActions : undefined,
+    },
+    {
+      to: "/events",
+      label: "Event List",
+      icon: "list",
+      children: isEditEvent && !fromCalendar ? eventActions : undefined,
+    },
+    { to: "/members", label: "Members", icon: "users" },
+    { to: "/rosters", label: "Rosters", icon: "list" },
+  ];
+  if (me?.user.isAdmin) navItems.push({ to: "/users", label: "Users", icon: "users" });
+  if (me?.user.isAdmin) {
     navItems.push({
       to: "/courses",
       label: me?.user.courseId ? "Course Info" : "Courses",
@@ -325,7 +332,6 @@ export default function AppShell() {
 
         <nav className="drawerNav">
           {navItems.map((item) => {
-            const isSubEvents = item.label === "Sub Events";
             const link = item.to ? (
               <NavLink
                 key={item.label}
@@ -333,9 +339,11 @@ export default function AppShell() {
                 className={({ isActive }) => {
                   if (isEditEvent) {
                     const preferCalendar = fromCalendar;
+                    const isParentRoute = item.to === "/calendar" || item.to === "/events";
                     const active =
-                      (preferCalendar && item.to === "/calendar") ||
-                      (!preferCalendar && item.to === "/events");
+                      isParentRoute &&
+                      ((preferCalendar && item.to === "/calendar") ||
+                        (!preferCalendar && item.to === "/events"));
                     return `navLink ${active ? "active" : ""}`;
                   }
                   return `navLink ${isActive ? "active" : ""}`;
@@ -363,27 +371,31 @@ export default function AppShell() {
             return (
               <div key={`nav-${item.label}`}>
                 {link}
-                {isSubEvents && isEditEvent && effectiveEventId ? (
-                  <div className="subEventList">
-                    {subEvents.map((sub) => (
-                      <NavLink
-                        key={sub.subevent_id}
-                        to={`/subevents/${sub.subevent_id}`}
-                        className={({ isActive }) =>
-                          `subEventLink ${isActive ? "active" : ""}`.trim()
-                        }
-                      >
-                        {sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}
-                      </NavLink>
-                    ))}
-                    <NavLink
-                      to={`/subevents/new?event=${effectiveEventId}`}
-                      className={({ isActive }) =>
-                        `subEventLink addSubEventLink ${isActive ? "active" : ""}`.trim()
-                      }
-                    >
-                      + Add Sub Event
-                    </NavLink>
+                {item.children ? (
+                  <div className="subNavList">
+                    {item.children.map((child) => {
+                      const childLink = child.to ? (
+                        <NavLink
+                          key={child.label}
+                          to={child.to}
+                          className={({ isActive }) =>
+                            `subNavLink ${isActive ? "active" : ""}`.trim()
+                          }
+                        >
+                          {child.label}
+                        </NavLink>
+                      ) : (
+                        <button
+                          key={child.label}
+                          type="button"
+                          className={`subNavLink subNavButton ${child.disabled ? "disabled" : ""}`}
+                          disabled={child.disabled}
+                        >
+                          {child.label}
+                        </button>
+                      );
+                      return <div key={`child-${child.label}`}>{childLink}</div>;
+                    })}
                   </div>
                 ) : null}
               </div>
@@ -398,8 +410,8 @@ export default function AppShell() {
       </aside>
 
       {/* Content */}
-      <main className="content">
-        <div className="content-inner">
+      <main className={`content ${isCalendarRoute ? "calendar-full" : ""}`}>
+        <div className={`content-inner ${isCalendarRoute ? "calendar-full" : ""}`}>
           <Outlet />
         </div>
       </main>
@@ -420,6 +432,7 @@ export default function AppShell() {
 
         * { box-sizing: border-box; }
         body { margin: 0; }
+        body.calendar-full { overflow: hidden; }
         .app { min-height: 100vh; background: var(--bg); color: var(--text); height: 100vh; }
         .app {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -562,22 +575,23 @@ export default function AppShell() {
         .navIcon svg { width: 13px; height: 13px; }
         .navLink.active .navIcon { color: #1d4ed8; border-color: #c7d2fe; }
 
-        .subEventList { display: grid; gap: 4px; margin: 4px 0 8px 32px; }
-        .subEventLink {
+        .subNavList { display: grid; gap: 4px; margin: 4px 0 8px 32px; }
+        .subNavLink {
           font-size: 11px;
           color: #6b7280;
           text-decoration: none;
           padding: 3px 6px;
           border-radius: 8px;
+          text-align: left;
+          background: transparent;
+          border: 1px solid transparent;
         }
-        .subEventLink:hover { background: #f1f5f9; color: #111827; }
-        .subEventLink.active {
+        .subNavButton { cursor: default; }
+        .subNavButton.disabled { cursor: not-allowed; }
+        .subNavLink:hover { background: #f1f5f9; color: #111827; }
+        .subNavLink.active {
           background: #e0e7ff;
           color: #1d4ed8;
-          font-weight: 600;
-        }
-        .addSubEventLink {
-          color: #2563eb;
           font-weight: 600;
         }
 
@@ -600,6 +614,16 @@ export default function AppShell() {
         .navSpacer { height: 88px; flex: 0 0 auto; }
         .content { padding: 16px; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
+        .content.calendar-full {
+          padding: 16px 0;
+          overflow: hidden;
+        }
+        .content-inner.calendar-full {
+          max-width: none;
+          margin: 0;
+          width: 100%;
+          min-height: 0;
+        }
 
         @media (min-width: 900px) {
           .overlay { display: none; }

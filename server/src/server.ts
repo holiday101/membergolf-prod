@@ -5,7 +5,8 @@ import mysql from "mysql2/promise";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes, createHash } from "crypto";
+import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import path from "path";
 import { eventsRouter } from "./routes/events.routes";
 import { presignGet, presignPut, deleteObject } from "./s3";
@@ -240,6 +241,66 @@ const pool = mysql.createPool({
   connectionLimit: 10,
 });
 
+const sesRegion = process.env.SES_REGION;
+const sesFromEmail = process.env.SES_FROM_EMAIL;
+const sesConfigSet = process.env.SES_CONFIGURATION_SET;
+
+const sesClient = sesRegion
+  ? new SESClient({ region: sesRegion })
+  : null;
+
+async function findMemberIdByEmail(courseId: number | null | undefined, email: string) {
+  if (!courseId) return null;
+  const [rows] = await pool.query<any[]>(
+    "SELECT member_id FROM memberMain WHERE course_id = ? AND email = ? LIMIT 1",
+    [courseId, email]
+  );
+  return rows?.[0]?.member_id ?? null;
+}
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function sendInviteEmail({
+  to,
+  inviteUrl,
+  courseName,
+}: {
+  to: string;
+  inviteUrl: string;
+  courseName: string;
+}) {
+  if (!sesClient) throw new Error("SES_REGION not configured");
+  if (!sesFromEmail) throw new Error("SES_FROM_EMAIL not configured");
+
+  const subject = `You're invited to ${courseName}`;
+  const text = `You have been invited to ${courseName} on MemberGolf.\n\nOpen this link to create your account:\n${inviteUrl}\n\nThis link expires in 7 days.`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.4;">
+      <h2>You're invited to ${courseName}</h2>
+      <p>You have been invited to ${courseName} on MemberGolf.</p>
+      <p><a href="${inviteUrl}">Create your account</a></p>
+      <p>This link expires in 7 days.</p>
+    </div>
+  `;
+
+  const command = new SendEmailCommand({
+    Destination: { ToAddresses: [to] },
+    Message: {
+      Subject: { Data: subject },
+      Body: {
+        Text: { Data: text },
+        Html: { Data: html },
+      },
+    },
+    Source: sesFromEmail,
+    ConfigurationSetName: sesConfigSet || undefined,
+  });
+
+  await sesClient.send(command);
+}
+
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env var: ${name}`);
@@ -254,6 +315,7 @@ type JwtPayload = {
   userId: number;
   email: string;
   courseId?: number | null;
+  memberId?: number | null;
   isAdmin?: boolean;
   adminYn?: number | null;
   globalYn?: number | null;
@@ -365,6 +427,196 @@ app.delete("/items/:id", async (req, res) => {
   res.status(204).send();
 });
 
+app.post("/auth/register", async (req, res) => {
+  const schema = z.object({
+    email: z.string().email().max(255),
+    password: z.string().min(8).max(72),
+    first_name: z.string().max(100).optional().nullable(),
+    last_name: z.string().max(100).optional().nullable(),
+    course_id: z.number().int().positive(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const email = parsed.data.email.toLowerCase().trim();
+  const courseId = parsed.data.course_id;
+
+  const memberId = await findMemberIdByEmail(courseId, email);
+  if (!memberId) {
+    return res.status(400).json({ error: "Email not found for this course" });
+  }
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+
+  try {
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      "INSERT INTO users (email, password_hash, first_name, last_name, course_id) VALUES (?, ?, ?, ?, ?)",
+      [
+        email,
+        passwordHash,
+        parsed.data.first_name ?? null,
+        parsed.data.last_name ?? null,
+        courseId,
+      ]
+    );
+
+    const token = jwt.sign(
+      {
+        userId: result.insertId,
+        email,
+        courseId,
+        memberId,
+        isAdmin: false,
+        adminYn: 0,
+        globalYn: 0,
+      },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.status(201).json({
+      token,
+      user: {
+        id: result.insertId,
+        email,
+        firstName: parsed.data.first_name ?? null,
+        lastName: parsed.data.last_name ?? null,
+        courseId,
+        memberId,
+        isAdmin: false,
+        adminYn: 0,
+        globalYn: 0,
+      },
+    });
+  } catch (err: any) {
+    if (String(err?.code) === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/auth/invite", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const schema = z.object({
+      email: z.string().email().max(255),
+      course_id: z.number().int().positive().optional().nullable(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const email = parsed.data.email.toLowerCase().trim();
+    const courseId = isGlobal(payload) ? parsed.data.course_id ?? null : payload.courseId ?? null;
+    if (!courseId) return res.status(400).json({ error: "Missing course_id" });
+
+    const memberId = await findMemberIdByEmail(courseId, email);
+    if (!memberId) return res.status(404).json({ error: "Member email not found" });
+
+    const token = randomBytes(32).toString("base64url");
+    const tokenHash = hashToken(token);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    await pool.execute(
+      `INSERT INTO memberInvite (course_id, member_id, email, token_hash, expires_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [courseId, memberId, email, tokenHash, expiresAt]
+    );
+
+    const baseUrl = process.env.INVITE_BASE_URL ?? "membergolf://invite";
+    const inviteUrl = `${baseUrl}${baseUrl.includes("?") ? "&" : "?"}token=${token}`;
+
+    const [courseRows] = await pool.query<any[]>(
+      "SELECT coursename FROM courseMain WHERE course_id = ? LIMIT 1",
+      [courseId]
+    );
+    const courseName = courseRows?.[0]?.coursename ?? "your course";
+
+    await sendInviteEmail({ to: email, inviteUrl, courseName });
+
+    res.status(201).json({ token, inviteUrl, expiresAt });
+  } catch (err) {
+    console.error("invite create error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/auth/invite/accept", async (req, res) => {
+  const schema = z.object({
+    token: z.string().min(10),
+    password: z.string().min(8).max(72),
+    first_name: z.string().max(100).optional().nullable(),
+    last_name: z.string().max(100).optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const tokenHash = hashToken(parsed.data.token);
+
+  const [invites] = await pool.query<any[]>(
+    `SELECT invite_id, course_id, member_id, email, expires_at, used_at
+     FROM memberInvite
+     WHERE token_hash = ?
+     LIMIT 1`,
+    [tokenHash]
+  );
+  const invite = invites?.[0];
+  if (!invite) return res.status(400).json({ error: "Invalid invite" });
+  if (invite.used_at) return res.status(400).json({ error: "Invite already used" });
+  if (invite.expires_at && new Date(invite.expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: "Invite expired" });
+  }
+
+  const [existing] = await pool.query<any[]>(
+    "SELECT id FROM users WHERE email = ? LIMIT 1",
+    [invite.email]
+  );
+  if (existing.length) return res.status(409).json({ error: "Email already registered" });
+
+  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    "INSERT INTO users (email, password_hash, first_name, last_name, course_id) VALUES (?, ?, ?, ?, ?)",
+    [
+      invite.email,
+      passwordHash,
+      parsed.data.first_name ?? null,
+      parsed.data.last_name ?? null,
+      invite.course_id,
+    ]
+  );
+
+  await pool.execute("UPDATE memberInvite SET used_at = NOW() WHERE invite_id = ?", [invite.invite_id]);
+
+  const token = jwt.sign(
+    {
+      userId: result.insertId,
+      email: invite.email,
+      courseId: invite.course_id,
+      memberId: invite.member_id,
+      isAdmin: false,
+      adminYn: 0,
+      globalYn: 0,
+    },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+
+  res.status(201).json({
+    token,
+    user: {
+      id: result.insertId,
+      email: invite.email,
+      firstName: parsed.data.first_name ?? null,
+      lastName: parsed.data.last_name ?? null,
+      courseId: invite.course_id,
+      memberId: invite.member_id,
+      isAdmin: false,
+      adminYn: 0,
+      globalYn: 0,
+    },
+  });
+});
+
 app.post("/auth/login", async (req, res) => {
   const schema = z.object({
     email: z.string().email().max(255),
@@ -386,11 +638,14 @@ app.post("/auth/login", async (req, res) => {
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) return res.status(401).json({ error: "Invalid email or password" });
 
+  const memberId = await findMemberIdByEmail(user.course_id ?? null, user.email);
+
   const token = jwt.sign(
     {
       userId: user.id,
       email: user.email,
       courseId: user.course_id ?? null,
+      memberId,
       isAdmin: isAdmin({ email: user.email, adminYn: user.admin_yn }),
       adminYn: user.admin_yn ?? 0,
       globalYn: user.global_yn ?? 0,
@@ -407,6 +662,7 @@ app.post("/auth/login", async (req, res) => {
       firstName: user.first_name ?? null,
       lastName: user.last_name ?? null,
       courseId: user.course_id ?? null,
+      memberId,
       isAdmin: isAdmin({ email: user.email, adminYn: user.admin_yn }),
       adminYn: user.admin_yn ?? 0,
       globalYn: user.global_yn ?? 0,
@@ -424,6 +680,8 @@ app.get("/me", authMiddleware, async (req, res) => {
     const row = rows[0];
     if (!row) return res.status(401).json({ error: "Invalid token" });
 
+    const memberId = await findMemberIdByEmail(row.course_id ?? null, row.email ?? payload.email);
+
     res.json({
       user: {
         userId: row.id,
@@ -431,6 +689,7 @@ app.get("/me", authMiddleware, async (req, res) => {
         firstName: row.first_name ?? null,
         lastName: row.last_name ?? null,
         courseId: row.course_id ?? null,
+        memberId,
         isAdmin: isAdmin({ ...payload, email: row.email, adminYn: row.admin_yn }),
         adminYn: row.admin_yn ?? 0,
         globalYn: row.global_yn ?? 0,
@@ -881,8 +1140,8 @@ app.get("/members/:id", authMiddleware, async (req, res) => {
 
     const [members] = await pool.query<any[]>(
       payload?.courseId && !isGlobal(payload)
-        ? "SELECT member_id, course_id, firstname, lastname, rhandicap AS handicap, handicap18 FROM memberMain WHERE course_id = ? AND member_id = ? LIMIT 1"
-        : "SELECT member_id, course_id, firstname, lastname, rhandicap AS handicap, handicap18 FROM memberMain WHERE member_id = ? LIMIT 1",
+        ? "SELECT member_id, course_id, firstname, lastname, email, rhandicap AS handicap, handicap18 FROM memberMain WHERE course_id = ? AND member_id = ? LIMIT 1"
+        : "SELECT member_id, course_id, firstname, lastname, email, rhandicap AS handicap, handicap18 FROM memberMain WHERE member_id = ? LIMIT 1",
       payload?.courseId && !isGlobal(payload) ? [payload.courseId, memberId] : [memberId]
     );
     const member = members?.[0];
@@ -943,6 +1202,66 @@ app.get("/members/:id", authMiddleware, async (req, res) => {
     console.error("member detail error", err);
     res.status(500).json({ error: "Server error" });
   }
+});
+
+app.put("/members/:id", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const schema = z.object({
+    firstname: z.string().min(1).max(50).optional(),
+    lastname: z.string().min(1).max(50).optional(),
+    email: z.string().email().max(255).optional().nullable(),
+    handicap: z.number().optional().nullable(),
+    handicap18: z.number().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const [rows] = await pool.query<any[]>(
+    "SELECT member_id, course_id FROM memberMain WHERE member_id = ? LIMIT 1",
+    [id]
+  );
+  const member = rows?.[0];
+  if (!member) return res.status(404).json({ error: "Not found" });
+  if (!isGlobal(payload) && member.course_id !== payload.courseId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (parsed.data.firstname !== undefined) {
+    fields.push("firstname=?");
+    values.push(parsed.data.firstname.trim());
+  }
+  if (parsed.data.lastname !== undefined) {
+    fields.push("lastname=?");
+    values.push(parsed.data.lastname.trim());
+  }
+  if (parsed.data.email !== undefined) {
+    fields.push("email=?");
+    values.push(parsed.data.email ? parsed.data.email.toLowerCase().trim() : null);
+  }
+  if (parsed.data.handicap !== undefined) {
+    fields.push("rhandicap=?");
+    values.push(parsed.data.handicap ?? null);
+  }
+  if (parsed.data.handicap18 !== undefined) {
+    fields.push("handicap18=?");
+    values.push(parsed.data.handicap18 ?? null);
+  }
+
+  if (!fields.length) return res.status(400).json({ error: "No fields to update" });
+
+  values.push(id);
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    `UPDATE memberMain SET ${fields.join(", ")} WHERE member_id = ?`,
+    values
+  );
+  if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ id });
 });
 
 app.get("/api/events/:id/winnings", authMiddleware, async (req, res) => {
@@ -1297,6 +1616,7 @@ app.post("/members", authMiddleware, async (req, res) => {
   const schema = z.object({
     firstname: z.string().min(1).max(50),
     lastname: z.string().min(1).max(50),
+    email: z.string().email().max(255).optional().nullable(),
     handicap: z.number().optional().nullable(),
     handicap18: z.number().optional().nullable(),
   });
@@ -1305,11 +1625,12 @@ app.post("/members", authMiddleware, async (req, res) => {
 
   try {
     const [result] = await pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO memberMain (course_id, firstname, lastname, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO memberMain (course_id, firstname, lastname, email, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?, ?)",
       [
         payload.courseId,
         parsed.data.firstname.trim(),
         parsed.data.lastname.trim(),
+        parsed.data.email ? parsed.data.email.toLowerCase().trim() : null,
         parsed.data.handicap ?? null,
         parsed.data.handicap18 ?? null,
       ]

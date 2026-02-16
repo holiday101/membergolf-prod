@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { publicFetch } from "../../api/public";
 
 export default function PublicShell() {
   const { courseId } = useParams();
+  const location = useLocation();
   const base = `/public/${courseId}`;
+  const isCalendarRoute = location.pathname === base;
   const desktopInit =
     typeof window !== "undefined" && window.matchMedia("(min-width: 900px)").matches;
   const [drawerOpen, setDrawerOpen] = useState(desktopInit);
@@ -43,6 +45,13 @@ export default function PublicShell() {
     };
   }, [userToggled]);
 
+  // Auto-close drawer on navigation for mobile
+  useEffect(() => {
+    if (!isDesktop) {
+      setDrawerOpen(false);
+    }
+  }, [location.pathname, isDesktop]);
+
   useEffect(() => {
     if (!courseId) return;
     (async () => {
@@ -79,6 +88,14 @@ export default function PublicShell() {
     document.title = courseName?.trim() || "Member Golf Online";
   }, [courseName]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.classList.toggle("public-calendar-full", isCalendarRoute);
+    return () => {
+      document.body.classList.remove("public-calendar-full");
+    };
+  }, [isCalendarRoute]);
+
   function NavIcon({ name }: { name: "calendar" | "list" | "users" }) {
     switch (name) {
       case "calendar":
@@ -112,7 +129,7 @@ export default function PublicShell() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${drawerOpen ? "drawer-open" : "drawer-closed"}`}>
       <header className="topbar">
         <div className="topbar-inner">
           <button
@@ -230,6 +247,7 @@ export default function PublicShell() {
 
         * { box-sizing: border-box; }
         body { margin: 0; }
+        body.public-calendar-full { overflow: hidden; }
         .app { min-height: 100vh; background: var(--bg); color: var(--text); }
         .app {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -386,6 +404,7 @@ export default function PublicShell() {
         @media (min-width: 900px) {
           .overlay { display: none; }
           .app { grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; }
+          .app.drawer-closed { grid-template-columns: 1fr; }
           .topbar { grid-column: 1 / -1; }
           .drawer {
             position: sticky;
@@ -397,6 +416,7 @@ export default function PublicShell() {
           }
           .drawer:not(.open) { display: none; }
           .content { grid-column: 2; }
+          .app.drawer-closed .content { grid-column: 1 / -1; }
         }
         @media (max-width: 899px) {
           .app { grid-template-columns: 1fr; }

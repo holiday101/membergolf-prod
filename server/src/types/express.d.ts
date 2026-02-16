@@ -5,6 +5,7 @@ declare global {
     interface User {
       id: number;
       courseId?: number | null;
+      memberId?: number | null;
     }
     interface Request {
       user?: User;
