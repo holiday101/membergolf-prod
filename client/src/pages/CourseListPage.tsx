@@ -472,7 +472,9 @@ export default function CourseListPage() {
                 </div>
                 {courses.map((c) => (
                   <div key={c.course_id} className="tableRow">
-                    <span>{c.coursename ?? "—"}</span>
+                    <span>
+                      {c.coursename ?? "—"} {c.course_id ? ` (Course ID: ${c.course_id})` : ""}
+                    </span>
                     <button className="btn small" onClick={() => beginEdit(c)}>
                       Edit
                     </button>
