@@ -262,7 +262,7 @@ export default function CourseListPage() {
           <section className="card">
             <div className="form">
               <label className="formLabel">
-                Course Name
+                Course Name {editingId ? `ID:${editingId}` : ""}
                 <input
                   value={form.coursename}
                   onChange={(e) => setField("coursename", e.target.value)}
@@ -467,17 +467,30 @@ export default function CourseListPage() {
             ) : (
               <div className="table">
                 <div className="tableHead">
+                  <span>ID</span>
                   <span>Name</span>
-                  <span></span>
                 </div>
                 {courses.map((c) => (
-                  <div key={c.course_id} className="tableRow">
-                    <span>
-                      {c.coursename ?? "—"} {c.course_id ? ` (Course ID: ${c.course_id})` : ""}
+                  <div
+                    key={c.course_id}
+                    className="tableRow clickable"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => beginEdit(c)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        beginEdit(c);
+                      }
+                    }}
+                  >
+                    <span className="courseIdCell">{c.course_id ?? ""}</span>
+                    <span className="courseName">
+                      <span>{c.coursename ?? "—"}</span>
+                      <span className="editIconBtn inline" aria-hidden="true">
+                        ✎
+                      </span>
                     </span>
-                    <button className="btn small" onClick={() => beginEdit(c)}>
-                      Edit
-                    </button>
                   </div>
                 ))}
               </div>
@@ -588,9 +601,28 @@ export default function CourseListPage() {
         .filterRow { display: grid; gap: 6px; justify-items: center; margin: 0 0 6px; }
         .filterTitle { font-size: 15px; color: #6b7280; font-weight: 600; }
         .table { display: grid; gap: 8px; margin-top: 20px; }
-        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr auto; align-items: center; }
+        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 72px 1fr; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
+        .courseIdCell { font-size: 11px; color: #6b7280; }
+        .tableRow.clickable { cursor: pointer; }
+        .tableRow.clickable:hover { background: #f7f8fb; }
+        .tableRow.clickable:focus { outline: 2px solid #93c5fd; outline-offset: 2px; }
+        .courseName { display: inline-flex; align-items: center; gap: 8px; justify-content: space-between; width: 100%; }
+        .editIconBtn {
+          border: 1px solid #d1d5db;
+          background: #fff;
+          width: 26px;
+          height: 26px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .editIconBtn.inline { width: 22px; height: 22px; border-radius: 6px; }
+        .editIconBtn:hover { background: #f7f8fb; }
       `}</style>
     </div>
   );
