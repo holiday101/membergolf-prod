@@ -23,11 +23,12 @@ import PublicEventListPage from "./pages/PublicEventListPage";
 import PublicMemberListPage from "./pages/PublicMemberListPage";
 import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
+import MarketingPage from "./pages/MarketingPage";
 
 import AppShell from "./components/AppShell";
 
 function HomeRedirect() {
-  return <Navigate to={getToken() ? "/calendar" : "/login"} replace />;
+  return getToken() ? <Navigate to="/calendar" replace /> : <MarketingPage />;
 }
 
 function LoginRedirect() {

@@ -158,7 +158,12 @@ export default function PublicMemberDetailPage() {
       {data ? (
         <div className="grid">
           <section className="card">
-            <h2>{fullName}</h2>
+            <h2>
+              {fullName}{" "}
+              <span style={{ fontWeight: 500, color: "#6b7280" }}>
+                ({formatHandicap(data.member.handicap, true)})
+              </span>
+            </h2>
             <div className="stats">
               <div className="stat">
                 <div className="statLabel">9 Hole Handicap</div>

@@ -247,6 +247,24 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
   }
 });
 
+app.post("/public/lead", async (req, res) => {
+  try {
+    const schema = z.object({
+      name: z.string().min(1).max(120),
+      course: z.string().min(1).max(120),
+      email: z.string().email().max(255),
+      phone: z.string().min(1).max(50),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    await sendLeadEmail(parsed.data);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message ?? "Failed to send" });
+  }
+});
+
 const pool = mysql.createPool({
   host: process.env.DB_HOST ?? "localhost",
   port: Number(process.env.DB_PORT ?? 3306),
@@ -310,6 +328,49 @@ async function sendInviteEmail({
         Html: { Data: html },
       },
     },
+    Source: sesFromEmail,
+    ConfigurationSetName: sesConfigSet || undefined,
+  });
+
+  await sesClient.send(command);
+}
+
+async function sendLeadEmail({
+  name,
+  course,
+  email,
+  phone,
+}: {
+  name: string;
+  course: string;
+  email: string;
+  phone: string;
+}) {
+  if (!sesClient) throw new Error("SES_REGION not configured");
+  if (!sesFromEmail) throw new Error("SES_FROM_EMAIL not configured");
+
+  const subject = `New MemberGolf inquiry: ${course}`;
+  const text = `New inquiry\n\nName: ${name}\nCourse: ${course}\nEmail: ${email}\nPhone: ${phone}\n`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;line-height:1.4;">
+      <h2>New MemberGolf inquiry</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Course:</strong> ${course}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>Phone:</strong> ${phone}</p>
+    </div>
+  `;
+
+  const command = new SendEmailCommand({
+    Destination: { ToAddresses: [ADMIN_EMAIL] },
+    Message: {
+      Subject: { Data: subject },
+      Body: {
+        Text: { Data: text },
+        Html: { Data: html },
+      },
+    },
+    ReplyToAddresses: [email],
     Source: sesFromEmail,
     ConfigurationSetName: sesConfigSet || undefined,
   });
