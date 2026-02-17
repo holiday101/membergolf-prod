@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { apiFetch } from "../auth";
 
 type EventRow = {
@@ -54,7 +54,6 @@ function toInputDate(value: string | null | undefined) {
 
 export default function EditEventPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [nines, setNines] = useState<Nine[]>([]);
   const [loading, setLoading] = useState(true);
