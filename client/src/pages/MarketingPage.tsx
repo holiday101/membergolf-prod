@@ -213,20 +213,21 @@ export default function MarketingPage() {
           display: inline-flex;
           align-items: center;
           gap: 12px;
-          padding: 10px 14px;
-          border-radius: 14px;
+          padding: 12px 22px;
+          border-radius: 999px;
           background: #ffffff;
-          border: 1px solid #e2e8f0;
-          box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+          border: 1px solid #dbe7d7;
+          box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
         }
         .brand { display: flex; align-items: center; gap: 12px; }
-        .brandMark { width: 36px; height: 36px; }
+        .brandMark { width: 42px; height: 42px; }
         .brandText {
           font-weight: 800;
-          letter-spacing: 0.02em;
-          font-size: 20px;
+          letter-spacing: 0;
+          font-size: 22px;
           line-height: 1.1;
           color: #1f8a5b;
+          font-family: "Cormorant Garamond", "Manrope", system-ui, sans-serif;
         }
         .fontCormorant { font-family: "Cormorant Garamond", "Manrope", system-ui, sans-serif; }
         .loginBtn { text-decoration: none; font-weight: 600; color: #0f172a; border: 1px solid #dbe7d7; padding: 8px 14px; border-radius: 999px; background: #f7fbf6; transition: all 160ms ease; }

@@ -12,13 +12,19 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
 }
 
-export async function apiFetch(path: string, options: RequestInit = {}) {
+function buildApiUrl(path: string) {
   const base = import.meta.env.VITE_API_BASE ?? "/api";
+  const normalizedPath =
+    base.endsWith("/api") && path.startsWith("/api") ? path.slice(4) || "/" : path;
+  return `${base}${normalizedPath}`;
+}
+
+export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = getToken();
 
   const headers = new Headers(options.headers || {});
   if (!headers.has("Content-Type") && options.body) headers.set("Content-Type", "application/json");
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  return fetch(`${base}${path}`, { ...options, headers });
+  return fetch(buildApiUrl(path), { ...options, headers });
 }

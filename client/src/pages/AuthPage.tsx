@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch, clearToken, getToken, setToken } from "../auth";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 type Me = { user: { userId: number; email: string } };
 
@@ -66,7 +67,7 @@ export default function App() {
   return (
     <div className="page">
       <main className="card">
-        <div className="cardHeaderBubble">
+        <Link className="cardHeaderBubble" to="/">
           <svg viewBox="0 0 120 120" aria-hidden="true" className="brandMark">
             <defs>
               <linearGradient id="mgo-gradient" x1="0" y1="0" x2="1" y2="1">
@@ -91,7 +92,7 @@ export default function App() {
           <div className="brandText">Member Golf Online</div>
           <div className="divider" />
           <div className="cardTitle">Course Login</div>
-        </div>
+        </Link>
         {loggedIn ? (
           <button className="softBtn" onClick={logout}>
             Log out
@@ -157,18 +158,20 @@ export default function App() {
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
-    border-radius: 14px;
+    padding: 12px 22px;
+    border-radius: 999px;
     background: #ffffff;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    border: 1px solid #dbe7d7;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
     margin: 0 auto 16px;
+    text-decoration: none;
+    color: #0f172a;
   }
-  .brandMark { width: 36px; height: 36px; }
+  .brandMark { width: 42px; height: 42px; }
   .brandText {
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+    font-size: 22px;
     line-height: 1.1;
     font-family: "Cormorant Garamond", "Manrope", system-ui, sans-serif;
     color: #1f8a5b;
@@ -204,6 +207,7 @@ export default function App() {
     font-weight: 700;
     text-align: center;
     white-space: nowrap;
+    color: #0f172a;
   }
 
   .form {
