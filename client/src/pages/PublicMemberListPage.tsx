@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 
@@ -21,6 +21,11 @@ export default function PublicMemberListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -53,6 +58,7 @@ export default function PublicMemberListPage() {
       <div className="listHeader">
         <h2>Members</h2>
         <input
+          ref={searchRef}
           className="search"
           placeholder="Search members…"
           value={query}
