@@ -61,10 +61,22 @@ export default function CourseListPage() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [isGlobal, setIsGlobal] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive">("active");
   const leagueInfoRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
 
   const isEditing = editingId !== null;
+  const sortedCourses = [...courses].sort((a, b) => {
+    const aActive = a.active_yn ?? 0;
+    const bActive = b.active_yn ?? 0;
+    if (aActive !== bActive) return bActive - aActive;
+    const aName = (a.coursename ?? "").toLowerCase();
+    const bName = (b.coursename ?? "").toLowerCase();
+    return aName.localeCompare(bName);
+  });
+  const visibleCourses = sortedCourses.filter((course) =>
+    statusFilter === "active" ? (course.active_yn ?? 0) === 1 : (course.active_yn ?? 0) === 0
+  );
 
   async function loadData() {
     setLoading(true);
@@ -461,6 +473,22 @@ export default function CourseListPage() {
           <section className="card">
             <div className="filterRow">
               <div className="filterTitle">Courses</div>
+              <div className="filterToggle">
+                <button
+                  type="button"
+                  className={`btn small ${statusFilter === "active" ? "primary" : ""}`}
+                  onClick={() => setStatusFilter("active")}
+                >
+                  Active
+                </button>
+                <button
+                  type="button"
+                  className={`btn small ${statusFilter === "inactive" ? "primary" : ""}`}
+                  onClick={() => setStatusFilter("inactive")}
+                >
+                  Inactive
+                </button>
+              </div>
             </div>
             {loading ? (
               <div className="muted">Loading…</div>
@@ -470,7 +498,7 @@ export default function CourseListPage() {
                   <span>ID</span>
                   <span>Name</span>
                 </div>
-                {courses.map((c) => (
+                {visibleCourses.map((c) => (
                   <div
                     key={c.course_id}
                     className="tableRow clickable"
@@ -600,6 +628,7 @@ export default function CourseListPage() {
         .muted { color: #6b7280; font-size: 12px; }
         .filterRow { display: grid; gap: 6px; justify-items: center; margin: 0 0 6px; }
         .filterTitle { font-size: 15px; color: #6b7280; font-weight: 600; }
+        .filterToggle { display: inline-flex; gap: 6px; }
         .table { display: grid; gap: 8px; margin-top: 20px; }
         .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 72px 1fr; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }

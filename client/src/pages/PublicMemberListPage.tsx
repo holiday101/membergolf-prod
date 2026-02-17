@@ -88,23 +88,30 @@ export default function PublicMemberListPage() {
       </div>
       <style>{`
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        h2 { margin: 0; font-size: 16px; }
-        .listHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        h2 { margin: 0; font-size: 15px; font-weight: 700; }
+        .listHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
         .search {
-          padding: 6px 10px;
+          padding: 4px 8px;
           border-radius: 8px;
-          border: 1px solid #d1d5db;
+          border: 1px solid #e5e7eb;
           font-size: 12px;
           min-width: 220px;
+          background: #fff;
         }
-        .list { display: grid; gap: 2px; }
-        .row { display: flex; justify-content: space-between; padding: 2px 6px; line-height: 1.2; color: #6b7280; }
-        .row:nth-child(even) { background: #f0f7ff; }
-        .row.header { font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
-        .linkRow { text-decoration: none; border-radius: 6px; cursor: pointer; }
+        .list { display: grid; gap: 6px; }
+        .row { display: grid; grid-template-columns: 1.6fr 0.6fr; gap: 8px; align-items: center; }
+        .row.header {
+          font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+          color: #9ca3af; font-weight: 600;
+        }
+        .linkRow {
+          text-decoration: none; border-radius: 10px; cursor: pointer;
+          background: #f9fafb; padding: 6px 8px; color: #374151; font-size: 12px;
+        }
+        .linkRow:nth-child(even) { background: #f0f7ff; }
         .linkRow:hover { background: #e0f2fe; }
-        .name { font-weight: 600; font-size: 12px; }
-        .handicap { font-size: 11px; }
+        .name { font-weight: 500; color: #111827; }
+        .handicap { font-size: 12px; }
       `}</style>
     </div>
   );
