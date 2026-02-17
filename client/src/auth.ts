@@ -13,7 +13,8 @@ export function clearToken() {
 }
 
 function buildApiUrl(path: string) {
-  const base = import.meta.env.VITE_API_BASE ?? "/api";
+  const rawBase = import.meta.env.VITE_API_BASE ?? "/api";
+  const base = rawBase.replace(/\/+$/, "");
   const normalizedPath =
     base.endsWith("/api") && path.startsWith("/api") ? path.slice(4) || "/" : path;
   return `${base}${normalizedPath}`;
