@@ -148,7 +148,7 @@ app.get("/public/:courseId/course", async (req, res) => {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
     const [rows] = await pool.query<any[]>(
-      "SELECT course_id, coursename, leagueinfo, logo, titlesponsor, website, titlesponsor_link FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT course_id, coursename, leagueinfo, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn FROM courseMain WHERE course_id = ? LIMIT 1",
       [courseId]
     );
     const course = rows?.[0];
@@ -156,6 +156,22 @@ app.get("/public/:courseId/course", async (req, res) => {
     const logo_url = course.logo ? await presignGet(course.logo) : null;
     const titlesponsor_url = course.titlesponsor ? await presignGet(course.titlesponsor) : null;
     res.json({ ...course, logo_url, titlesponsor_url });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/course", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+    const [rows] = await pool.query<any[]>(
+      "SELECT course_id, coursename, decimalhandicap_yn FROM courseMain WHERE course_id = ? LIMIT 1",
+      [payload.courseId]
+    );
+    const course = rows?.[0];
+    if (!course) return res.status(404).json({ error: "Not found" });
+    res.json(course);
   } catch {
     res.status(500).json({ error: "Server error" });
   }

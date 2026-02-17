@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../auth";
+import { formatHandicap } from "../utils/formatHandicap";
 
 type Round = {
   card_id: number;
@@ -56,12 +57,6 @@ function formatDate(value: string | null) {
   return dt.toLocaleDateString();
 }
 
-function formatHandicap(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  if (Number.isNaN(Number(value))) return "—";
-  return Number(value).toFixed(2);
-}
-
 function formatAverage(value: number | null) {
   if (value === null || value === undefined) return "—";
   if (Number.isNaN(Number(value))) return "—";
@@ -110,6 +105,23 @@ export default function MemberDetailPage() {
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+
+  useEffect(() => {
+    const loadCourseSettings = async () => {
+      try {
+        const res = await apiFetch("/course");
+        if (!res.ok) return;
+        const settings = await res.json();
+        if (settings?.decimalhandicap_yn === 0 || settings?.decimalhandicap_yn === 1) {
+          setDecimalHandicapEnabled(settings.decimalhandicap_yn === 1);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadCourseSettings();
+  }, []);
 
   useEffect(() => {
     const run = async () => {
@@ -262,11 +274,15 @@ export default function MemberDetailPage() {
             <div className="stats">
               <div className="stat">
                 <div className="statLabel">9 Hole Handicap</div>
-                <div className="statValue">{formatHandicap(data.member.handicap)}</div>
+                <div className="statValue">
+                  {formatHandicap(data.member.handicap, decimalHandicapEnabled)}
+                </div>
               </div>
               <div className="stat">
                 <div className="statLabel">18 Hole Handicap</div>
-                <div className="statValue">{formatHandicap(data.member.handicap18)}</div>
+                <div className="statValue">
+                  {formatHandicap(data.member.handicap18, decimalHandicapEnabled)}
+                </div>
               </div>
             </div>
           </section>

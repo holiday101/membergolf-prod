@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../auth";
+import { formatHandicap } from "../utils/formatHandicap";
 
 type Member = {
   member_id: number;
@@ -8,12 +9,6 @@ type Member = {
   lastname: string | null;
   handicap: number | null;
 };
-
-function formatHandicap(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  if (Number.isNaN(Number(value))) return "—";
-  return Number(value).toFixed(2);
-}
 
 export default function MemberListPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -27,7 +22,24 @@ export default function MemberListPage() {
   const [handicap18, setHandicap18] = useState("");
   const [sendInvite, setSendInvite] = useState(false);
   const [query, setQuery] = useState("");
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const loadCourseSettings = async () => {
+      try {
+        const res = await apiFetch("/course");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
+          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadCourseSettings();
+  }, []);
 
   const loadMembers = async () => {
     setLoading(true);
@@ -141,7 +153,9 @@ export default function MemberListPage() {
                 <div className="name">
                   {(m.lastname || "").trim()}, {(m.firstname || "").trim()}
                 </div>
-                <div className="handicap">{formatHandicap(m.handicap)}</div>
+                <div className="handicap">
+                  {formatHandicap(m.handicap, decimalHandicapEnabled)}
+                </div>
                 <div className="actionsCol">
                   <button
                     className="iconBtn"

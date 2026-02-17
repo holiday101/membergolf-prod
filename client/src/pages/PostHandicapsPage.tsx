@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiFetch } from "../auth";
+import { formatHandicap } from "../utils/formatHandicap";
 
 type HandicapRow = {
   member_id: number;
@@ -10,12 +11,6 @@ type HandicapRow = {
   rhandicap18: number | null;
 };
 
-function formatHandicap(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  if (Number.isNaN(Number(value))) return "—";
-  return Number(value).toFixed(2);
-}
-
 export default function PostHandicapsPage() {
   const { id } = useParams();
   const [eventName, setEventName] = useState<string | null>(null);
@@ -24,6 +19,23 @@ export default function PostHandicapsPage() {
   const [error, setError] = useState("");
   const [ran, setRan] = useState(false);
   const [lastPosted, setLastPosted] = useState<string | null>(null);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+
+  useEffect(() => {
+    const loadCourseSettings = async () => {
+      try {
+        const res = await apiFetch("/course");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
+          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadCourseSettings();
+  }, []);
 
   const loadEvent = async () => {
     if (!id) return;
@@ -119,8 +131,8 @@ export default function PostHandicapsPage() {
                 <span>
                   {(r.lastname || "").trim()}, {(r.firstname || "").trim()}
                 </span>
-                <span>{formatHandicap(r.rhandicap)}</span>
-                <span>{formatHandicap(r.rhandicap18)}</span>
+                <span>{formatHandicap(r.rhandicap, decimalHandicapEnabled)}</span>
+                <span>{formatHandicap(r.rhandicap18, decimalHandicapEnabled)}</span>
               </div>
             ))}
             {!rows.length ? <div className="muted">No rows returned.</div> : null}

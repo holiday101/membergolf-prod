@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
+import { formatHandicap } from "../utils/formatHandicap";
 
 type Member = {
   member_id: number;
@@ -9,12 +10,6 @@ type Member = {
   handicap: number | null;
 };
 
-function formatHandicap(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  if (Number.isNaN(Number(value))) return "—";
-  return Number(value).toFixed(2);
-}
-
 export default function PublicMemberListPage() {
   const { courseId } = useParams();
   const [members, setMembers] = useState<Member[]>([]);
@@ -22,6 +17,7 @@ export default function PublicMemberListPage() {
   const [error, setError] = useState<string>("");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -41,6 +37,21 @@ export default function PublicMemberListPage() {
       }
     };
     run();
+  }, [courseId]);
+
+  useEffect(() => {
+    const loadCourseSettings = async () => {
+      if (!courseId) return;
+      try {
+        const data = await publicFetch<any>(`/public/${courseId}/course`);
+        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
+          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadCourseSettings();
   }, [courseId]);
 
   const filteredMembers = members.filter((m) => {
@@ -82,7 +93,9 @@ export default function PublicMemberListPage() {
             <div className="name">
               {(m.lastname || "").trim()}, {(m.firstname || "").trim()}
             </div>
-            <div className="handicap">{formatHandicap(m.handicap)}</div>
+            <div className="handicap">
+              {formatHandicap(m.handicap, decimalHandicapEnabled)}
+            </div>
           </Link>
         ))}
       </div>
