@@ -105,7 +105,7 @@ export default function MemberDetailPage() {
   const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
-  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
 
   useEffect(() => {
     const loadCourseSettings = async () => {
@@ -113,9 +113,7 @@ export default function MemberDetailPage() {
         const res = await apiFetch("/course");
         if (!res.ok) return;
         const settings = await res.json();
-        if (settings?.decimalhandicap_yn === 0 || settings?.decimalhandicap_yn === 1) {
-          setDecimalHandicapEnabled(settings.decimalhandicap_yn === 1);
-        }
+        setDecimalHandicapEnabled(settings?.decimalhandicap_yn === 1);
       } catch {
         // ignore
       }

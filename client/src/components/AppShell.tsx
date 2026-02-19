@@ -8,6 +8,7 @@ type Me = {
     email: string;
     courseId?: number | null;
     isAdmin?: boolean;
+    globalYn?: number | null;
     // If you later add these on the backend, it will “just work”
     firstName?: string | null;
     lastName?: string | null;
@@ -84,6 +85,7 @@ export default function AppShell() {
   const isEditEvent = Boolean(eventId || subEventEventId || eventQuery);
   const fromCalendar = Boolean((location as any)?.state?.fromCalendar);
   const isCalendarRoute = location.pathname === "/calendar";
+  const isGlobalUser = Boolean(me?.user?.globalYn === 1 || (!me?.user?.courseId && me?.user?.isAdmin));
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -129,6 +131,15 @@ export default function AppShell() {
 
 
   if (!token) return <Navigate to="/login" replace />;
+  if (!me) {
+    return <div style={{ padding: "24px" }}>Loading…</div>;
+  }
+  if (isGlobalUser) {
+    const blockedPrefixes = ["/calendar", "/events", "/members", "/rosters", "/subevents"];
+    if (blockedPrefixes.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))) {
+      return <Navigate to="/users" replace />;
+    }
+  }
 
   function logout() {
     clearToken();
@@ -175,24 +186,33 @@ export default function AppShell() {
       icon: "calendar" | "plus" | "users" | "list";
       disabled?: boolean;
     }>;
-  }> = [
-    {
-      to: "/calendar",
-      label: "Calendar",
-      icon: "calendar",
-      children: isEditEvent && fromCalendar ? eventActions : undefined,
-    },
-    {
-      to: "/events",
-      label: "Event List",
-      icon: "list",
-      children: isEditEvent && !fromCalendar ? eventActions : undefined,
-    },
-    { to: "/members", label: "Members", icon: "users" },
-    { to: "/rosters", label: "Rosters", icon: "list" },
-  ];
-  if (me?.user.isAdmin) navItems.push({ to: "/users", label: "Users", icon: "users" });
-  if (me?.user.isAdmin) {
+  }> = isGlobalUser
+    ? [
+        { to: "/users", label: "Users", icon: "users" },
+        {
+          to: "/courses",
+          label: me?.user.courseId ? "Course Info" : "Courses",
+          icon: "list",
+        },
+      ]
+    : [
+        {
+          to: "/calendar",
+          label: "Calendar",
+          icon: "calendar",
+          children: isEditEvent && fromCalendar ? eventActions : undefined,
+        },
+        {
+          to: "/events",
+          label: "Event List",
+          icon: "list",
+          children: isEditEvent && !fromCalendar ? eventActions : undefined,
+        },
+        { to: "/members", label: "Members", icon: "users" },
+        { to: "/rosters", label: "Rosters", icon: "list" },
+      ];
+  if (!isGlobalUser && me?.user.isAdmin) navItems.push({ to: "/users", label: "Users", icon: "users" });
+  if (!isGlobalUser && me?.user.isAdmin) {
     navItems.push({
       to: "/courses",
       label: me?.user.courseId ? "Course Info" : "Courses",

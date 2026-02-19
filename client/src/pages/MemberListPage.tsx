@@ -22,7 +22,7 @@ export default function MemberListPage() {
   const [handicap18, setHandicap18] = useState("");
   const [sendInvite, setSendInvite] = useState(false);
   const [query, setQuery] = useState("");
-  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -31,9 +31,7 @@ export default function MemberListPage() {
         const res = await apiFetch("/course");
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
-          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
-        }
+        setDecimalHandicapEnabled(data?.decimalhandicap_yn === 1);
       } catch {
         // ignore
       }

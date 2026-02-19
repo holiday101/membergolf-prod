@@ -17,7 +17,7 @@ export default function PublicMemberListPage() {
   const [error, setError] = useState<string>("");
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement | null>(null);
-  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -44,9 +44,7 @@ export default function PublicMemberListPage() {
       if (!courseId) return;
       try {
         const data = await publicFetch<any>(`/public/${courseId}/course`);
-        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
-          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
-        }
+        setDecimalHandicapEnabled(data?.decimalhandicap_yn === 1);
       } catch {
         // ignore
       }

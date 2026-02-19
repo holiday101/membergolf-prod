@@ -99,7 +99,7 @@ export default function PublicMemberDetailPage() {
   const [data, setData] = useState<MemberDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -124,9 +124,7 @@ export default function PublicMemberDetailPage() {
       if (!courseId) return;
       try {
         const course = await publicFetch<any>(`/public/${courseId}/course`);
-        if (course?.decimalhandicap_yn === 0 || course?.decimalhandicap_yn === 1) {
-          setDecimalHandicapEnabled(course.decimalhandicap_yn === 1);
-        }
+        setDecimalHandicapEnabled(course?.decimalhandicap_yn === 1);
       } catch {
         // ignore
       }

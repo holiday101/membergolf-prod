@@ -19,7 +19,7 @@ export default function PostHandicapsPage() {
   const [error, setError] = useState("");
   const [ran, setRan] = useState(false);
   const [lastPosted, setLastPosted] = useState<string | null>(null);
-  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(true);
+  const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
 
   useEffect(() => {
     const loadCourseSettings = async () => {
@@ -27,9 +27,7 @@ export default function PostHandicapsPage() {
         const res = await apiFetch("/course");
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.decimalhandicap_yn === 0 || data?.decimalhandicap_yn === 1) {
-          setDecimalHandicapEnabled(data.decimalhandicap_yn === 1);
-        }
+        setDecimalHandicapEnabled(data?.decimalhandicap_yn === 1);
       } catch {
         // ignore
       }

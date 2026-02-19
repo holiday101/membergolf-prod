@@ -108,6 +108,12 @@ export default function App() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
               />
             </label>
 
@@ -120,6 +126,12 @@ export default function App() {
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 autoComplete="current-password"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
               />
             </label>
 
