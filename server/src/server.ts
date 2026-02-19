@@ -897,12 +897,12 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
   res.json({ id });
 });
 
-app.post("/courses/manage/:id/assets/presign", authMiddleware, requireAdmin, async (req, res) => {
+app.post("/courses/manage/:id/assets/presign", authMiddleware, async (req, res) => {
   try {
     const payload = (req as any).user as JwtPayload;
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
-    if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+    if (!isAdmin(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
 
     const schema = z.object({
       field: z.enum(["logo", "titlesponsor"]),
@@ -922,13 +922,13 @@ app.post("/courses/manage/:id/assets/presign", authMiddleware, requireAdmin, asy
   }
 });
 
-app.delete("/courses/manage/:id/assets/:field", authMiddleware, requireAdmin, async (req, res) => {
+app.delete("/courses/manage/:id/assets/:field", authMiddleware, async (req, res) => {
   try {
     const payload = (req as any).user as JwtPayload;
     const id = Number(req.params.id);
     const field = String(req.params.field);
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
-    if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+    if (!isAdmin(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
     if (!["logo", "titlesponsor"].includes(field)) {
       return res.status(400).json({ error: "Invalid field" });
     }
