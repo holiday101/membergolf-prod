@@ -39,6 +39,16 @@ function ymd(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+
+function toLocalDateNoTZ(value: string | null | undefined): Date {
+  if (!value) return new Date(NaN);
+  const datePart = value.slice(0, 10);
+  const [y, m, d] = datePart.split("-").map(Number);
+  if (!y || !m || !d) return new Date(NaN);
+  // Use local noon to avoid DST edge cases
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
+
 // Inclusive day iteration
 function eachDayInclusive(start: Date, end: Date): Date[] {
   const days: Date[] = [];
@@ -59,8 +69,8 @@ function bucketEventsByDay(events: CalendarEvent[], rangeStart: Date, rangeEnd: 
   const buckets = new Map<string, CalendarEvent[]>();
 
   for (const ev of events) {
-    const s = new Date(ev.start_dt);
-    const e = new Date(ev.end_dt);
+    const s = toLocalDateNoTZ(ev.start_dt);
+    const e = toLocalDateNoTZ(ev.end_dt);
 
     // clamp to visible range so we don't iterate extra days
     const clampStart = s < rangeStart ? rangeStart : s;
@@ -77,8 +87,8 @@ function bucketEventsByDay(events: CalendarEvent[], rangeStart: Date, rangeEnd: 
   // optional: sort inside each day by start time then id
   for (const [k, arr] of buckets.entries()) {
     arr.sort((a, b) => {
-      const da = new Date(a.start_dt).getTime();
-      const db = new Date(b.start_dt).getTime();
+      const da = toLocalDateNoTZ(a.start_dt).getTime();
+      const db = toLocalDateNoTZ(b.start_dt).getTime();
       return da - db || a.id - b.id;
     });
     buckets.set(k, arr);
@@ -189,8 +199,8 @@ export default function CalendarMonth() {
 
               {dayEvents.map((ev) => (
                 (() => {
-                  const isStart = ymd(new Date(ev.start_dt)) === cell.key;
-                  const isEnd = ymd(new Date(ev.end_dt)) === cell.key;
+                  const isStart = ymd(toLocalDateNoTZ(ev.start_dt)) === cell.key;
+                  const isEnd = ymd(toLocalDateNoTZ(ev.end_dt)) === cell.key;
                   const colorIdx = colorIndexById.get(ev.id) ?? 0;
                   return (
                 <div
