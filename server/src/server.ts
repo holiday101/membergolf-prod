@@ -143,6 +143,56 @@ app.get("/public/:courseId/members", async (req, res) => {
   }
 });
 
+
+app.get("/public/:courseId/moneylist", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+    const yearParam = req.query.year;
+    const year =
+      yearParam === undefined || yearParam === null || yearParam === "" || yearParam === "all"
+        ? null
+        : Number(yearParam);
+    if (year !== null && !Number.isFinite(year)) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        m.member_id,
+        m.firstname,
+        m.lastname,
+        SUM(ml.amount) AS total_amount
+      FROM eventMoneyList ml
+      JOIN memberMain m ON m.member_id = ml.member_id
+      LEFT JOIN eventMain e ON e.event_id = ml.event_id
+      LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
+      LEFT JOIN eventMain e2 ON e2.event_id = se.event_id
+      WHERE m.course_id = ?
+        AND ml.amount <> 0
+        AND (
+          ? IS NULL
+          OR YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) = ?
+        )
+      GROUP BY m.member_id, m.firstname, m.lastname
+      ORDER BY total_amount DESC, lastname ASC, firstname ASC
+      `,
+      [courseId, year, year]
+    );
+
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        total_amount: row.total_amount !== null ? Number(row.total_amount) : 0,
+      }))
+    );
+  } catch (err) {
+    console.error("public money list error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/public/:courseId/course", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
@@ -194,7 +244,9 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
 
     const [nineRows] = await pool.query<any[]>(
       `
-        SELECT DISTINCT n.nine_id, n.ninename, n.numholes, n.startinghole
+        SELECT DISTINCT n.nine_id, n.ninename, n.numholes, n.startinghole,
+               n.hole1, n.hole2, n.hole3, n.hole4, n.hole5, n.hole6, n.hole7, n.hole8, n.hole9,
+               n.hole10, n.hole11, n.hole12, n.hole13, n.hole14, n.hole15, n.hole16, n.hole17, n.hole18
         FROM eventCard c
         LEFT JOIN courseNine n ON n.nine_id = c.nine_id
         WHERE c.course_id = ? AND c.member_id = ?
@@ -237,6 +289,24 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
         ninename: nine.ninename ?? null,
         numholes: nine.numholes ?? null,
         startinghole: nine.startinghole ?? null,
+        hole1: nine.hole1 ?? null,
+        hole2: nine.hole2 ?? null,
+        hole3: nine.hole3 ?? null,
+        hole4: nine.hole4 ?? null,
+        hole5: nine.hole5 ?? null,
+        hole6: nine.hole6 ?? null,
+        hole7: nine.hole7 ?? null,
+        hole8: nine.hole8 ?? null,
+        hole9: nine.hole9 ?? null,
+        hole10: nine.hole10 ?? null,
+        hole11: nine.hole11 ?? null,
+        hole12: nine.hole12 ?? null,
+        hole13: nine.hole13 ?? null,
+        hole14: nine.hole14 ?? null,
+        hole15: nine.hole15 ?? null,
+        hole16: nine.hole16 ?? null,
+        hole17: nine.hole17 ?? null,
+        hole18: nine.hole18 ?? null,
         rounds,
       });
     }
@@ -1226,7 +1296,9 @@ app.get("/members/:id", authMiddleware, async (req, res) => {
 
     const [nineRows] = await pool.query<any[]>(
       `
-        SELECT DISTINCT n.nine_id, n.ninename, n.numholes, n.startinghole
+        SELECT DISTINCT n.nine_id, n.ninename, n.numholes, n.startinghole,
+               n.hole1, n.hole2, n.hole3, n.hole4, n.hole5, n.hole6, n.hole7, n.hole8, n.hole9,
+               n.hole10, n.hole11, n.hole12, n.hole13, n.hole14, n.hole15, n.hole16, n.hole17, n.hole18
         FROM eventCard c
         LEFT JOIN courseNine n ON n.nine_id = c.nine_id
         WHERE c.course_id = ? AND c.member_id = ?
@@ -1270,6 +1342,24 @@ app.get("/members/:id", authMiddleware, async (req, res) => {
         ninename: nine.ninename ?? null,
         numholes: nine.numholes ?? null,
         startinghole: nine.startinghole ?? null,
+        hole1: nine.hole1 ?? null,
+        hole2: nine.hole2 ?? null,
+        hole3: nine.hole3 ?? null,
+        hole4: nine.hole4 ?? null,
+        hole5: nine.hole5 ?? null,
+        hole6: nine.hole6 ?? null,
+        hole7: nine.hole7 ?? null,
+        hole8: nine.hole8 ?? null,
+        hole9: nine.hole9 ?? null,
+        hole10: nine.hole10 ?? null,
+        hole11: nine.hole11 ?? null,
+        hole12: nine.hole12 ?? null,
+        hole13: nine.hole13 ?? null,
+        hole14: nine.hole14 ?? null,
+        hole15: nine.hole15 ?? null,
+        hole16: nine.hole16 ?? null,
+        hole17: nine.hole17 ?? null,
+        hole18: nine.hole18 ?? null,
         rounds,
       });
     }

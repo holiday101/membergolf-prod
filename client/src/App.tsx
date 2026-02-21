@@ -21,6 +21,7 @@ import PublicShell from "./components/Public/PublicShell";
 import PublicCalendarPage from "./pages/PublicCalendarPage";
 import PublicEventListPage from "./pages/PublicEventListPage";
 import PublicMemberListPage from "./pages/PublicMemberListPage";
+import PublicMoneyListPage from "./pages/PublicMoneyListPage";
 import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
 import MarketingPage from "./pages/MarketingPage";
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="events/:eventId" element={<PublicEventDetailPage />} />
         <Route path="members" element={<PublicMemberListPage />} />
         <Route path="members/:memberId" element={<PublicMemberDetailPage />} />
+        <Route path="moneylist" element={<PublicMoneyListPage />} />
       </Route>
 
       {/* Everything inside AppShell shows the global header/nav */}

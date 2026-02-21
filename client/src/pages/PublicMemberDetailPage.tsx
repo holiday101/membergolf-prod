@@ -45,6 +45,24 @@ type MemberDetail = {
     ninename: string | null;
     numholes: number | null;
     startinghole: number | null;
+    hole1?: number | null;
+    hole2?: number | null;
+    hole3?: number | null;
+    hole4?: number | null;
+    hole5?: number | null;
+    hole6?: number | null;
+    hole7?: number | null;
+    hole8?: number | null;
+    hole9?: number | null;
+    hole10?: number | null;
+    hole11?: number | null;
+    hole12?: number | null;
+    hole13?: number | null;
+    hole14?: number | null;
+    hole15?: number | null;
+    hole16?: number | null;
+    hole17?: number | null;
+    hole18?: number | null;
     rounds: Round[];
   }>;
 };
@@ -86,6 +104,36 @@ function getHoleValues(
     return labels.map((_, idx) => (round as any)[`hole${idx + 1}`]);
   }
   return labels.map((label) => (round as any)[`hole${label}`]);
+}
+
+function getParValues(
+  group: MemberDetail["groups"][number],
+  labels: number[],
+  numholes: number | null,
+  startinghole: number | null
+): Array<number | null | undefined> {
+  if (numholes === 9 && startinghole === 10) {
+    return labels.map((_, idx) => (group as any)[`hole${idx + 1}`]);
+  }
+  return labels.map((label) => (group as any)[`hole${label}`]);
+}
+
+function getScoreMeta(score: number | null | undefined, par: number | null | undefined) {
+  if (typeof score !== "number" || typeof par !== "number" || Number.isNaN(score) || Number.isNaN(par)) {
+    return { className: "holeCell", style: undefined, showEagle: false };
+  }
+  const diff = score - par;
+  if (diff === 0) return { className: "holeCell neutral", style: undefined, showEagle: false };
+  if (diff === -1) return { className: "holeCell birdie", style: undefined, showEagle: false };
+  if (diff <= -2) return { className: "holeCell eagle", style: undefined, showEagle: true };
+
+  if (diff >= 1) {
+    const bg = diff >= 4 ? "#1d4ed8" : diff === 3 ? "#3b82f6" : diff === 2 ? "#60a5fa" : "#93c5fd";
+    const color = diff >= 3 ? "#eff6ff" : "#0f172a";
+    return { className: "holeCell over", style: { background: bg, color }, showEagle: false };
+  }
+
+  return { className: "holeCell", style: undefined, showEagle: false };
 }
 
 function average(values: Array<number | null | undefined>) {
@@ -243,11 +291,20 @@ export default function PublicMemberDetailPage() {
                               gridTemplateColumns: `repeat(${group.numholes === 18 ? 18 : 9}, minmax(12px, 1fr))`,
                             }}
                           >
-                          {getHoleValues(round, holes, group.numholes, group.startinghole).map((score, idx) => (
-                            <div key={idx} className="holeCell">
-                              {score ?? "—"}
-                            </div>
-                          ))}
+                          {getHoleValues(round, holes, group.numholes, group.startinghole).map((score, idx) => {
+                            const parValues = getParValues(group, holes, group.numholes, group.startinghole);
+                            const meta = getScoreMeta(score, parValues[idx]);
+                            return (
+                              <div key={idx} className={meta.className} style={meta.style}>
+                                {meta.showEagle ? (
+                                  <span className="eagleIcon" aria-hidden="true">
+                                    🦅
+                                  </span>
+                                ) : null}
+                                <span className="holeValue">{score ?? "—"}</span>
+                              </div>
+                            );
+                          })}
                           </div>
                           <div className="roundScore">{round.gross ?? "—"}</div>
                           <div className="roundScore">{round.net ?? "—"}</div>
@@ -367,7 +424,25 @@ export default function PublicMemberDetailPage() {
           display: flex;
           align-items: center;
           justify-content: center;
+          position: relative;
+          overflow: hidden;
         }
+        .holeCell.neutral { background: #ffffff; }
+        .holeCell.birdie { background: #fee2e2; color: #991b1b; }
+        .holeCell.eagle { background: #ffffff; color: #991b1b; }
+        .holeCell.over { border-color: #bfdbfe; }
+        .eagleIcon {
+          color: #f97316;
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          opacity: 0.25;
+          z-index: 0;
+        }
+        .holeValue { position: relative; z-index: 1; }
         .holeCell:nth-child(even) { background: inherit; }
         .empty { color: #9ca3af; font-size: 12px; padding: 4px 0; }
 

@@ -19,11 +19,13 @@ export default function PublicShell() {
   const [courseWebsite, setCourseWebsite] = useState<string | null>(null);
   const [titleSponsorLink, setTitleSponsorLink] = useState<string | null>(null);
 
-  const navItems: Array<{ to: string; label: string; icon: "calendar" | "list" | "users" }> = [
+    const navItems: Array<{ to: string; label: string; icon: "calendar" | "list" | "users" | "money" }> = [
     { to: `${base}`, label: "Calendar", icon: "calendar" },
     { to: `${base}/events`, label: "Event List", icon: "list" },
     { to: `${base}/members`, label: "Members", icon: "users" },
+    { to: `${base}/moneylist`, label: "Money List", icon: "money" },
   ];
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -96,7 +98,7 @@ export default function PublicShell() {
     };
   }, [isCalendarRoute]);
 
-  function NavIcon({ name }: { name: "calendar" | "list" | "users" }) {
+  function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" }) {
     switch (name) {
       case "calendar":
         return (
@@ -121,6 +123,15 @@ export default function PublicShell() {
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M4 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm4-1h12a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Zm-4 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm4-1h12a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Zm-4 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm4-1h12a1 1 0 1 1 0 2H8a1 1 0 1 1 0-2Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "money":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm1 5h-2v1.2c-1.7.2-3 1.2-3 2.8 0 1.4 1 2.2 2.6 2.6l1.4.3c1 .2 1.4.6 1.4 1.2 0 .8-.8 1.3-1.9 1.3-1.1 0-1.9-.5-2-1.4H8c.1 1.7 1.3 2.7 3 2.9V17h2v-1.2c1.8-.2 3.1-1.2 3.1-2.8 0-1.5-1.1-2.2-2.6-2.6l-1.5-.3c-.9-.2-1.3-.6-1.3-1.1 0-.7.7-1.2 1.7-1.2s1.7.4 1.9 1.1h1.4C15.8 8.2 14.6 7.2 13 7V7Z"
               fill="currentColor"
             />
           </svg>
