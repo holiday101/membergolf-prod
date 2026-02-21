@@ -42,6 +42,15 @@ export default function PublicCalendarPage() {
     return out;
   }, [gridStart, gridEnd, cursor]);
 
+  function toLocalDateNoTZ(value: string | null | undefined): Date {
+    if (!value) return new Date(NaN);
+    const datePart = value.slice(0, 10);
+    const [y, m, d] = datePart.split('-').map(Number);
+    if (!y || !m || !d) return new Date(NaN);
+    return new Date(y, m - 1, d, 12, 0, 0, 0);
+  }
+
+
   useEffect(() => {
     if (!courseId) return;
     const cacheKey = `public_calendar_${courseId}`;
@@ -123,8 +132,8 @@ export default function PublicCalendarPage() {
               <span className={cell.inMonth ? "" : "day-muted"}>{cell.date.getDate()}</span>
             </div>
             {events.filter((e) => {
-              const sd = new Date(e.start_dt);
-              const ed = new Date(e.end_dt);
+              const sd = toLocalDateNoTZ(e.start_dt);
+              const ed = toLocalDateNoTZ(e.end_dt);
               const key = cell.key;
               const y = sd.getFullYear();
               const m = String(sd.getMonth() + 1).padStart(2, "0");
