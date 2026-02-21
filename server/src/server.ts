@@ -612,8 +612,7 @@ app.post("/auth/register", async (req, res) => {
         userId: result.insertId,
         email,
         courseId,
-        memberId,
-        isAdmin: false,
+          isAdmin: false,
         adminYn: 0,
         globalYn: 0,
       },
@@ -629,8 +628,7 @@ app.post("/auth/register", async (req, res) => {
         firstName: parsed.data.first_name ?? null,
         lastName: parsed.data.last_name ?? null,
         courseId,
-        memberId,
-        isAdmin: false,
+          isAdmin: false,
         adminYn: 0,
         globalYn: 0,
       },
@@ -785,14 +783,11 @@ app.post("/auth/login", async (req, res) => {
   const ok = await bcrypt.compare(parsed.data.password, user.password_hash);
   if (!ok) return res.status(401).json({ error: "Invalid email or password" });
 
-  const memberId = await findMemberIdByEmail(user.course_id ?? null, user.email);
-
   const token = jwt.sign(
     {
       userId: user.id,
       email: user.email,
       courseId: user.course_id ?? null,
-      memberId,
       isAdmin: isAdmin({ email: user.email, adminYn: user.admin_yn }),
       adminYn: user.admin_yn ?? 0,
       globalYn: user.global_yn ?? 0,
@@ -809,7 +804,6 @@ app.post("/auth/login", async (req, res) => {
       firstName: user.first_name ?? null,
       lastName: user.last_name ?? null,
       courseId: user.course_id ?? null,
-      memberId,
       isAdmin: isAdmin({ email: user.email, adminYn: user.admin_yn }),
       adminYn: user.admin_yn ?? 0,
       globalYn: user.global_yn ?? 0,
@@ -827,8 +821,6 @@ app.get("/me", authMiddleware, async (req, res) => {
     const row = rows[0];
     if (!row) return res.status(401).json({ error: "Invalid token" });
 
-    const memberId = await findMemberIdByEmail(row.course_id ?? null, row.email ?? payload.email);
-
     res.json({
       user: {
         userId: row.id,
@@ -836,8 +828,7 @@ app.get("/me", authMiddleware, async (req, res) => {
         firstName: row.first_name ?? null,
         lastName: row.last_name ?? null,
         courseId: row.course_id ?? null,
-        memberId,
-        isAdmin: isAdmin({ ...payload, email: row.email, adminYn: row.admin_yn }),
+          isAdmin: isAdmin({ ...payload, email: row.email, adminYn: row.admin_yn }),
         adminYn: row.admin_yn ?? 0,
         globalYn: row.global_yn ?? 0,
       },
@@ -890,7 +881,7 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
 
   const schema = z.object({
     coursename: z.string().min(1).max(200),
-    leagueinfo: z.string().max(2000).optional().nullable(),
+    leagueinfo: z.string().max(20000).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),
     payout: z.number().optional().nullable(),
@@ -935,7 +926,7 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
 
   const schema = z.object({
     coursename: z.string().min(1).max(200).optional(),
-    leagueinfo: z.string().max(2000).optional().nullable(),
+    leagueinfo: z.string().max(20000).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),
     payout: z.number().optional().nullable(),
