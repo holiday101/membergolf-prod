@@ -278,6 +278,7 @@ export default function PublicShell() {
           max-width: 1100px; margin: 0 auto;
           padding: 6px 10px;
           display: flex; align-items: center; gap: 8px;
+          flex-wrap: nowrap;
         }
         .iconBtn {
           width: 42px; height: 42px;

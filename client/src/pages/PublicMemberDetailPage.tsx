@@ -148,6 +148,9 @@ export default function PublicMemberDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
+  const [moneyTotal, setMoneyTotal] = useState<number | null>(null);
+  const [moneyRank, setMoneyRank] = useState<number | null>(null);
+  const [moneyLoading, setMoneyLoading] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -180,6 +183,32 @@ export default function PublicMemberDetailPage() {
     loadCourseSettings();
   }, [courseId]);
 
+  useEffect(() => {
+    const loadMoney = async () => {
+      if (!courseId || !memberId) return;
+      setMoneyLoading(true);
+      try {
+        const year = new Date().getFullYear();
+        const rows = await publicFetch<Array<{ member_id: number; total_amount: number }>>(
+          `/public/${courseId}/moneylist?year=${year}`
+        );
+        const matchIndex = rows.findIndex((row) => String(row.member_id) === String(memberId));
+        const match = matchIndex >= 0 ? rows[matchIndex] : null;
+        setMoneyTotal(match?.total_amount ?? 0);
+        if (rows.length === 0) {
+          setMoneyRank(1);
+        } else {
+          setMoneyRank(matchIndex >= 0 ? matchIndex + 1 : null);
+        }
+      } catch {
+        setMoneyTotal(null);
+      } finally {
+        setMoneyLoading(false);
+      }
+    };
+    loadMoney();
+  }, [courseId, memberId]);
+
   const fullName = useMemo(() => {
     const first = data?.member.firstname ?? "";
     const last = data?.member.lastname ?? "";
@@ -189,6 +218,12 @@ export default function PublicMemberDetailPage() {
     if (!data) return [];
     return [...data.groups].sort((a, b) => (a.numholes ?? 0) - (b.numholes ?? 0));
   }, [data]);
+
+  const currentYear = new Date().getFullYear();
+  const moneyFormatter = useMemo(
+    () => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
+    []
+  );
 
   return (
     <div className="page">
@@ -221,6 +256,25 @@ export default function PublicMemberDetailPage() {
                 <div className="statLabel">18 Hole Handicap</div>
                 <div className="statValue">
                   {formatHandicap(data.member.handicap18, decimalHandicapEnabled)}
+                </div>
+              </div>
+              <div className="stat">
+                <div className="statLabel">Money List ({currentYear})</div>
+                <div className="statValue">
+                  {moneyLoading ? (
+                    "Loading…"
+                  ) : moneyTotal === null ? (
+                    "—"
+                  ) : (
+                    <>
+                      {moneyFormatter.format(moneyTotal)}
+                      {moneyRank ? (
+                        <span className="rankText">
+                          {moneyRank === 1 && moneyTotal === 0 ? " (T-1)" : ` (Rank #${moneyRank})`}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -368,6 +422,7 @@ export default function PublicMemberDetailPage() {
         .stat { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; }
         .statLabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; }
         .statValue { font-size: 16px; font-weight: 700; color: #111827; margin-top: 4px; }
+        .rankText { font-weight: 600; color: #475569; }
 
         .rounds { display: grid; gap: 4px; }
         .roundBlock { display: grid; gap: 4px; }
