@@ -102,6 +102,14 @@ export default function PublicCalendarPage() {
     return fmt.format(cursor);
   }, [cursor]);
 
+  const todayKey = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }, []);
+
   return (
     <div className="calendar">
       <div className="cal-header">
@@ -127,7 +135,7 @@ export default function PublicCalendarPage() {
           <div className="cal-dow" key={d}>{d}</div>
         ))}
         {cells.map((cell) => (
-          <div className="day" key={cell.key}>
+          <div className={`day ${cell.key === todayKey ? "today" : ""}`} key={cell.key}>
             <div className="day-top">
               <span className={cell.inMonth ? "" : "day-muted"}>{cell.date.getDate()}</span>
             </div>

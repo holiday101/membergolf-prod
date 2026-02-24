@@ -209,6 +209,7 @@ export default function EventListPage() {
                   </option>
                 ))}
               </select>
+            <div className="filterTitle">Events</div>
             </label>
 
             <label className="formLabel checkbox">
@@ -230,7 +231,6 @@ export default function EventListPage() {
 
         <section className="card">
           <div className="filterRow">
-            <div className="filterTitle">Events</div>
             <select
               className="filterSelect"
               value={rangeFilter}

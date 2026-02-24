@@ -129,6 +129,8 @@ export default function CalendarMonth() {
 
   const buckets = useMemo(() => bucketEventsByDay(events, gridStart, gridEnd), [events, gridStart, gridEnd]);
 
+  const todayKey = ymd(new Date());
+
   useEffect(() => {
     const run = async () => {
       setLoading(true);
@@ -192,7 +194,7 @@ export default function CalendarMonth() {
           const dayNum = cell.date.getDate();
 
           return (
-            <div className={`day ${cell.inMonth ? "in-month" : "out-month"}`} key={cell.key}>
+            <div className={`day ${cell.inMonth ? "in-month" : "out-month"} ${cell.key === todayKey ? "today" : ""}`} key={cell.key}>
               <div className="day-top">
                 <span className={cell.inMonth ? "" : "day-muted"}>{dayNum}</span>
               </div>

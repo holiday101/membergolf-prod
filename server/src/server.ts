@@ -193,6 +193,36 @@ app.get("/public/:courseId/moneylist", async (req, res) => {
   }
 });
 
+
+app.get("/public/:courseId/moneylist/years", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT DISTINCT
+        YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) AS year
+      FROM eventMoneyList ml
+      JOIN memberMain m ON m.member_id = ml.member_id
+      LEFT JOIN eventMain e ON e.event_id = ml.event_id
+      LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
+      LEFT JOIN eventMain e2 ON e2.event_id = se.event_id
+      WHERE m.course_id = ?
+        AND ml.amount <> 0
+        AND YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) IS NOT NULL
+      ORDER BY year DESC
+      `,
+      [courseId]
+    );
+
+    res.json(rows.map((r) => r.year).filter((y: any) => y));
+  } catch (err) {
+    console.error("public money list years error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/public/:courseId/course", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);

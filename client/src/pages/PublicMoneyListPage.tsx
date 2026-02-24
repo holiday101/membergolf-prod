@@ -18,10 +18,27 @@ export default function PublicMoneyListPage() {
   const searchRef = useRef<HTMLInputElement | null>(null);
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
 
   useEffect(() => {
     searchRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const loadYears = async () => {
+      if (!courseId) return;
+      try {
+        const years = await publicFetch<number[]>(`/public/${courseId}/moneylist/years`);
+        setAvailableYears(years);
+        if (years.length > 0 && !years.includes(currentYear)) {
+          setSelectedYear(String(years[0]));
+        }
+      } catch {
+        setAvailableYears([]);
+      }
+    };
+    loadYears();
+  }, [courseId, currentYear]);
 
   useEffect(() => {
     const run = async () => {
@@ -67,23 +84,7 @@ export default function PublicMoneyListPage() {
   return (
     <div className="card">
       <div className="listHeader">
-        <h2>Money List {selectedYear === "all" ? "Overall" : selectedYear}</h2>
         <div className="controls">
-          <select
-            className="yearSelect"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            <option value="all">Overall</option>
-            {Array.from({ length: 6 }).map((_, i) => {
-              const y = currentYear - i;
-              return (
-                <option key={y} value={String(y)}>
-                  {y}
-                </option>
-              );
-            })}
-          </select>
           <input
           ref={searchRef}
           className="search"
@@ -92,6 +93,18 @@ export default function PublicMoneyListPage() {
           onChange={(e) => setQuery(e.target.value)}
           autoFocus
         />
+          <select
+            className="yearSelect"
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+          >
+            <option value="all">Overall</option>
+            {availableYears.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       {loading ? <div>Loading…</div> : null}
@@ -115,7 +128,7 @@ export default function PublicMoneyListPage() {
       <style>{`
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
         h2 { margin: 0; font-size: 15px; font-weight: 700; }
-        .listHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+        .listHeader { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
         .controls { display: flex; align-items: center; gap: 8px; }
         .yearSelect {
           padding: 4px 8px;
@@ -149,6 +162,18 @@ export default function PublicMoneyListPage() {
         .rank { font-weight: 700; color: #0f172a; }
         .name { font-weight: 500; color: #111827; }
         .amount { font-weight: 600; text-align: right; }
+
+        @media (max-width: 420px) {
+          .controls { flex-direction: column; align-items: stretch; }
+          .yearSelect { width: 100%; }
+          .search { width: 100%; }
+          .row { grid-template-columns: 1fr; gap: 4px; }
+          .row.header { display: none; }
+          .listRow { padding: 8px 10px; }
+          .rank { font-size: 11px; color: #6b7280; }
+          .name { font-size: 13px; font-weight: 600; }
+          .amount { font-size: 13px; text-align: left; color: #0f172a; }
+        }
       `}</style>
     </div>
   );

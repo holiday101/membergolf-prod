@@ -65,7 +65,6 @@ export default function PublicMemberListPage() {
   return (
     <div className="card">
       <div className="listHeader">
-        <h2>Members</h2>
         <input
           ref={searchRef}
           className="search"
@@ -100,7 +99,7 @@ export default function PublicMemberListPage() {
       <style>{`
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
         h2 { margin: 0; font-size: 15px; font-weight: 700; }
-        .listHeader { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+        .listHeader { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-bottom: 8px; }
         .search {
           padding: 4px 8px;
           border-radius: 8px;
@@ -123,6 +122,14 @@ export default function PublicMemberListPage() {
         .linkRow:hover { background: #e0f2fe; }
         .name { font-weight: 500; color: #111827; }
         .handicap { font-size: 12px; }
+
+        @media (max-width: 420px) {
+          .row { grid-template-columns: 1fr; gap: 4px; }
+          .row.header { display: none; }
+          .linkRow { padding: 8px 10px; }
+          .name { font-size: 13px; font-weight: 600; }
+          .handicap { font-size: 12px; color: #6b7280; }
+        }
       `}</style>
     </div>
   );

@@ -434,6 +434,20 @@ export default function PublicShell() {
           .app { grid-template-columns: 1fr; }
           .content { grid-column: 1; }
         }
+
+        @media (max-width: 720px) {
+          .topbar-inner { gap: 6px; padding: 6px 8px; }
+          .brandBlock { gap: 8px; }
+          .brandTitle { font-size: 12px; line-height: 1.2; }
+          .brandImage { height: 36px; max-width: 120px; }
+          .sponsorImage { height: 36px; max-width: 120px; }
+        }
+
+
+        @media (max-width: 420px) {
+          .brandImage, .sponsorImage { display: none; }
+          .brandTitle { text-align: center; }
+        }
       `}</style>
     </div>
   );

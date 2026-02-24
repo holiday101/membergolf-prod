@@ -58,7 +58,7 @@
   }
 
   .day.in-month { background: #ffffff; }
-  .day.out-month { background: #f9fafb; }
+  .day.out-month { background: #ffffff; }
   
   .day:nth-child(7n) { border-right: none; }
   
@@ -147,3 +147,8 @@
     color: #555;
   }
   
+
+
+.day.today {
+  background: #ffffff;
+}
