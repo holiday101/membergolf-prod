@@ -129,6 +129,52 @@ app.get("/public/:courseId/events/:eventId/files", async (req, res) => {
   }
 });
 
+
+app.get("/public/:courseId/events/:eventId/winnings", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        ml.moneylist_id,
+        ml.member_id,
+        m.firstname,
+        m.lastname,
+        ml.amount,
+        ml.flight_id,
+        f.flightname AS flight_name,
+        ml.place,
+        ml.description,
+        ml.payout_type
+      FROM eventMoneyList ml
+      JOIN memberMain m ON m.member_id = ml.member_id
+      LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
+      LEFT JOIN rosterFlight f ON f.flight_id = ml.flight_id
+      WHERE m.course_id = ?
+        AND (ml.event_id = ? OR se.event_id = ?)
+        AND ml.amount <> 0
+      ORDER BY
+        (ml.flight_id IS NULL),
+        ml.flight_id,
+        CASE WHEN ml.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
+        FIELD(ml.payout_type, 'GROSS', 'NET', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
+        ml.amount DESC
+      `,
+      [courseId, eventId, eventId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("public event winnings error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/public/:courseId/members", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);

@@ -505,6 +505,26 @@ export default function PublicMemberDetailPage() {
           .roundRow { grid-template-columns: 70px 1fr 1fr 44px 44px 44px; }
           .holeCell { font-size: 8px; }
         }
+
+        @media (max-width: 520px) {
+          .roundRow {
+            grid-template-columns: 1fr;
+            gap: 6px;
+            align-items: start;
+          }
+          .roundRow.header {
+            display: none;
+          }
+          .roundDate, .roundEvent { font-size: 11px; }
+          .holesInline {
+            grid-template-columns: repeat(9, minmax(12px, 1fr));
+          }
+          .roundScore { text-align: left; }
+          .roundBlock { padding: 2px 0; }
+          .roundRow .roundScore { font-size: 11px; }
+          .roundRow .roundEvent { color: #4b5563; }
+          .avgRow { display: none; }
+        }
       `}</style>
     </div>
   );

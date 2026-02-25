@@ -11,6 +11,19 @@ type EventRow = {
   ninename?: string | null;
 };
 
+type WinningsRow = {
+  moneylist_id: number;
+  member_id: number;
+  firstname: string | null;
+  lastname: string | null;
+  amount: number;
+  flight_id: number | null;
+  flight_name: string | null;
+  place: number | null;
+  description: string | null;
+  payout_type: string | null;
+};
+
 type EventFile = {
   eventfile_id: number;
   filename: string;
@@ -24,6 +37,7 @@ export default function PublicEventDetailPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [files, setFiles] = useState<EventFile[]>([]);
+  const [winnings, setWinnings] = useState<WinningsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
@@ -33,12 +47,14 @@ export default function PublicEventDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, filesRes] = await Promise.all([
+        const [eventRes, filesRes, winningsRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
           publicFetch<EventFile[]>(`/public/${courseId}/events/${eventId}/files`),
+          publicFetch<WinningsRow[]>(`/public/${courseId}/events/${eventId}/winnings`),
         ]);
         setEvent(eventRes);
         setFiles(filesRes);
+        setWinnings(winningsRes);
       } catch (e: any) {
         setError(e.message ?? "Failed to load event");
       } finally {
@@ -67,10 +83,7 @@ export default function PublicEventDetailPage() {
           {event.eventdescription ? <div className="desc">{event.eventdescription}</div> : null}
 
           <div className="files">
-            <div className="filesTitle">Results</div>
-            {files.length === 0 ? (
-              <div className="empty">No uploads yet</div>
-            ) : (
+            {files.length === 0 ? null : (
               <div className="fileList">
                 {files.map((f) => {
                   const isImage =
@@ -98,10 +111,67 @@ export default function PublicEventDetailPage() {
               </div>
             )}
           </div>
+
+          <div className="winnings">
+            {winnings.length === 0 ? (
+              <div className="empty">No winnings posted</div>
+            ) : (
+              <div className="winningsList">
+                {(() => {
+                  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+                  const payoutLabel = (value: string | null) => {
+                    switch ((value || "").toUpperCase()) {
+                      case "BB_GROSS": return "Best Ball Gross";
+                      case "BB_NET": return "Best Ball Net";
+                      case "GROSS": return "Gross";
+                      case "NET": return "Net";
+                      case "CHICAGO": return "Chicago";
+                      case "OTHER": return "Other";
+                      default: return value || "";
+                    }
+                  };
+                  let lastFlight: number | null | undefined = undefined;
+                  let lastType: string | null | undefined = undefined;
+                  return winnings.map((w) => {
+                    const flightChanged = w.flight_id !== lastFlight;
+                    if (flightChanged) {
+                      lastFlight = w.flight_id;
+                      lastType = undefined;
+                    }
+                    const typeChanged = w.payout_type !== lastType;
+                    if (typeChanged) {
+                      lastType = w.payout_type;
+                    }
+                    const typeLabel = payoutLabel(w.payout_type);
+                    return (
+                      <div key={w.moneylist_id} className="winningsRowWrap">
+                        {flightChanged ? (
+                          <div className="flightLabel">
+                            {w.flight_name ? `${w.flight_name.trim()} Flight` : w.flight_id ? `Flight ${w.flight_id}` : "Overall"}
+                          </div>
+                        ) : null}
+                        {typeChanged && typeLabel ? (
+                          <div className="typeLabel">{typeLabel}</div>
+                        ) : null}
+                        <div className="winningsRow">
+                          <div className="wname">
+                            {w.place ? <span className="wplace">#{w.place} </span> : null}
+                            {w.description ? <span className="wdesc">{w.description} • </span> : null}
+                            {(w.lastname || "").trim()}, {(w.firstname || "").trim()}
+                          </div>
+                          <div className="wamount">{fmt.format(w.amount ?? 0)}</div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
         </div>
       ) : null}
 
-      <style>{`
+                        <style>{`
         .page { display: grid; gap: 12px; }
         .backLink {
           color: #0f172a;
@@ -121,6 +191,42 @@ export default function PublicEventDetailPage() {
         .meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
         .desc { font-size: 13px; color: #374151; margin-top: 10px; }
         .files { margin-top: 14px; display: grid; gap: 8px; }
+        .winnings { margin-top: 14px; display: grid; gap: 8px; }
+        .winningsList { display: grid; gap: 10px; }
+        .typeLabel {
+          font-size: 12px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #0f172a;
+          margin: 6px 0 2px;
+        }
+        .flightLabel {
+          font-size: 12px;
+          font-weight: 800;
+          color: #0f172a;
+          margin-top: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          padding: 6px 10px;
+        }
+        .winningsRow {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 6px 12px;
+          align-items: center;
+          background: #f9fafb;
+          border-radius: 10px;
+          padding: 8px 10px;
+          color: #374151;
+          font-size: 12px;
+          border: 1px solid #e5e7eb;
+        }
+        .wname { font-weight: 600; }
+        .wamount { font-weight: 700; color: #0f172a; text-align: right; }
+        .wplace { font-weight: 600; color: #475569; }
+        .wtype { font-weight: 600; color: #0f172a; }
+        .wdesc { font-weight: 500; color: #64748b; }
         .filesTitle { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; }
         .fileList { display: grid; gap: 6px; }
         .fileItem {
@@ -147,7 +253,13 @@ export default function PublicEventDetailPage() {
         .empty { color: #9ca3af; font-size: 12px; }
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
+        @media (max-width: 480px) {
+          .winningsRow { grid-template-columns: 1fr; }
+          .wamount { text-align: left; }
+        }
       `}</style>
     </div>
   );
 }
+
+
