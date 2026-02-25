@@ -175,6 +175,62 @@ app.get("/public/:courseId/events/:eventId/winnings", async (req, res) => {
   }
 });
 
+app.get("/public/:courseId/events/:eventId/scores", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        c.card_id,
+        c.member_id,
+        m.firstname,
+        m.lastname,
+        c.card_dt,
+        c.gross,
+        c.net,
+        c.adjustedscore,
+        c.numholes
+      FROM eventCard c
+      JOIN memberMain m ON m.member_id = c.member_id
+      WHERE c.course_id = ? AND c.event_id = ?
+      ORDER BY c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
+      `,
+      [courseId, eventId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("public event scores error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/public/:courseId/events/:eventId/scores/exists", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      "SELECT COUNT(*) AS count FROM eventCard WHERE course_id = ? AND event_id = ?",
+      [courseId, eventId]
+    );
+
+    res.json({ count: rows?.[0]?.count ?? 0 });
+  } catch (err) {
+    console.error("public event scores exists error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+
 app.get("/public/:courseId/members", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);

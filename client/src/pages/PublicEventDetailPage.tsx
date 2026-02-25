@@ -38,6 +38,7 @@ export default function PublicEventDetailPage() {
   const [event, setEvent] = useState<EventRow | null>(null);
   const [files, setFiles] = useState<EventFile[]>([]);
   const [winnings, setWinnings] = useState<WinningsRow[]>([]);
+  const [scoresCount, setScoresCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
@@ -47,14 +48,16 @@ export default function PublicEventDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, filesRes, winningsRes] = await Promise.all([
+        const [eventRes, filesRes, winningsRes, scoresRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
           publicFetch<EventFile[]>(`/public/${courseId}/events/${eventId}/files`),
           publicFetch<WinningsRow[]>(`/public/${courseId}/events/${eventId}/winnings`),
+          publicFetch<{ count: number }>(`/public/${courseId}/events/${eventId}/scores/exists`),
         ]);
         setEvent(eventRes);
         setFiles(filesRes);
         setWinnings(winningsRes);
+        setScoresCount(scoresRes?.count ?? 0);
       } catch (e: any) {
         setError(e.message ?? "Failed to load event");
       } finally {
@@ -81,6 +84,12 @@ export default function PublicEventDetailPage() {
             {event.ninename ? ` • ${event.ninename}` : ""}
           </div>
           {event.eventdescription ? <div className="desc">{event.eventdescription}</div> : null}
+
+          {scoresCount > 0 ? (
+            <Link className="scoresBtn" to={`/public/${courseId}/events/${eventId}/scores`}>
+              View Scores
+            </Link>
+          ) : null}
 
           <div className="files">
             {files.length === 0 ? null : (
@@ -189,6 +198,22 @@ export default function PublicEventDetailPage() {
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
         .title { font-size: 18px; font-weight: 700; color: #111827; }
         .meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        .scoresBtn {
+          margin-top: 10px;
+          width: fit-content;
+          text-decoration: none;
+          background: #0f172a;
+          color: #fff;
+          padding: 8px 14px;
+          border-radius: 999px;
+          font-weight: 600;
+          font-size: 12px;
+          display: inline-flex;
+          align-items: center;
+          transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+        }
+        .scoresBtn:hover { background: #111827; transform: translateY(-1px); }
         .desc { font-size: 13px; color: #374151; margin-top: 10px; }
         .files { margin-top: 14px; display: grid; gap: 8px; }
         .winnings { margin-top: 14px; display: grid; gap: 8px; }

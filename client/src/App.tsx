@@ -24,6 +24,7 @@ import PublicMemberListPage from "./pages/PublicMemberListPage";
 import PublicMoneyListPage from "./pages/PublicMoneyListPage";
 import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
+import PublicEventScoresPage from "./pages/PublicEventScoresPage";
 import MarketingPage from "./pages/MarketingPage";
 
 import AppShell from "./components/AppShell";
@@ -46,6 +47,7 @@ export default function App() {
         <Route index element={<PublicCalendarPage />} />
         <Route path="events" element={<PublicEventListPage />} />
         <Route path="events/:eventId" element={<PublicEventDetailPage />} />
+        <Route path="events/:eventId/scores" element={<PublicEventScoresPage />} />
         <Route path="members" element={<PublicMemberListPage />} />
         <Route path="members/:memberId" element={<PublicMemberDetailPage />} />
         <Route path="moneylist" element={<PublicMoneyListPage />} />
