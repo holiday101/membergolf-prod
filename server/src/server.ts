@@ -17,8 +17,22 @@ import { presignGet, presignPut, deleteObject } from "./s3";
 dotenv.config();
 
 const app = express();
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(express.json());
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow non-browser requests and configured browser origins.
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 app.use("/api/events", eventsRouter);
 
 app.get("/public/:courseId/events", async (req, res) => {
