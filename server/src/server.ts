@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import { randomUUID, randomBytes, createHash } from "crypto";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import path from "path";
+import fs from "fs";
 import { eventsRouter } from "./routes/events.routes";
 import { presignGet, presignPut, deleteObject } from "./s3";
 
@@ -2225,6 +2226,21 @@ app.put("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
   if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
   res.json({ id });
 });
+
+const clientDistCandidates = [
+  process.env.CLIENT_DIST_PATH,
+  path.resolve(__dirname, "../../client/dist"),
+  path.resolve(process.cwd(), "../client/dist"),
+].filter((p): p is string => Boolean(p));
+
+const clientDist = clientDistCandidates.find((p) => fs.existsSync(path.join(p, "index.html")));
+if (clientDist) {
+  app.use(express.static(clientDist));
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/public")) return next();
+    return res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
 
 const port = Number(process.env.PORT ?? 4000);
 app.listen(port, () => console.log(`API running on http://localhost:${port}`));
