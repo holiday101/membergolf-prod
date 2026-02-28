@@ -11,12 +11,16 @@ import SubEventDetailPage from "./pages/SubEventDetailPage";
 import SubEventCreatePage from "./pages/SubEventCreatePage";
 import RosterListPage from "./pages/RosterListPage";
 import UserListPage from "./pages/UserListPage";
+import UserEditorPage from "./pages/UserEditorPage";
 import EditEventPage from "./pages/EditEventPage";
 import EnterScoresPage from "./pages/EnterScoresPage";
 import EventWinningsPage from "./pages/EventWinningsPage";
 import EventUploadPage from "./pages/EventUploadPage";
 import PostHandicapsPage from "./pages/PostHandicapsPage";
 import CourseListPage from "./pages/CourseListPage";
+import CourseEditorPage from "./pages/CourseEditorPage";
+import CourseNineCreatePage from "./pages/CourseNineCreatePage";
+import CourseNineEditPage from "./pages/CourseNineEditPage";
 import PublicShell from "./components/Public/PublicShell";
 import PublicCalendarPage from "./pages/PublicCalendarPage";
 import PublicEventListPage from "./pages/PublicEventListPage";
@@ -69,7 +73,13 @@ export default function App() {
         <Route path="/subevents/:id" element={<SubEventDetailPage />} />
         <Route path="/rosters" element={<RosterListPage />} />
         <Route path="/courses" element={<CourseListPage />} />
+        <Route path="/courses/new" element={<CourseEditorPage />} />
+        <Route path="/courses/:courseId/edit" element={<CourseEditorPage />} />
+        <Route path="/courses/:courseId/nines/new" element={<CourseNineCreatePage />} />
+        <Route path="/courses/:courseId/nines/:nineId/edit" element={<CourseNineEditPage />} />
         <Route path="/users" element={<UserListPage />} />
+        <Route path="/users/new" element={<UserEditorPage />} />
+        <Route path="/users/:userId/edit" element={<UserEditorPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

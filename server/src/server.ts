@@ -203,15 +203,20 @@ app.get("/public/:courseId/events/:eventId/scores", async (req, res) => {
       SELECT
         c.card_id,
         c.member_id,
+        c.nine_id,
         m.firstname,
         m.lastname,
         c.card_dt,
         c.gross,
         c.net,
         c.adjustedscore,
-        c.numholes
+        c.numholes,
+        n.startinghole,
+        c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
+        c.hole10, c.hole11, c.hole12, c.hole13, c.hole14, c.hole15, c.hole16, c.hole17, c.hole18
       FROM eventCard c
       JOIN memberMain m ON m.member_id = c.member_id
+      LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
       ORDER BY c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
@@ -1022,6 +1027,190 @@ app.get("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
   res.json(withUrls);
 });
 
+app.get("/courses/manage/:id/nines", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const [rows] = await pool.query<any[]>(
+    `
+    SELECT
+      nine_id,
+      course_id,
+      ninename,
+      numholes,
+      startinghole,
+      hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
+      hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18,
+      handicaphole1, handicaphole2, handicaphole3, handicaphole4, handicaphole5,
+      handicaphole6, handicaphole7, handicaphole8, handicaphole9,
+      handicaphole10, handicaphole11, handicaphole12, handicaphole13, handicaphole14,
+      handicaphole15, handicaphole16, handicaphole17, handicaphole18
+    FROM courseNine
+    WHERE course_id = ?
+    ORDER BY ninename ASC, nine_id ASC
+    `,
+    [id]
+  );
+  res.json(rows);
+});
+
+app.get("/courses/manage/:id/nines/:nineId", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  const nineId = Number(req.params.nineId);
+  if (!Number.isFinite(id) || !Number.isFinite(nineId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const [rows] = await pool.query<any[]>(
+    `
+    SELECT
+      nine_id,
+      course_id,
+      ninename,
+      sloperating,
+      courserating,
+      numholes,
+      startinghole,
+      hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
+      hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18,
+      handicaphole1, handicaphole2, handicaphole3, handicaphole4, handicaphole5,
+      handicaphole6, handicaphole7, handicaphole8, handicaphole9,
+      handicaphole10, handicaphole11, handicaphole12, handicaphole13, handicaphole14,
+      handicaphole15, handicaphole16, handicaphole17, handicaphole18
+    FROM courseNine
+    WHERE course_id = ? AND nine_id = ?
+    LIMIT 1
+    `,
+    [id, nineId]
+  );
+  if (!rows.length) return res.status(404).json({ error: "Not found" });
+  res.json(rows[0]);
+});
+
+app.post("/courses/manage/:id/nines", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const schema = z.object({
+    ninename: z.string().min(1).max(100),
+    sloperating: z.number().optional().nullable(),
+    courserating: z.number().optional().nullable(),
+    numholes: z.number().int().min(9).max(18).optional().nullable(),
+    startinghole: z.number().int().optional().nullable(),
+    hole1: z.number().int().optional().nullable(),
+    hole2: z.number().int().optional().nullable(),
+    hole3: z.number().int().optional().nullable(),
+    hole4: z.number().int().optional().nullable(),
+    hole5: z.number().int().optional().nullable(),
+    hole6: z.number().int().optional().nullable(),
+    hole7: z.number().int().optional().nullable(),
+    hole8: z.number().int().optional().nullable(),
+    hole9: z.number().int().optional().nullable(),
+    hole10: z.number().int().optional().nullable(),
+    hole11: z.number().int().optional().nullable(),
+    hole12: z.number().int().optional().nullable(),
+    hole13: z.number().int().optional().nullable(),
+    hole14: z.number().int().optional().nullable(),
+    hole15: z.number().int().optional().nullable(),
+    hole16: z.number().int().optional().nullable(),
+    hole17: z.number().int().optional().nullable(),
+    hole18: z.number().int().optional().nullable(),
+    handicaphole1: z.number().int().optional().nullable(),
+    handicaphole2: z.number().int().optional().nullable(),
+    handicaphole3: z.number().int().optional().nullable(),
+    handicaphole4: z.number().int().optional().nullable(),
+    handicaphole5: z.number().int().optional().nullable(),
+    handicaphole6: z.number().int().optional().nullable(),
+    handicaphole7: z.number().int().optional().nullable(),
+    handicaphole8: z.number().int().optional().nullable(),
+    handicaphole9: z.number().int().optional().nullable(),
+    handicaphole10: z.number().int().optional().nullable(),
+    handicaphole11: z.number().int().optional().nullable(),
+    handicaphole12: z.number().int().optional().nullable(),
+    handicaphole13: z.number().int().optional().nullable(),
+    handicaphole14: z.number().int().optional().nullable(),
+    handicaphole15: z.number().int().optional().nullable(),
+    handicaphole16: z.number().int().optional().nullable(),
+    handicaphole17: z.number().int().optional().nullable(),
+    handicaphole18: z.number().int().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    `
+    INSERT INTO courseNine (
+      course_id, ninename, sloperating, courserating, numholes, startinghole,
+      hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
+      hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18,
+      handicaphole1, handicaphole2, handicaphole3, handicaphole4, handicaphole5, handicaphole6,
+      handicaphole7, handicaphole8, handicaphole9, handicaphole10, handicaphole11, handicaphole12,
+      handicaphole13, handicaphole14, handicaphole15, handicaphole16, handicaphole17, handicaphole18
+    )
+    VALUES (
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?,
+      ?, ?, ?, ?, ?, ?
+    )
+    `,
+    [
+      id,
+      parsed.data.ninename.trim(),
+      parsed.data.sloperating ?? null,
+      parsed.data.courserating ?? null,
+      parsed.data.numholes ?? 9,
+      parsed.data.startinghole ?? 1,
+      parsed.data.hole1 ?? null,
+      parsed.data.hole2 ?? null,
+      parsed.data.hole3 ?? null,
+      parsed.data.hole4 ?? null,
+      parsed.data.hole5 ?? null,
+      parsed.data.hole6 ?? null,
+      parsed.data.hole7 ?? null,
+      parsed.data.hole8 ?? null,
+      parsed.data.hole9 ?? null,
+      parsed.data.hole10 ?? null,
+      parsed.data.hole11 ?? null,
+      parsed.data.hole12 ?? null,
+      parsed.data.hole13 ?? null,
+      parsed.data.hole14 ?? null,
+      parsed.data.hole15 ?? null,
+      parsed.data.hole16 ?? null,
+      parsed.data.hole17 ?? null,
+      parsed.data.hole18 ?? null,
+      parsed.data.handicaphole1 ?? null,
+      parsed.data.handicaphole2 ?? null,
+      parsed.data.handicaphole3 ?? null,
+      parsed.data.handicaphole4 ?? null,
+      parsed.data.handicaphole5 ?? null,
+      parsed.data.handicaphole6 ?? null,
+      parsed.data.handicaphole7 ?? null,
+      parsed.data.handicaphole8 ?? null,
+      parsed.data.handicaphole9 ?? null,
+      parsed.data.handicaphole10 ?? null,
+      parsed.data.handicaphole11 ?? null,
+      parsed.data.handicaphole12 ?? null,
+      parsed.data.handicaphole13 ?? null,
+      parsed.data.handicaphole14 ?? null,
+      parsed.data.handicaphole15 ?? null,
+      parsed.data.handicaphole16 ?? null,
+      parsed.data.handicaphole17 ?? null,
+      parsed.data.handicaphole18 ?? null,
+    ]
+  );
+
+  res.status(201).json({ nine_id: result.insertId, course_id: id });
+});
+
 app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
   if (!isGlobal(payload)) return res.status(403).json({ error: "Forbidden" });
@@ -1103,6 +1292,131 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
   );
   if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
   res.json({ id });
+});
+
+app.put("/courses/manage/:id/nines/:nineId", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  const nineId = Number(req.params.nineId);
+  if (!Number.isFinite(id) || !Number.isFinite(nineId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const schema = z.object({
+    ninename: z.string().min(1).max(100).optional(),
+    sloperating: z.number().optional().nullable(),
+    courserating: z.number().optional().nullable(),
+    numholes: z.number().int().min(9).max(18).optional(),
+    startinghole: z.number().int().optional().nullable(),
+    hole1: z.number().int().optional().nullable(),
+    hole2: z.number().int().optional().nullable(),
+    hole3: z.number().int().optional().nullable(),
+    hole4: z.number().int().optional().nullable(),
+    hole5: z.number().int().optional().nullable(),
+    hole6: z.number().int().optional().nullable(),
+    hole7: z.number().int().optional().nullable(),
+    hole8: z.number().int().optional().nullable(),
+    hole9: z.number().int().optional().nullable(),
+    hole10: z.number().int().optional().nullable(),
+    hole11: z.number().int().optional().nullable(),
+    hole12: z.number().int().optional().nullable(),
+    hole13: z.number().int().optional().nullable(),
+    hole14: z.number().int().optional().nullable(),
+    hole15: z.number().int().optional().nullable(),
+    hole16: z.number().int().optional().nullable(),
+    hole17: z.number().int().optional().nullable(),
+    hole18: z.number().int().optional().nullable(),
+    handicaphole1: z.number().int().optional().nullable(),
+    handicaphole2: z.number().int().optional().nullable(),
+    handicaphole3: z.number().int().optional().nullable(),
+    handicaphole4: z.number().int().optional().nullable(),
+    handicaphole5: z.number().int().optional().nullable(),
+    handicaphole6: z.number().int().optional().nullable(),
+    handicaphole7: z.number().int().optional().nullable(),
+    handicaphole8: z.number().int().optional().nullable(),
+    handicaphole9: z.number().int().optional().nullable(),
+    handicaphole10: z.number().int().optional().nullable(),
+    handicaphole11: z.number().int().optional().nullable(),
+    handicaphole12: z.number().int().optional().nullable(),
+    handicaphole13: z.number().int().optional().nullable(),
+    handicaphole14: z.number().int().optional().nullable(),
+    handicaphole15: z.number().int().optional().nullable(),
+    handicaphole16: z.number().int().optional().nullable(),
+    handicaphole17: z.number().int().optional().nullable(),
+    handicaphole18: z.number().int().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const key of Object.keys(parsed.data) as Array<keyof typeof parsed.data>) {
+    fields.push(`${key} = ?`);
+    values.push((parsed.data as any)[key]);
+  }
+  if (!fields.length) return res.status(400).json({ error: "No fields to update" });
+
+  values.push(nineId, id);
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    `UPDATE courseNine SET ${fields.join(", ")} WHERE nine_id = ? AND course_id = ?`,
+    values
+  );
+  if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ nine_id: nineId, course_id: id });
+});
+
+app.delete("/courses/manage/:id/nines/:nineId", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    if (!isGlobal(payload)) return res.status(403).json({ error: "Forbidden" });
+
+    const id = Number(req.params.id);
+    const nineId = Number(req.params.nineId);
+    if (!Number.isFinite(id) || !Number.isFinite(nineId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      "DELETE FROM courseNine WHERE nine_id = ? AND course_id = ?",
+      [nineId, id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.status(204).send();
+  } catch (err: any) {
+    if (String(err?.code || "").startsWith("ER_ROW_IS_REFERENCED")) {
+      return res.status(409).json({
+        error: "Nine cannot be deleted because related records exist.",
+      });
+    }
+    console.error("delete nine failed", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.delete("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    if (!isGlobal(payload)) return res.status(403).json({ error: "Forbidden" });
+
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      "DELETE FROM courseMain WHERE course_id = ?",
+      [id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.status(204).send();
+  } catch (err: any) {
+    if (String(err?.code || "").startsWith("ER_ROW_IS_REFERENCED")) {
+      return res.status(409).json({
+        error: "Course cannot be deleted because related records exist.",
+      });
+    }
+    console.error("course delete error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
 });
 
 app.post("/courses/manage/:id/assets/presign", authMiddleware, async (req, res) => {
@@ -2251,7 +2565,8 @@ const clientDist = clientDistCandidates.find((p) => fs.existsSync(path.join(p, "
 if (clientDist) {
   app.use(express.static(clientDist));
   app.get(/.*/, (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path.startsWith("/public")) return next();
+    // Keep API requests out of SPA fallback, but allow deep links like /public/:courseId.
+    if (req.path.startsWith("/api")) return next();
     return res.sendFile(path.join(clientDist, "index.html"));
   });
 }

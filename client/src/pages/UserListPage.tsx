@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { apiFetch } from "../auth";
 
 type User = {
@@ -18,38 +18,17 @@ type Course = {
   coursename: string;
 };
 
-type FormState = {
-  email: string;
-  password: string;
-  first_name: string;
-  last_name: string;
-  course_id: string;
-  admin_yn: boolean;
-};
-
-const emptyForm: FormState = {
-  email: "",
-  password: "",
-  first_name: "",
-  last_name: "",
-  course_id: "",
-  admin_yn: false,
-};
-
 export default function UserListPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [busy, setBusy] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [courseFilter, setCourseFilter] = useState<string>("global");
+  const [toast, setToast] = useState<string>("");
+  const [courseFilter, setCourseFilter] = useState<string>("all");
   const navigate = useNavigate();
+  const location = useLocation();
   const [isGlobalUser, setIsGlobalUser] = useState(false);
   const [myCourseId, setMyCourseId] = useState<number | null>(null);
-
-  const isEditing = editingId !== null;
 
   const courseOptions = useMemo(() => {
     return courses.map((c) => ({ value: String(c.course_id), label: c.coursename }));
@@ -72,6 +51,7 @@ export default function UserListPage() {
     if (courseFilter === "global") {
       return sorted.filter((u) => u.course_id == null);
     }
+    if (courseFilter === "all") return sorted;
 
     const id = Number(courseFilter);
     if (!Number.isFinite(id)) return sorted;
@@ -115,58 +95,15 @@ export default function UserListPage() {
     loadData();
   }, [navigate]);
 
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function beginEdit(user: User) {
-    setEditingId(user.id);
-    setForm({
-      email: user.email,
-      password: "",
-      first_name: user.first_name ?? "",
-      last_name: user.last_name ?? "",
-      course_id: user.course_id ? String(user.course_id) : "",
-      admin_yn: (user.admin_yn ?? 0) === 1,
-    });
-  }
-
-  function resetForm() {
-    setEditingId(null);
-    setForm(emptyForm);
-  }
-
-  async function submit() {
-    setBusy(true);
-    setError("");
-    try {
-      const payload: any = {
-        email: form.email.trim(),
-        first_name: form.first_name.trim() || null,
-        last_name: form.last_name.trim() || null,
-        course_id: form.course_id ? Number(form.course_id) : null,
-        admin_yn: form.admin_yn ? 1 : 0,
-      };
-      if (!isEditing || form.password.trim()) payload.password = form.password;
-
-      const res = await apiFetch(isEditing ? `/users/${editingId}` : "/users", {
-        method: isEditing ? "PUT" : "POST",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Request failed");
-      }
-
-      await loadData();
-      resetForm();
-    } catch (err: any) {
-      setError(String(err?.message || "Request failed"));
-    } finally {
-      setBusy(false);
-    }
-  }
+  useEffect(() => {
+    const state = (location.state as any) || null;
+    if (!state) return;
+    if (state.toast) setToast(String(state.toast));
+    if (state.courseFilter) setCourseFilter(String(state.courseFilter));
+    const t = window.setTimeout(() => setToast(""), 2200);
+    navigate(location.pathname, { replace: true, state: null });
+    return () => window.clearTimeout(t);
+  }, [location.pathname, location.state, navigate]);
 
   return (
     <div className="page">
@@ -176,160 +113,82 @@ export default function UserListPage() {
         </div>
       )}
 
-      <div className="grid">
-        <section className="card">
-          <h2 className="sectionTitle">{isEditing ? "Edit user" : "Create user"}</h2>
+      <section className="card">
+        <div className="headerRow">
+          <div className="filterTitle">Users</div>
+          <Link className="btn primary" to="/users/new">
+            New User
+          </Link>
+        </div>
 
-          <div className="form">
-            <label className="formLabel">
-              Email
-              <input
-                value={form.email}
-                onChange={(e) => setField("email", e.target.value)}
-                placeholder="user@example.com"
-              />
-            </label>
-
-            <label className="formLabel">
-              Password {isEditing ? "(leave blank to keep)" : ""}
-              <input
-                type="password"
-                value={form.password}
-                onChange={(e) => setField("password", e.target.value)}
-                placeholder={isEditing ? "" : "Min 8 characters"}
-              />
-            </label>
-
-            <div className="row">
-              <label className="formLabel">
-                First name
-                <input
-                  value={form.first_name}
-                  onChange={(e) => setField("first_name", e.target.value)}
-                />
-              </label>
-
-              <label className="formLabel">
-                Last name
-                <input
-                  value={form.last_name}
-                  onChange={(e) => setField("last_name", e.target.value)}
-                />
-              </label>
-            </div>
-
-            <label className="formLabel">
-              Course
-              <select
-                value={form.course_id}
-                onChange={(e) => setField("course_id", e.target.value)}
-              >
-                <option value="">None</option>
-                {courseOptions.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="formLabel checkbox">
-              <input
-                type="checkbox"
-                checked={form.admin_yn}
-                onChange={(e) => setField("admin_yn", e.target.checked)}
-              />
-              Admin
-            </label>
-
-            <div className="actions">
-              <button className="btn primary" onClick={submit} disabled={busy}>
-                {busy ? "Saving…" : isEditing ? "Save changes" : "Create user"}
-              </button>
-              {isEditing && (
-                <button className="btn" onClick={resetForm} disabled={busy}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="card">
-          {isGlobalUser ? (
-            <div className="filterRow">
-              <div className="filterTitle">View Users By Course</div>
-              <select
-                className="filterSelect"
-                value={courseFilter}
-                onChange={(e) => setCourseFilter(e.target.value)}
-              >
-                <option value="global">Global users</option>
-                {courseOptions.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="filterRow">
-              <div className="filterTitle">Users</div>
-            </div>
-          )}
-          {loading ? (
-            <div className="muted">Loading…</div>
-          ) : (
-            <div className="table">
-              <div className="tableHead">
-                <span>Name</span>
-                <span></span>
-              </div>
-              {filteredUsers.map((u) => (
-                <div key={u.id} className="tableRow">
-                  <span>
-                    {(u.last_name || "").trim()}, {(u.first_name || "").trim()}
-                  </span>
-                  <button className="btn small" onClick={() => beginEdit(u)}>
-                    Edit
-                  </button>
-                </div>
+        {isGlobalUser ? (
+          <div className="filterRow">
+            <div className="filterTitle">View Users By Course</div>
+            <select
+              className="filterSelect"
+              value={courseFilter}
+              onChange={(e) => setCourseFilter(e.target.value)}
+            >
+              <option value="all">All users</option>
+              <option value="global">Global users</option>
+              {courseOptions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
               ))}
+            </select>
+          </div>
+        ) : null}
+        {toast ? <div className="toast success">{toast}</div> : null}
+
+        {loading ? (
+          <div className="muted">Loading…</div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="muted">No users found.</div>
+        ) : (
+          <div className="table">
+            <div className="tableHead">
+              <span>Name</span>
+              <span>Email</span>
+              <span>Course</span>
+              <span>Action</span>
             </div>
-          )}
-        </section>
-      </div>
+            {filteredUsers.map((u) => (
+              <div key={u.id} className="tableRow">
+                <span>{(u.last_name || "").trim()}, {(u.first_name || "").trim()}</span>
+                <span>{u.email}</span>
+                <span>{u.coursename || (u.course_id ? `Course #${u.course_id}` : "Global")}</span>
+                <span>
+                  <Link className="btn small" to={`/users/${u.id}/edit`}>
+                    Edit
+                  </Link>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <style>{`
         .page { display: grid; gap: 14px; }
-        .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        h2 { margin: 0; font-size: 15px; text-align: center; }
-        .sectionTitle { color: #6b7280; }
-        .filterRow {
-          display: grid;
-          gap: 6px;
-          justify-items: center;
-          margin: 0 0 6px;
-        }
+        .headerRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .filterRow { display: grid; gap: 6px; margin-bottom: 10px; }
         .filterTitle { font-size: 15px; color: #6b7280; font-weight: 600; }
-        .filterSelect { padding: 6px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 12px; }
-        .form { display: grid; gap: 10px; }
-        label { display: grid; gap: 4px; font-weight: 600; font-size: 12px; }
-        .formLabel { color: #6b7280; }
-        input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
-        .checkbox { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-        .checkbox input { width: 16px; height: 16px; padding: 0; }
-        .row { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-        .actions { display: flex; gap: 8px; }
-        .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+        .filterSelect { padding: 6px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 12px; max-width: 320px; }
+        .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; text-decoration: none; color: #111827; display: inline-flex; align-items: center; transition: background 140ms ease, border-color 140ms ease, transform 140ms ease; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
         .btn.small { padding: 5px 8px; font-size: 11px; }
+        .btn:hover { background: #f8fafc; border-color: #cbd5e1; transform: translateY(-1px); }
+        .btn.primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+        .btn:active { transform: translateY(0); }
+        .toast { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; width: fit-content; margin-bottom: 8px; }
+        .toast.success { border: 1px solid #bbf7d0; background: #ecfdf3; color: #166534; }
         .alert { padding: 10px 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; color: #991b1b; }
         .muted { color: #6b7280; }
-        .table { display: grid; gap: 8px; margin-top: 20px; }
-        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr auto; align-items: center; }
-        .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; text-transform: none; letter-spacing: normal; }
+        .table { display: grid; gap: 8px; margin-top: 10px; }
+        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.1fr) minmax(120px, 1fr) 70px; align-items: center; }
+        .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
       `}</style>
     </div>

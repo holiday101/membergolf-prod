@@ -188,7 +188,11 @@ export default function AppShell() {
     }>;
   }> = isGlobalUser
     ? [
-        { to: "/users", label: "Users", icon: "users" },
+        {
+          to: "/users",
+          label: "Users",
+          icon: "users",
+        },
         {
           to: "/courses",
           label: me?.user.courseId ? "Course Info" : "Courses",
@@ -211,7 +215,13 @@ export default function AppShell() {
         { to: "/members", label: "Members", icon: "users" },
         { to: "/rosters", label: "Rosters", icon: "list" },
       ];
-  if (!isGlobalUser && me?.user.isAdmin) navItems.push({ to: "/users", label: "Users", icon: "users" });
+  if (!isGlobalUser && me?.user.isAdmin) {
+    navItems.push({
+      to: "/users",
+      label: "Users",
+      icon: "users",
+    });
+  }
   if (!isGlobalUser && me?.user.isAdmin) {
     navItems.push({
       to: "/courses",
@@ -598,20 +608,32 @@ export default function AppShell() {
         .subNavList { display: grid; gap: 4px; margin: 4px 0 8px 32px; }
         .subNavLink {
           font-size: 11px;
-          color: #6b7280;
+          color: #1f2937;
           text-decoration: none;
-          padding: 3px 6px;
-          border-radius: 8px;
+          padding: 6px 8px;
+          border-radius: 9px;
           text-align: left;
-          background: transparent;
-          border: 1px solid transparent;
+          background: #fff;
+          border: 1px solid #dbe3f3;
+          font-weight: 600;
+          display: inline-flex;
+          align-items: center;
+          width: fit-content;
+          transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
         }
         .subNavButton { cursor: default; }
         .subNavButton.disabled { cursor: not-allowed; }
-        .subNavLink:hover { background: #f1f5f9; color: #111827; }
+        .subNavLink:hover {
+          background: #eef2ff;
+          border-color: #c7d2fe;
+          color: #1d4ed8;
+          transform: translateY(-1px);
+        }
+        .subNavLink:active { transform: translateY(0); }
         .subNavLink.active {
           background: #e0e7ff;
           color: #1d4ed8;
+          border-color: #c7d2fe;
           font-weight: 600;
         }
 

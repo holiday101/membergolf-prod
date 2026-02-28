@@ -12,6 +12,7 @@ type EventRow = {
 type ScoreRow = {
   card_id: number;
   member_id: number;
+  nine_id: number | null;
   firstname: string | null;
   lastname: string | null;
   card_dt: string;
@@ -19,6 +20,25 @@ type ScoreRow = {
   net: number | null;
   adjustedscore: number | null;
   numholes: number | null;
+  startinghole: number | null;
+  hole1?: number | null;
+  hole2?: number | null;
+  hole3?: number | null;
+  hole4?: number | null;
+  hole5?: number | null;
+  hole6?: number | null;
+  hole7?: number | null;
+  hole8?: number | null;
+  hole9?: number | null;
+  hole10?: number | null;
+  hole11?: number | null;
+  hole12?: number | null;
+  hole13?: number | null;
+  hole14?: number | null;
+  hole15?: number | null;
+  hole16?: number | null;
+  hole17?: number | null;
+  hole18?: number | null;
 };
 
 export default function PublicEventScoresPage() {
@@ -49,6 +69,26 @@ export default function PublicEventScoresPage() {
     run();
   }, [courseId, eventId]);
 
+  const formatDate = (value: string) => {
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return value;
+    return dt.toLocaleDateString();
+  };
+
+  const formatNum = (value: number | null) => (typeof value === "number" ? value : "—");
+  const getHoleLabels = (numholes: number | null, startinghole: number | null) => {
+    if (numholes === 9) return startinghole === 10 ? [10, 11, 12, 13, 14, 15, 16, 17, 18] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    return startinghole === 10
+      ? [10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+      : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+  };
+  const getHoleScores = (row: ScoreRow, labels: number[]) => {
+    if (row.numholes === 9 && row.startinghole === 10) {
+      return labels.map((_, idx) => (row as any)[`hole${idx + 1}`] ?? null);
+    }
+    return labels.map((hole) => (row as any)[`hole${hole}`] ?? null);
+  };
+
   return (
     <div className="page">
       <Link className="backLink" to={`/public/${courseId}/events/${eventId}`}>
@@ -71,16 +111,44 @@ export default function PublicEventScoresPage() {
             <div className="scoreList">
               <div className="scoreHeader">
                 <div>Player</div>
+                <div>Date</div>
+                <div>Holes</div>
                 <div>Gross</div>
                 <div>Net</div>
+                <div>Adj</div>
               </div>
               {scores.map((s) => (
-                <div key={s.card_id} className="scoreRow">
-                  <div className="sname">
-                    {(s.lastname || "").trim()}, {(s.firstname || "").trim()}
+                <div key={s.card_id} className="scoreCard">
+                  <div className="scoreRow">
+                    <div className="snameCell">
+                      <Link className="sname" to={`/public/${courseId}/members/${s.member_id}`}>
+                        {(s.lastname || "").trim()}, {(s.firstname || "").trim()}
+                      </Link>
+                    </div>
+                    <div className="sdate">{formatDate(s.card_dt)}</div>
+                    <div className="snum">{formatNum(s.numholes)}</div>
+                    <div className="snum">{formatNum(s.gross)}</div>
+                    <div className="snum">{formatNum(s.net)}</div>
+                    <div className="snum">{formatNum(s.adjustedscore)}</div>
                   </div>
-                  <div className="snum">{s.gross ?? "-"}</div>
-                  <div className="snum">{s.net ?? "-"}</div>
+                  {(() => {
+                    const labels = getHoleLabels(s.numholes, s.startinghole);
+                    const values = getHoleScores(s, labels);
+                    return (
+                      <div className="holesWrap">
+                        <div className="holesGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(22px, 1fr))` }}>
+                          {labels.map((h) => (
+                            <div key={`h-${s.card_id}-${h}`} className="holeHead">{h}</div>
+                          ))}
+                        </div>
+                        <div className="holesGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(22px, 1fr))` }}>
+                          {values.map((v, idx) => (
+                            <div key={`v-${s.card_id}-${idx}`} className="holeVal">{typeof v === "number" ? v : "—"}</div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -110,7 +178,7 @@ export default function PublicEventScoresPage() {
         .scoreHeader,
         .scoreRow {
           display: grid;
-          grid-template-columns: 1fr 70px 70px;
+          grid-template-columns: minmax(160px, 1fr) 90px 56px 56px 56px 56px;
           gap: 8px;
           align-items: center;
         }
@@ -122,18 +190,56 @@ export default function PublicEventScoresPage() {
           font-weight: 700;
         }
         .scoreRow {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
           padding: 8px 10px;
           font-size: 13px;
         }
-        .sname { font-weight: 600; color: #0f172a; }
+        .scoreCard {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+        }
+        .snameCell { min-width: 0; }
+        .sname {
+          font-weight: 600;
+          color: #0f172a;
+          text-decoration: none;
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .sdate { color: #475569; font-size: 12px; }
         .snum { text-align: right; font-variant-numeric: tabular-nums; }
+        .holesWrap {
+          border-top: 1px solid #e2e8f0;
+          padding: 8px 10px 10px;
+          display: grid;
+          gap: 4px;
+        }
+        .holesGrid { display: grid; gap: 4px; }
+        .holeHead {
+          font-size: 10px;
+          text-align: center;
+          color: #64748b;
+          font-weight: 700;
+        }
+        .holeVal {
+          text-align: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: #0f172a;
+          background: #ffffff;
+          border: 1px solid #dbeafe;
+          border-radius: 6px;
+          padding: 2px 0;
+          font-variant-numeric: tabular-nums;
+        }
         .empty { font-size: 12px; color: #6b7280; padding: 6px 0; }
         @media (max-width: 520px) {
           .scoreHeader,
-          .scoreRow { grid-template-columns: 1fr 56px 56px; }
+          .scoreRow { grid-template-columns: minmax(120px, 1fr) 82px 48px 48px 48px 48px; }
+          .scoreRow { font-size: 12px; }
+          .sdate { font-size: 11px; }
         }
       `}</style>
     </div>
