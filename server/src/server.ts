@@ -295,7 +295,7 @@ app.get("/public/:courseId/moneylist", async (req, res) => {
         AND ml.amount <> 0
         AND (
           ? IS NULL
-          OR YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) = ?
+          OR YEAR(ml.payout_date) = ?
         )
       GROUP BY m.member_id, m.firstname, m.lastname
       ORDER BY total_amount DESC, lastname ASC, firstname ASC
@@ -324,7 +324,7 @@ app.get("/public/:courseId/moneylist/years", async (req, res) => {
     const [rows] = await pool.query<any[]>(
       `
       SELECT DISTINCT
-        YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) AS year
+        YEAR(ml.payout_date) AS year
       FROM eventMoneyList ml
       JOIN memberMain m ON m.member_id = ml.member_id
       LEFT JOIN eventMain e ON e.event_id = ml.event_id
@@ -332,7 +332,7 @@ app.get("/public/:courseId/moneylist/years", async (req, res) => {
       LEFT JOIN eventMain e2 ON e2.event_id = se.event_id
       WHERE m.course_id = ?
         AND ml.amount <> 0
-        AND YEAR(COALESCE(ml.payout_date, e.start_dt, e2.start_dt, ml.created_at)) IS NOT NULL
+        AND YEAR(ml.payout_date) IS NOT NULL
       ORDER BY year DESC
       `,
       [courseId]
