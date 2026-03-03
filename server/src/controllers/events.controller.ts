@@ -18,9 +18,16 @@ function requireCourseId(req: Request): number {
 
 function parseISODateTime(s: unknown): string {
   if (typeof s !== "string" || !s.trim()) throw new Error("Invalid datetime");
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) throw new Error("Invalid datetime");
+  const raw = s.trim();
   const pad = (n: number) => String(n).padStart(2, "0");
+
+  // Accept MySQL-style DATE and DATETIME strings directly.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return `${raw} 00:00:00`;
+  const mysqlDateTime = raw.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})(?::(\d{2}))?$/);
+  if (mysqlDateTime) return `${mysqlDateTime[1]} ${mysqlDateTime[2]}:${mysqlDateTime[3] ?? "00"}`;
+
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) throw new Error("Invalid datetime");
   // Normalize to MySQL DATETIME format in UTC.
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(
     d.getUTCHours()
