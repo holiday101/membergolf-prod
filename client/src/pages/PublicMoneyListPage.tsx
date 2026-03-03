@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 
 type MoneyRow = {
@@ -116,13 +116,17 @@ export default function PublicMoneyListPage() {
           <div className="amount">Winnings</div>
         </div>
         {filteredRows.map((row, index) => (
-          <div key={row.member_id} className="row listRow">
+          <Link
+            key={row.member_id}
+            className="row listRow linkRow"
+            to={`/public/${courseId}/members/${row.member_id}`}
+          >
             <div className="rank">{index + 1}</div>
             <div className="name">
               {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
             </div>
             <div className="amount">{money.format(row.total_amount ?? 0)}</div>
-          </div>
+          </Link>
         ))}
       </div>
       <style>{`
@@ -159,6 +163,8 @@ export default function PublicMoneyListPage() {
           font-size: 12px;
         }
         .listRow:nth-child(even) { background: #f0f7ff; }
+        .linkRow { text-decoration: none; cursor: pointer; }
+        .linkRow:hover { background: #e0f2fe; }
         .rank { font-weight: 700; color: #0f172a; }
         .name { font-weight: 500; color: #111827; }
         .amount { font-weight: 600; text-align: right; }

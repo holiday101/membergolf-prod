@@ -123,6 +123,11 @@ export default function EventListPage() {
     return sorted;
   }, [events, rangeFilter]);
 
+  const dateFormat: Intl.DateTimeFormatOptions =
+    rangeFilter === "all"
+      ? { year: "numeric", month: "numeric", day: "numeric" }
+      : { month: "numeric", day: "numeric" };
+
   async function submit() {
     setBusy(true);
     setError("");
@@ -271,13 +276,11 @@ export default function EventListPage() {
                   </span>
                   <span className="dateRange">
                     {new Date(ev.start_dt).toLocaleDateString(undefined, {
-                      month: "numeric",
-                      day: "numeric",
+                      ...dateFormat,
                     })}{" "}
                     -{" "}
                     {new Date(ev.end_dt).toLocaleDateString(undefined, {
-                      month: "numeric",
-                      day: "numeric",
+                      ...dateFormat,
                     })}
                   </span>
                   <span>{ev.ninename ?? ev.nine_id ?? "—"}</span>
