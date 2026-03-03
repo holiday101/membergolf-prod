@@ -18,9 +18,13 @@ function requireCourseId(req: Request): number {
 
 function parseISODateTime(s: unknown): string {
   if (typeof s !== "string" || !s.trim()) throw new Error("Invalid datetime");
-  // Expect ISO strings like "2026-01-26T00:00:00.000Z" or "2026-01-26T00:00:00Z"
-  // mysql2 can handle JS Date too, but we’ll keep strings for clarity.
-  return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) throw new Error("Invalid datetime");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  // Normalize to MySQL DATETIME format in UTC.
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(
+    d.getUTCHours()
+  )}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
 // GET /api/events?start=...&end=...
@@ -361,8 +365,8 @@ export async function updateEvent(req: Request, res: Response) {
 
     // Minimal validation; tighten as desired
     if (eventname !== undefined && typeof eventname !== "string") throw new Error("eventname must be string");
-    if (start_dt !== undefined) parseISODateTime(start_dt);
-    if (end_dt !== undefined) parseISODateTime(end_dt);
+    const parsedStart = start_dt !== undefined ? parseISODateTime(start_dt) : null;
+    const parsedEnd = end_dt !== undefined ? parseISODateTime(end_dt) : null;
 
     const sql = `
       UPDATE eventMain
@@ -379,8 +383,8 @@ export async function updateEvent(req: Request, res: Response) {
     const [result]: any = await pool.execute(sql, [
       eventname ?? null,
       eventdescription ?? null,
-      start_dt ?? null,
-      end_dt ?? null,
+      parsedStart,
+      parsedEnd,
       handicap_yn !== undefined ? Number(Boolean(handicap_yn)) : null,
       nine_id ?? null,
       id,
