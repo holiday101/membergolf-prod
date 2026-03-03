@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../auth";
 
 type EventRow = {
@@ -54,11 +54,13 @@ function toInputDate(value: string | null | undefined) {
 
 export default function EditEventPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [nines, setNines] = useState<Nine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saveSuccess, setSaveSuccess] = useState<string>("");
   const saveSuccessTimer = useRef<number | null>(null);
@@ -199,6 +201,23 @@ export default function EditEventPage() {
     }
   }
 
+  async function deleteEvent() {
+    if (!id) return;
+    const ok = window.confirm("Delete this event? This action cannot be undone.");
+    if (!ok) return;
+
+    setDeleteBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/api/events/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      navigate("/events", { replace: true });
+    } catch (err: any) {
+      setError(String(err?.message || "Failed to delete event"));
+      setDeleteBusy(false);
+    }
+  }
+
   useEffect(() => {
     return () => {
       if (subEventSuccessTimer.current) window.clearTimeout(subEventSuccessTimer.current);
@@ -277,6 +296,9 @@ export default function EditEventPage() {
               <div className="actions">
                 <button className="btn primary" onClick={submit} disabled={busy}>
                   {busy ? "Saving…" : "Save changes"}
+                </button>
+                <button className="btn danger" onClick={deleteEvent} disabled={deleteBusy || busy}>
+                  {deleteBusy ? "Deleting…" : "Delete event"}
                 </button>
                 {saveSuccess ? <div className="toast success toast-inline">{saveSuccess}</div> : null}
               </div>
@@ -392,6 +414,7 @@ export default function EditEventPage() {
         .toast-inline { margin-left: 0; }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .btn.danger { background: #ef4444; color: #fff; border-color: #ef4444; }
         .alert { padding: 10px 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; color: #991b1b; }
         .muted { color: #6b7280; font-size: 12px; }
         .errorText { color: #991b1b; }

@@ -74,10 +74,9 @@ export default function EventListPage() {
       end.setFullYear(end.getFullYear() + 2);
 
       if (rangeFilter === "near") {
-        start = new Date(now);
-        start.setDate(start.getDate() - 120);
-        end = new Date(now);
-        end.setDate(end.getDate() + 120);
+        // Fetch a broad range, then derive the nearest 5 past/next 5 in UI.
+        start = new Date("2000-01-01T00:00:00Z");
+        end = new Date("2100-12-31T23:59:59Z");
       } else if (rangeFilter === "year") {
         start = startOfYear(now);
         end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
