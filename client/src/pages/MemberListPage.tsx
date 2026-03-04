@@ -20,7 +20,6 @@ export default function MemberListPage() {
   const [email, setEmail] = useState("");
   const [handicap, setHandicap] = useState("");
   const [handicap18, setHandicap18] = useState("");
-  const [sendInvite, setSendInvite] = useState(false);
   const [query, setQuery] = useState("");
   const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
   const navigate = useNavigate();
@@ -73,10 +72,6 @@ export default function MemberListPage() {
       setError("First and last name are required.");
       return;
     }
-    if (sendInvite && !email.trim()) {
-      setError("Email is required to send an invite.");
-      return;
-    }
     setBusy(true);
     setError("");
     try {
@@ -91,19 +86,11 @@ export default function MemberListPage() {
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      if (sendInvite && email.trim()) {
-        const inviteRes = await apiFetch("/auth/invite", {
-          method: "POST",
-          body: JSON.stringify({ email: email.trim().toLowerCase() }),
-        });
-        if (!inviteRes.ok) throw new Error(await inviteRes.text());
-      }
       setFirstName("");
       setLastName("");
       setEmail("");
       setHandicap("");
       setHandicap18("");
-      setSendInvite(false);
       await loadMembers();
     } catch (e: any) {
       setError(e.message ?? "Failed to add member");
@@ -174,7 +161,7 @@ export default function MemberListPage() {
         <section className="card">
           <h2>Add Member</h2>
           <div className="form">
-            <div className="rowInputs">
+            <div className="rowInputs rowInputsTwo">
               <label className="formLabel">
                 First Name
                 <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
@@ -185,7 +172,7 @@ export default function MemberListPage() {
               </label>
             </div>
 
-            <div className="rowInputs">
+            <div className="rowInputs rowInputsThree">
               <label className="formLabel">
                 Email
                 <input value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -201,14 +188,6 @@ export default function MemberListPage() {
             </div>
 
             <div className="actions">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={sendInvite}
-                  onChange={(e) => setSendInvite(e.target.checked)}
-                />
-                Send invite email
-              </label>
               <button className="btn primary" onClick={submit} disabled={busy}>
                 {busy ? "Saving…" : "Add member"}
               </button>
@@ -232,11 +211,15 @@ export default function MemberListPage() {
           min-width: 220px;
         }
         .form { display: grid; gap: 10px; }
-        .formLabel { color: #6b7280; display: grid; gap: 6px; font-weight: 600; font-size: 12px; }
-        input { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
-        .rowInputs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-        .actions { display: flex; gap: 8px; }
-        .check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #374151; }
+        .formLabel { color: #6b7280; display: grid; gap: 6px; font-weight: 600; font-size: 12px; min-width: 0; }
+        input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
+        .rowInputs { display: grid; gap: 10px; }
+        .rowInputsTwo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .rowInputsThree { grid-template-columns: minmax(0, 2fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr); }
+        .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        @media (max-width: 760px) {
+          .rowInputsTwo, .rowInputsThree { grid-template-columns: 1fr; }
+        }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
         .list { display: grid; gap: 2px; }

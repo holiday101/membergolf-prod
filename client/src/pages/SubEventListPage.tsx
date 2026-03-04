@@ -8,6 +8,8 @@ type SubEventRow = {
   eventname: string | null;
   eventtype_id: number | null;
   eventtypename: string | null;
+  roster_id: number | null;
+  rostername: string | null;
   amount: number | null;
   addedmoney: number | null;
 };
@@ -53,7 +55,9 @@ export default function SubEventListPage() {
           <span>Sub Event</span>
           <span>Event</span>
           <span>Type</span>
-          <span>Amount</span>
+          <span>Roster</span>
+          <span>Amount / Player</span>
+          <span>Added Money</span>
         </div>
         {display.map((row) => (
           <div
@@ -69,10 +73,9 @@ export default function SubEventListPage() {
             <span>#{row.subevent_id}</span>
             <span>{row.eventname ?? row.event_id ?? "—"}</span>
             <span>{row.eventtypename ?? row.eventtype_id ?? "—"}</span>
-            <span>
-              {row.amount != null ? row.amount.toFixed(2) : "—"}
-              {row.addedmoney != null ? ` (+${row.addedmoney.toFixed(2)})` : ""}
-            </span>
+            <span>{row.rostername ?? row.roster_id ?? "—"}</span>
+            <span>{row.amount != null ? row.amount.toFixed(2) : "—"}</span>
+            <span>{row.addedmoney != null ? row.addedmoney.toFixed(2) : "—"}</span>
           </div>
         ))}
         {display.length === 0 && !loading ? <div className="empty">No subevents found</div> : null}
@@ -83,7 +86,7 @@ export default function SubEventListPage() {
         .title { font-size: 16px; font-weight: 700; color: #111827; }
         .table { display: grid; gap: 6px; margin-top: 12px; }
         .tableHead, .tableRow {
-          display: grid; grid-template-columns: 90px 1.2fr 0.8fr 0.8fr; gap: 8px; align-items: center;
+          display: grid; grid-template-columns: 90px 1.2fr 0.8fr 1fr 0.8fr 0.8fr; gap: 8px; align-items: center;
         }
         .tableHead { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; }
         .tableRow {

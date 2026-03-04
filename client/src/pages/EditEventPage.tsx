@@ -19,7 +19,14 @@ type Nine = {
 
 type SubEventType = { eventtype_id: number; eventtypename: string | null };
 type SubEventRoster = { roster_id: number; rostername: string | null };
-type SubEventRow = { subevent_id: number; eventtypename: string | null };
+type SubEventRow = {
+  subevent_id: number;
+  eventtypename: string | null;
+  roster_id: number | null;
+  rostername: string | null;
+  amount: number | null;
+  addedmoney: number | null;
+};
 
 type FormState = {
   eventname: string;
@@ -317,7 +324,12 @@ export default function EditEventPage() {
               <div className="subEventList">
                 {subEvents.map((sub) => (
                   <Link key={sub.subevent_id} className="subEventLink" to={`/subevents/${sub.subevent_id}`}>
-                    {sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}
+                    <span className="subEventTitle">{sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}</span>
+                    <span className="subEventMeta">
+                      Roster: {sub.rostername ?? sub.roster_id ?? "—"} | Amount/Player:{" "}
+                      {sub.amount != null ? sub.amount.toFixed(2) : "—"} | Added Money:{" "}
+                      {sub.addedmoney != null ? sub.addedmoney.toFixed(2) : "—"}
+                    </span>
                   </Link>
                 ))}
               </div>
@@ -424,13 +436,16 @@ export default function EditEventPage() {
         .subEventLink {
           text-decoration: none;
           color: #111827;
-          font-size: 12px;
           padding: 6px 8px;
           border-radius: 8px;
           border: 1px solid #e5e7eb;
           background: #f9fafb;
+          display: grid;
+          gap: 2px;
         }
         .subEventLink:hover { background: #eef2ff; border-color: #c7d2fe; }
+        .subEventTitle { font-size: 12px; font-weight: 700; color: #111827; }
+        .subEventMeta { font-size: 11px; color: #4b5563; }
       `}</style>
     </div>
   );

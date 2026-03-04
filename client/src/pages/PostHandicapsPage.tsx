@@ -88,6 +88,90 @@ export default function PostHandicapsPage() {
     loadExisting();
   }, [id]);
 
+  const handlePrint = () => {
+    const esc = (v: string) =>
+      v
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const tableRows = rows
+      .map((r) => {
+        const member = `${(r.lastname || "").trim()}, ${(r.firstname || "").trim()}`;
+        const h9 = formatHandicap(r.rhandicap, decimalHandicapEnabled);
+        const h18 = formatHandicap(r.rhandicap18, decimalHandicapEnabled);
+        return `<tr><td>${esc(member)}</td><td>${esc(String(h9 ?? ""))}</td><td>${esc(String(h18 ?? ""))}</td></tr>`;
+      })
+      .join("");
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Handicaps</title>
+    <style>
+      @page { margin: 0.2in; }
+      body { font-family: Arial, sans-serif; margin: 0; color: #111827; }
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      th, td { border-top: 1px solid #d1d5db; padding: 2px 4px; font-size: 9px; line-height: 1.0; text-align: left; }
+      thead th { border-top: none; font-size: 9px; font-weight: 700; color: #374151; }
+      th:nth-child(1), td:nth-child(1) { width: 64%; }
+      th:nth-child(2), td:nth-child(2) { width: 18%; }
+      th:nth-child(3), td:nth-child(3) { width: 18%; }
+      tr { page-break-inside: avoid; }
+    </style>
+  </head>
+  <body>
+    <table>
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Handicap (9)</th>
+          <th>Handicap (18)</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  </body>
+</html>`;
+
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    document.body.appendChild(frame);
+
+    const doc = frame.contentWindow?.document;
+    if (!doc || !frame.contentWindow) {
+      document.body.removeChild(frame);
+      return;
+    }
+
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const printAndCleanup = () => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      setTimeout(() => {
+        if (frame.parentNode) frame.parentNode.removeChild(frame);
+      }, 1000);
+    };
+
+    if (doc.readyState === "complete") {
+      printAndCleanup();
+    } else {
+      frame.onload = printAndCleanup;
+    }
+  };
+
   return (
     <div className="page">
       <div className="eventHeader">
@@ -106,7 +190,7 @@ export default function PostHandicapsPage() {
       <div className="card">
         <div className="headerRow">
           <div className="headerActions">
-            <button className="btn" onClick={() => window.print()}>
+            <button className="btn" onClick={handlePrint}>
               Print
             </button>
             <button className="btn primary" onClick={run} disabled={loading}>
@@ -118,11 +202,11 @@ export default function PostHandicapsPage() {
         {!ran ? (
           <div className="muted">Run the procedure to generate handicaps for this event.</div>
         ) : (
-          <div className="table">
+          <div className="table printArea">
             <div className="tableHead">
               <span>Member</span>
-              <span>RHandicap</span>
-              <span>RHandicap18</span>
+              <span>Handicap (9)</span>
+              <span>Handicap (18)</span>
             </div>
             {rows.map((r) => (
               <div key={r.member_id} className="tableRow">
@@ -170,13 +254,21 @@ export default function PostHandicapsPage() {
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; color: #374151; }
         @media print {
           @page { margin: 0.5in; }
-          .page > * { display: none !important; }
-          .page .eventHeader { display: flex !important; gap: 10px; align-items: center; }
-          .page .card { display: block !important; border: none; padding: 0; }
-          .page .headerRow { display: none !important; }
-          .page .headerActions, .backLink, .alert, .muted { display: none !important; }
-          .page .eventTitle { font-size: 18px; color: #111827; }
-          .table { margin: 0; }
+          body * { display: none !important; }
+          .printArea, .printArea * { display: revert !important; }
+          .printArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            gap: 2px;
+            font-size: 10px;
+            line-height: 1.1;
+          }
+          .printArea .tableHead { font-size: 10px; }
+          .printArea .tableRow { font-size: 10px; padding: 2px 0; border-top: 1px solid #e5e7eb; }
           .tableRow, .tableHead { page-break-inside: avoid; }
         }
       `}</style>

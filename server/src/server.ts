@@ -407,6 +407,81 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
       [courseId, memberId]
     );
 
+    const [courseRows] = await pool.query<any[]>(
+      "SELECT cardsmax, cardsused FROM courseMain WHERE course_id = ? LIMIT 1",
+      [courseId]
+    );
+    const cardsmax = Number(courseRows?.[0]?.cardsmax ?? 0);
+    const cardsused = Number(courseRows?.[0]?.cardsused ?? 0);
+
+    const [eligibleCountRows] = await pool.query<any[]>(
+      `
+        SELECT COUNT(*) AS total
+        FROM eventCard c
+        JOIN eventMain e ON e.event_id = c.event_id
+        WHERE c.course_id = ? AND c.member_id = ?
+          AND e.handicap_yn = 1
+          AND c.card_dt < NOW()
+      `,
+      [courseId, memberId]
+    );
+    const totalScores = Number(eligibleCountRows?.[0]?.total ?? 0);
+
+    const capCardsMax = Math.max(cardsmax, 0);
+    const capCardsUsed = Math.max(cardsused, 0);
+    let usedBase = 0;
+    if (totalScores >= capCardsMax && capCardsMax > 0) {
+      usedBase = capCardsUsed - 1;
+    } else if (totalScores <= 3) usedBase = 0;
+    else if (totalScores <= 5) usedBase = 1;
+    else if (totalScores <= 7) usedBase = 2;
+    else if (totalScores <= 9) usedBase = 3;
+    else if (totalScores <= 11) usedBase = 4;
+    else if (totalScores <= 13) usedBase = 5;
+    else if (totalScores <= 15) usedBase = 6;
+    else if (totalScores <= 17) usedBase = 7;
+    else if (totalScores <= 19) usedBase = 8;
+    else usedBase = 9;
+
+    const usedCount = totalScores > 0 ? Math.max(0, usedBase + 1) : 0;
+
+    const [recentEligibleRounds] = await pool.query<any[]>(
+      `
+        SELECT
+          c.card_id,
+          c.event_id,
+          c.card_dt,
+          c.numholes,
+          c.gross,
+          c.net,
+          c.hdiff,
+          e.eventname
+        FROM eventCard c
+        JOIN eventMain e ON e.event_id = c.event_id
+        WHERE c.course_id = ? AND c.member_id = ?
+          AND e.handicap_yn = 1
+          AND c.card_dt < NOW()
+        ORDER BY c.card_dt DESC, c.card_id DESC
+        LIMIT ?
+      `,
+      [courseId, memberId, capCardsMax > 0 ? capCardsMax : 0]
+    );
+
+    const usedCardIds = new Set<number>(
+      [...recentEligibleRounds]
+        .filter((r) => typeof r.hdiff === "number")
+        .sort((a, b) => {
+          if (a.hdiff !== b.hdiff) return a.hdiff - b.hdiff;
+          if (a.card_dt !== b.card_dt) return String(b.card_dt).localeCompare(String(a.card_dt));
+          return (b.card_id ?? 0) - (a.card_id ?? 0);
+        })
+        .slice(0, usedCount)
+        .map((r) => Number(r.card_id))
+    );
+    const usedHdiffSum = [...recentEligibleRounds]
+      .filter((r) => usedCardIds.has(Number(r.card_id)) && typeof r.hdiff === "number")
+      .reduce((sum, r) => sum + Number(r.hdiff), 0);
+
     const roundsSql = `
       SELECT
         c.card_id,
@@ -463,7 +538,21 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
       });
     }
 
-    res.json({ member, groups });
+    res.json({
+      member,
+      groups,
+      handicap_calculation: {
+        cardsmax: capCardsMax,
+        cardsused: capCardsUsed,
+        total_scores: totalScores,
+        used_count: usedCount,
+        used_hdiff_sum: Number(usedHdiffSum.toFixed(4)),
+        rounds: recentEligibleRounds.map((r) => ({
+          ...r,
+          used_in_calc: usedCardIds.has(Number(r.card_id)),
+        })),
+      },
+    });
   } catch {
     res.status(500).json({ error: "Server error" });
   }
@@ -1512,11 +1601,14 @@ app.get("/subevents", authMiddleware, async (req, res) => {
         e.eventname,
         s.eventtype_id,
         t.eventtypename,
+        s.roster_id,
+        r.rostername,
         s.amount,
         s.addedmoney
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      LEFT JOIN rosterMain r ON r.roster_id = s.roster_id
       WHERE 1=1
       ${payload?.courseId && !isGlobal(payload) ? "AND s.course_id = ?" : ""}
       ${eventId ? "AND s.event_id = ?" : ""}

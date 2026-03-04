@@ -65,6 +65,24 @@ type MemberDetail = {
     hole18?: number | null;
     rounds: Round[];
   }>;
+  handicap_calculation?: {
+    cardsmax: number;
+    cardsused: number;
+    total_scores: number;
+    used_count: number;
+    used_hdiff_sum: number;
+    rounds: Array<{
+      card_id: number;
+      event_id: number | null;
+      card_dt: string | null;
+      numholes: number | null;
+      gross: number | null;
+      net: number | null;
+      hdiff: number | null;
+      eventname: string | null;
+      used_in_calc: boolean;
+    }>;
+  };
 };
 
 function formatDate(value: string | null) {
@@ -78,6 +96,11 @@ function formatAverage(value: number | null) {
   if (value === null || value === undefined) return "—";
   if (Number.isNaN(Number(value))) return "—";
   return Number(value).toFixed(1);
+}
+
+function formatHdiff(value: number | null | undefined) {
+  if (typeof value !== "number" || Number.isNaN(value)) return "—";
+  return Number(value).toFixed(2);
 }
 
 function getHoleLabels(numholes: number | null, startinghole: number | null): number[] {
@@ -292,24 +315,25 @@ export default function PublicMemberDetailPage() {
                   {group.ninename ?? "Nine"} {group.numholes ? `(${group.numholes} holes)` : ""}
                 </h3>
                 {(() => {
+                  const displayedRounds = group.rounds.slice(0, 10);
                   const holes = getHoleLabels(group.numholes, group.startinghole);
                   const holeCount = holes.length;
                   const avgHoles = holes.map((n, idx) =>
                     average(
-                      group.rounds.map((round) =>
+                      displayedRounds.map((round) =>
                         group.numholes === 9 && group.startinghole === 10
                           ? (round as any)[`hole${idx + 1}`]
                           : (round as any)[`hole${n}`]
                       )
                     )
                   );
-                  const avgGross = average(group.rounds.map((round) => round.gross));
-                  const avgNet = average(group.rounds.map((round) => round.net));
+                  const avgGross = average(displayedRounds.map((round) => round.gross));
+                  const avgNet = average(displayedRounds.map((round) => round.net));
                   return (
                 <div className="rounds">
                   <div className="roundHead">
                     <div className="roundRow header">
-                      <div className="roundDate">Date</div>
+                      <div className="roundDate">Card Date</div>
                       <div className="roundEvent">Event</div>
                       <div className="holesHeaderCell">
                         <div className="holesTitle">Holes</div>
@@ -331,10 +355,10 @@ export default function PublicMemberDetailPage() {
                       <div className="roundScore">Adj</div>
                     </div>
                   </div>
-                  {group.rounds.length === 0 ? (
+                  {displayedRounds.length === 0 ? (
                     <div className="empty">No rounds</div>
                   ) : (
-                    group.rounds.map((round) => (
+                    displayedRounds.map((round) => (
                       <div key={round.card_id} className="roundBlock">
                         <div className="roundRow">
                           <div className="roundDate">{formatDate(round.card_dt)}</div>
@@ -360,9 +384,18 @@ export default function PublicMemberDetailPage() {
                             );
                           })}
                           </div>
-                          <div className="roundScore">{round.gross ?? "—"}</div>
-                          <div className="roundScore">{round.net ?? "—"}</div>
-                          <div className="roundScore">{round.adjustedscore ?? "—"}</div>
+                          <div className="roundScore">
+                            <span className="scoreLabel">Gross</span>
+                            <span>{round.gross ?? "—"}</span>
+                          </div>
+                          <div className="roundScore">
+                            <span className="scoreLabel">Net</span>
+                            <span>{round.net ?? "—"}</span>
+                          </div>
+                          <div className="roundScore">
+                            <span className="scoreLabel">Adj</span>
+                            <span>{round.adjustedscore ?? "—"}</span>
+                          </div>
                         </div>
                       </div>
                     ))
@@ -382,8 +415,14 @@ export default function PublicMemberDetailPage() {
                         </div>
                       ))}
                     </div>
-                    <div className="roundScore">{formatAverage(avgGross)}</div>
-                    <div className="roundScore">{formatAverage(avgNet)}</div>
+                    <div className="roundScore">
+                      <span className="scoreLabel">Gross</span>
+                      <span>{formatAverage(avgGross)}</span>
+                    </div>
+                    <div className="roundScore">
+                      <span className="scoreLabel">Net</span>
+                      <span>{formatAverage(avgNet)}</span>
+                    </div>
                     <div />
                   </div>
                 </div>
@@ -392,6 +431,40 @@ export default function PublicMemberDetailPage() {
               </section>
             ))
           )}
+
+          <section className="card">
+            <h3>Handicap Calculation</h3>
+            {data.handicap_calculation ? (
+              <>
+                <div className="calcMeta">
+                  <span>Total Eligible Rounds: {data.handicap_calculation.total_scores}</span>
+                  <span>Recent Pool (cardsmax): {data.handicap_calculation.cardsmax}</span>
+                  <span>Used in Calc: {data.handicap_calculation.used_count}</span>
+                  <span>Total HDiff Used: {formatHdiff(data.handicap_calculation.used_hdiff_sum)}</span>
+                </div>
+                {data.handicap_calculation.rounds.length === 0 ? (
+                  <div className="empty">No handicap-eligible rounds</div>
+                ) : (
+                  <div className="calcTable">
+                    <div className="calcRow calcHead">
+                      <div>Card Date</div>
+                      <div>Event</div>
+                      <div>HDiff</div>
+                    </div>
+                    {data.handicap_calculation.rounds.map((r) => (
+                      <div key={r.card_id} className={`calcRow ${r.used_in_calc ? "usedRow" : ""}`}>
+                        <div>{formatDate(r.card_dt)}</div>
+                        <div>{r.eventname ?? "Event"}</div>
+                        <div>{formatHdiff(r.hdiff)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="empty">No calculation details</div>
+            )}
+          </section>
         </div>
       ) : null}
 
@@ -448,6 +521,7 @@ export default function PublicMemberDetailPage() {
         .roundDate { font-size: 11px; }
         .roundEvent { font-size: 11px; font-weight: 400; color: #6b7280; }
         .roundScore { text-align: right; font-size: 12px; font-weight: 700; color: #0f172a; }
+        .scoreLabel { display: none; }
         .holesHeaderCell { display: grid; gap: 4px; justify-items: center; }
         .holesTitle { text-align: center; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; }
         .holesNumbers { display: grid; gap: 4px; width: 100%; justify-items: center; }
@@ -500,6 +574,36 @@ export default function PublicMemberDetailPage() {
         .holeValue { position: relative; z-index: 1; }
         .holeCell:nth-child(even) { background: inherit; }
         .empty { color: #9ca3af; font-size: 12px; padding: 4px 0; }
+        .calcMeta {
+          display: grid;
+          gap: 4px;
+          font-size: 11px;
+          color: #6b7280;
+          margin-bottom: 8px;
+        }
+        .calcTable { display: grid; gap: 4px; }
+        .calcRow {
+          display: grid;
+          grid-template-columns: 100px 1fr 70px;
+          gap: 8px;
+          align-items: center;
+          font-size: 11px;
+          color: #374151;
+          background: #f9fafb;
+          border-radius: 8px;
+          padding: 6px 8px;
+        }
+        .calcRow:nth-child(even) { background: #f0f7ff; }
+        .calcRow.usedRow { background: #fef9c3; }
+        .calcHead {
+          background: transparent !important;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 0 8px 4px;
+        }
 
         @media (max-width: 640px) {
           .roundRow { grid-template-columns: 70px 1fr 1fr 44px 44px 44px; }
@@ -516,9 +620,31 @@ export default function PublicMemberDetailPage() {
             display: none;
           }
           .roundDate, .roundEvent { font-size: 11px; }
+          .roundScore {
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+          }
+          .scoreLabel {
+            display: inline-block;
+            min-width: 42px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #9ca3af;
+            font-weight: 600;
+          }
           .holesInline {
             grid-template-columns: repeat(9, minmax(12px, 1fr));
           }
+          .calcRow {
+            grid-template-columns: 1fr;
+            gap: 4px;
+            font-size: 11px;
+          }
+          .calcHead { display: none; }
           .roundScore { text-align: left; }
           .roundBlock { padding: 2px 0; }
           .roundRow .roundScore { font-size: 11px; }

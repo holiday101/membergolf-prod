@@ -102,9 +102,9 @@ BEGIN
 
     IF v_totalscores <> 0 THEN
       INSERT INTO eventHandicap
-        (event_id,member_id,handicap,rhandicap,handicap18,totalcards,cardsused,totaldiffs)
+        (event_id,member_id,handicap,rhandicap,handicap18,rhandicap18,totalcards,cardsused,totaldiffs)
       VALUES
-        (p_eventid, v_memberid, ROUND(v_hdcp,0), ROUND(v_hdcp,2), ROUND(v_hdcp*2,0),
+        (p_eventid, v_memberid, ROUND(v_hdcp,0), ROUND(v_hdcp,2), ROUND(v_hdcp*2,0), ROUND(v_hdcp*2,2),
          v_totalscores, v_ub + 1, v_sumdiffs);
 
       UPDATE memberMain
@@ -130,8 +130,8 @@ BEGIN
          AND member_id = v_memberid;
     ELSE
       INSERT INTO eventHandicap
-        (event_id,member_id,handicap,rhandicap,handicap18,totalcards,cardsused,totaldiffs)
-        SELECT p_eventid, v_memberid, handicap, handicap, handicap18, 0, 0, 0
+        (event_id,member_id,handicap,rhandicap,handicap18,rhandicap18,totalcards,cardsused,totaldiffs)
+        SELECT p_eventid, v_memberid, handicap, handicap, handicap18, handicap18, 0, 0, 0
           FROM memberMain
          WHERE member_id = v_memberid;
     END IF;

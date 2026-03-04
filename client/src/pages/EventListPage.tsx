@@ -150,6 +150,13 @@ export default function EventListPage() {
         throw new Error(text || "Request failed");
       }
 
+      const created = await res.json();
+      const createdId = Number(created?.id ?? created?.event_id);
+      if (Number.isFinite(createdId)) {
+        navigate(`/events/${createdId}`);
+        return;
+      }
+
       await loadData();
       setForm(emptyForm);
     } catch (err: any) {
