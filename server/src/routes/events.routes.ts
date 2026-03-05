@@ -6,6 +6,7 @@ import {
   listEventCards,
   updateEventCard,
   createEventCard,
+  deleteEventCard,
   updateEvent,
   deleteEvent,
 } from "../controllers/events.controller";
@@ -30,6 +31,7 @@ eventsRouter.get("/:id", getEvent);
 eventsRouter.get("/:id/cards", listEventCards);
 eventsRouter.post("/:id/cards", createEventCard);
 eventsRouter.put("/:id/cards/:cardId", updateEventCard);
+eventsRouter.delete("/:id/cards/:cardId", deleteEventCard);
 
 /**
  * POST /api/events

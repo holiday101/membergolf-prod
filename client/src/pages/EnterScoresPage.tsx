@@ -90,15 +90,18 @@ function toInputDate(value: string | null | undefined) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function getHoleLabels(event: EventRow | null): number[] {
-  const numholes = event?.numholes ?? 18;
-  const startinghole = event?.startinghole ?? 1;
+function getHoleLabels(numholes: number, startinghole: number): number[] {
   if (numholes === 9) {
     return startinghole === 10
       ? [10, 11, 12, 13, 14, 15, 16, 17, 18]
       : [1, 2, 3, 4, 5, 6, 7, 8, 9];
   }
   return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+}
+
+function storageHoleNumber(displayHole: number, numholes: number, startinghole: number): number {
+  if (numholes === 9 && startinghole === 10) return displayHole - 9;
+  return displayHole;
 }
 
 function getHoleDefault(nine: NineRow | null, hole: number): number | null {
@@ -144,11 +147,14 @@ export default function EnterScoresPage() {
   const [members, setMembers] = useState<Array<{ member_id: number; firstname: string; lastname: string }>>([]);
   const [nines, setNines] = useState<NineRow[]>([]);
   const [cardSort, setCardSort] = useState<"recent" | "name">("recent");
+  const [cardQuery, setCardQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [busy, setBusy] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
   const addMemberRef = useRef<HTMLInputElement | null>(null);
   const editMemberRef = useRef<HTMLInputElement | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const selectedCard = useMemo(
     () => cards.find((c) => c.card_id === selectedCardId) ?? null,
@@ -162,23 +168,35 @@ export default function EnterScoresPage() {
     const idVal = cardForm.nine_id || (event?.nine_id ? String(event.nine_id) : "");
     return nines.find((n) => String(n.nine_id) === idVal) ?? null;
   }, [cardForm.nine_id, event, nines]);
+  const addNumholes = addNine?.numholes ?? event?.numholes ?? 18;
+  const addStartinghole = addNine?.startinghole ?? event?.startinghole ?? 1;
+  const editNumholes = editNine?.numholes ?? event?.numholes ?? 18;
+  const editStartinghole = editNine?.startinghole ?? event?.startinghole ?? 1;
+  const addHoleLabels = useMemo(() => getHoleLabels(addNumholes, addStartinghole), [addNumholes, addStartinghole]);
+  const editHoleLabels = useMemo(() => getHoleLabels(editNumholes, editStartinghole), [editNumholes, editStartinghole]);
 
   const displayCards = useMemo(() => {
-    if (cardSort === "name") {
-      return [...cards].sort((a, b) => {
-        const la = (a.lastname ?? "").toLowerCase();
-        const lb = (b.lastname ?? "").toLowerCase();
-        if (la !== lb) return la.localeCompare(lb);
-        const fa = (a.firstname ?? "").toLowerCase();
-        const fb = (b.firstname ?? "").toLowerCase();
-        if (fa !== fb) return fa.localeCompare(fb);
-        const da = a.card_dt ? new Date(a.card_dt).getTime() : 0;
-        const db = b.card_dt ? new Date(b.card_dt).getTime() : 0;
-        return da - db;
-      });
-    }
-    return [...cards].sort((a, b) => b.card_id - a.card_id);
-  }, [cards, cardSort]);
+    const sorted =
+      cardSort === "name"
+        ? [...cards].sort((a, b) => {
+            const la = (a.lastname ?? "").toLowerCase();
+            const lb = (b.lastname ?? "").toLowerCase();
+            if (la !== lb) return la.localeCompare(lb);
+            const fa = (a.firstname ?? "").toLowerCase();
+            const fb = (b.firstname ?? "").toLowerCase();
+            if (fa !== fb) return fa.localeCompare(fb);
+            const da = a.card_dt ? new Date(a.card_dt).getTime() : 0;
+            const db = b.card_dt ? new Date(b.card_dt).getTime() : 0;
+            return da - db;
+          })
+        : [...cards].sort((a, b) => b.card_id - a.card_id);
+
+    const q = cardQuery.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter((c) =>
+      `${(c.lastname ?? "").toLowerCase()}, ${(c.firstname ?? "").toLowerCase()}`.includes(q)
+    );
+  }, [cards, cardSort, cardQuery]);
 
   const normalizeName = (value: string) =>
     value.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
@@ -272,6 +290,18 @@ export default function EnterScoresPage() {
     });
   }, [selectedCard, cards, event]);
 
+  function showToast(message: string) {
+    setToastMsg(message);
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToastMsg(""), 2600);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (selectedCardId) {
       editMemberRef.current?.focus();
@@ -317,6 +347,26 @@ export default function EnterScoresPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       await loadCards();
+      showToast(`Card saved for ${selectedMember.firstname} ${selectedMember.lastname}`);
+    } catch (err: any) {
+      setError(String(err?.message || "Request failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteCard() {
+    if (!selectedCardId || !id || !selectedCard) return;
+    const name = `${(selectedCard.firstname ?? "").trim()} ${(selectedCard.lastname ?? "").trim()}`.trim();
+    if (!window.confirm(`Delete this card${name ? ` for ${name}` : ""}?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/api/events/${id}/cards/${selectedCardId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(await res.text());
+      setSelectedCardId(null);
+      await loadCards();
+      showToast(`Card deleted${name ? ` for ${name}` : ""}`);
     } catch (err: any) {
       setError(String(err?.message || "Request failed"));
     } finally {
@@ -347,6 +397,7 @@ export default function EnterScoresPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(await res.text());
+      showToast(`Card saved for ${selectedMember.firstname} ${selectedMember.lastname}`);
       setAddCardForm({
         member_id: "",
         nine_id: event?.nine_id ? String(event.nine_id) : "",
@@ -369,6 +420,7 @@ export default function EnterScoresPage() {
           <strong>Error:</strong> {error}
         </div>
       )}
+      {toastMsg && <div className="toast">{toastMsg}</div>}
 
       <div className="eventHeader">
         <button
@@ -409,12 +461,12 @@ export default function EnterScoresPage() {
                 />
               </div>
               <div className="formRow">
-                <span className="formLabelText">Nine</span>
+                <span className="formLabelText">Layout</span>
                 <select
                   value={cardForm.nine_id}
                   onChange={(e) => setCardForm((p) => ({ ...p, nine_id: e.target.value }))}
                 >
-                  <option value="">Select nine</option>
+                  <option value="">Select layout</option>
                   {nines.map((n) => (
                     <option key={n.nine_id} value={String(n.nine_id)}>
                       {n.ninename}
@@ -422,31 +474,31 @@ export default function EnterScoresPage() {
                   ))}
                 </select>
               </div>
-              {event?.numholes === 18 ? (
+              {(selectedCard ? editNumholes : addNumholes) === 18 ? (
                 <div className="holesLines">
                   <div className="holesHead">Holes</div>
                   <div className="holesNums">
-                    {splitFrontBack(getHoleLabels(event)).front.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).front.map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {splitFrontBack(getHoleLabels(event)).front.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).front.map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={cardForm.holes[hole] ?? ""}
+                          value={cardForm.holes[storageHoleNumber(hole, editNumholes, editStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(editNine, hole) != null
-                              ? String(getHoleDefault(editNine, hole))
+                            getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)) != null
+                              ? String(getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, editNumholes, editStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -454,27 +506,27 @@ export default function EnterScoresPage() {
                     ))}
                   </div>
                   <div className="holesNums">
-                    {splitFrontBack(getHoleLabels(event)).back.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).back.map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {splitFrontBack(getHoleLabels(event)).back.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).back.map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={cardForm.holes[hole] ?? ""}
+                          value={cardForm.holes[storageHoleNumber(hole, editNumholes, editStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(editNine, hole) != null
-                              ? String(getHoleDefault(editNine, hole))
+                            getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)) != null
+                              ? String(getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, editNumholes, editStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -486,27 +538,27 @@ export default function EnterScoresPage() {
                 <div className="holesLines">
                   <div className="holesHead">Holes</div>
                   <div className="holesNums">
-                    {getHoleLabels(event).map((hole) => (
+                    {(selectedCard ? editHoleLabels : addHoleLabels).map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {getHoleLabels(event).map((hole) => (
+                    {(selectedCard ? editHoleLabels : addHoleLabels).map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={cardForm.holes[hole] ?? ""}
+                          value={cardForm.holes[storageHoleNumber(hole, editNumholes, editStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(editNine, hole) != null
-                              ? String(getHoleDefault(editNine, hole))
+                            getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)) != null
+                              ? String(getHoleDefault(editNine, storageHoleNumber(hole, editNumholes, editStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, editNumholes, editStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -539,6 +591,9 @@ export default function EnterScoresPage() {
                 <button className="btn primary" onClick={saveCard} disabled={busy}>
                   {busy ? "Saving…" : "Save card"}
                 </button>
+                <button className="btn danger" onClick={deleteCard} disabled={busy}>
+                  Delete
+                </button>
               </div>
             </div>
           ) : (
@@ -566,12 +621,12 @@ export default function EnterScoresPage() {
                 })}
               </datalist>
               <div className="formRow">
-                <span className="formLabelText">Nine</span>
+                <span className="formLabelText">Layout</span>
                 <select
                   value={addCardForm.nine_id}
                   onChange={(e) => setAddCardForm((p) => ({ ...p, nine_id: e.target.value }))}
                 >
-                  <option value="">Select nine</option>
+                  <option value="">Select layout</option>
                   {nines.map((n) => (
                     <option key={n.nine_id} value={String(n.nine_id)}>
                       {n.ninename}
@@ -579,31 +634,31 @@ export default function EnterScoresPage() {
                   ))}
                 </select>
               </div>
-              {event?.numholes === 18 ? (
+              {(selectedCard ? editNumholes : addNumholes) === 18 ? (
                 <div className="holesLines">
                   <div className="holesHead">Holes</div>
                   <div className="holesNums">
-                    {splitFrontBack(getHoleLabels(event)).front.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).front.map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {splitFrontBack(getHoleLabels(event)).front.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).front.map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={addCardForm.holes[hole] ?? ""}
+                          value={addCardForm.holes[storageHoleNumber(hole, addNumholes, addStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(addNine, hole) != null
-                              ? String(getHoleDefault(addNine, hole))
+                            getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)) != null
+                              ? String(getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setAddCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, addNumholes, addStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -611,27 +666,27 @@ export default function EnterScoresPage() {
                     ))}
                   </div>
                   <div className="holesNums">
-                    {splitFrontBack(getHoleLabels(event)).back.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).back.map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {splitFrontBack(getHoleLabels(event)).back.map((hole) => (
+                    {splitFrontBack(selectedCard ? editHoleLabels : addHoleLabels).back.map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={addCardForm.holes[hole] ?? ""}
+                          value={addCardForm.holes[storageHoleNumber(hole, addNumholes, addStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(addNine, hole) != null
-                              ? String(getHoleDefault(addNine, hole))
+                            getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)) != null
+                              ? String(getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setAddCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, addNumholes, addStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -643,27 +698,27 @@ export default function EnterScoresPage() {
                 <div className="holesLines">
                   <div className="holesHead">Holes</div>
                   <div className="holesNums">
-                    {getHoleLabels(event).map((hole) => (
+                    {(selectedCard ? editHoleLabels : addHoleLabels).map((hole) => (
                       <div key={hole} className="holeNum">
                         {hole}
                       </div>
                     ))}
                   </div>
                   <div className="holesRow">
-                    {getHoleLabels(event).map((hole) => (
+                    {(selectedCard ? editHoleLabels : addHoleLabels).map((hole) => (
                       <label key={hole} className="holeInline">
                         <input
                           className="holeInput"
-                          value={addCardForm.holes[hole] ?? ""}
+                          value={addCardForm.holes[storageHoleNumber(hole, addNumholes, addStartinghole)] ?? ""}
                           placeholder={
-                            getHoleDefault(addNine, hole) != null
-                              ? String(getHoleDefault(addNine, hole))
+                            getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)) != null
+                              ? String(getHoleDefault(addNine, storageHoleNumber(hole, addNumholes, addStartinghole)))
                               : ""
                           }
                           onChange={(e) =>
                             setAddCardForm((p) => ({
                               ...p,
-                              holes: { ...p.holes, [hole]: e.target.value },
+                              holes: { ...p.holes, [storageHoleNumber(hole, addNumholes, addStartinghole)]: e.target.value },
                             }))
                           }
                         />
@@ -702,8 +757,14 @@ export default function EnterScoresPage() {
         </section>
 
         <section className="card">
+          <div className="filterTitle">Event Cards</div>
           <div className="filterRow">
-            <div className="filterTitle">Event Cards</div>
+            <input
+              className="searchInput"
+              placeholder="Search name…"
+              value={cardQuery}
+              onChange={(e) => setCardQuery(e.target.value)}
+            />
             <select
               className="filterSelect"
               value={cardSort}
@@ -782,7 +843,8 @@ export default function EnterScoresPage() {
         }
         .actions { display: flex; gap: 8px; }
         .filterRow { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; margin: 6px 0; }
-        .filterTitle { text-align: center; font-size: 15px; color: #6b7280; font-weight: 600; }
+        .filterTitle { font-size: 15px; color: #6b7280; font-weight: 600; margin: 6px 0; }
+        .searchInput { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; min-width: 180px; }
         .filterSelect { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; }
         .table { display: grid; gap: 8px; margin-top: 12px; }
         .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr 1fr 1fr auto; align-items: center; }
@@ -824,8 +886,23 @@ export default function EnterScoresPage() {
         }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .btn.danger { background: #fff; color: #b91c1c; border-color: #fca5a5; }
+        .btn.danger:hover { background: #fef2f2; }
         .backBtn { padding: 4px 8px; font-size: 11px; }
         .alert { padding: 10px 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; color: #991b1b; }
+        .toast {
+          position: fixed;
+          top: 16px;
+          right: 16px;
+          z-index: 50;
+          background: #065f46;
+          color: #ecfdf5;
+          border: 1px solid #10b981;
+          border-radius: 10px;
+          padding: 8px 12px;
+          font-size: 12px;
+          box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        }
       `}</style>
     </div>
   );

@@ -37,10 +37,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP

@@ -1,5 +1,6 @@
 CREATE PROCEDURE spUnPost(IN p_subeventid INT)
 BEGIN
+  DELETE FROM eventSkin WHERE subevent_id = p_subeventid;
   DELETE FROM subEventBBPayGross WHERE subevent_id = p_subeventid;
   DELETE FROM subEventBBPayNet WHERE subevent_id = p_subeventid;
   DELETE FROM subEventPayGross WHERE subevent_id = p_subeventid;
@@ -9,4 +10,3 @@ BEGIN
   DELETE FROM subEventSkinNet WHERE subevent_id = p_subeventid;
   DELETE FROM subEventSkinNetResults WHERE subevent_id = p_subeventid;
 END
-

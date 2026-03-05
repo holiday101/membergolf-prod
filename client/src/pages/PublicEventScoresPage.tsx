@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 
@@ -19,6 +19,9 @@ type ScoreRow = {
   gross: number | null;
   net: number | null;
   adjustedscore: number | null;
+  handicap: number | null;
+  flight_id?: number | null;
+  flightname?: string | null;
   numholes: number | null;
   startinghole: number | null;
   hole1?: number | null;
@@ -39,7 +42,53 @@ type ScoreRow = {
   hole16?: number | null;
   hole17?: number | null;
   hole18?: number | null;
+  par1?: number | null;
+  par2?: number | null;
+  par3?: number | null;
+  par4?: number | null;
+  par5?: number | null;
+  par6?: number | null;
+  par7?: number | null;
+  par8?: number | null;
+  par9?: number | null;
+  par10?: number | null;
+  par11?: number | null;
+  par12?: number | null;
+  par13?: number | null;
+  par14?: number | null;
+  par15?: number | null;
+  par16?: number | null;
+  par17?: number | null;
+  par18?: number | null;
 };
+
+function getHoleLabels(numholes: number | null, startinghole: number | null) {
+  if (numholes === 9) return startinghole === 10 ? [10, 11, 12, 13, 14, 15, 16, 17, 18] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  return startinghole === 10
+    ? [10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+}
+
+function storageHoleNumber(displayHole: number, numholes: number | null, startinghole: number | null) {
+  if (numholes === 9 && startinghole === 10) return displayHole - 9;
+  return displayHole;
+}
+
+function getScoreMeta(score: number | null | undefined, par: number | null | undefined) {
+  if (typeof score !== "number" || typeof par !== "number" || Number.isNaN(score) || Number.isNaN(par)) {
+    return { className: "scoreCell", style: undefined };
+  }
+  const diff = score - par;
+  if (diff === 0) return { className: "scoreCell neutral", style: undefined };
+  if (diff === -1) return { className: "scoreCell birdie", style: undefined };
+  if (diff <= -2) return { className: "scoreCell eagle", style: undefined };
+  if (diff >= 1) {
+    const bg = diff >= 4 ? "#1d4ed8" : diff === 3 ? "#3b82f6" : diff === 2 ? "#60a5fa" : "#93c5fd";
+    const color = diff >= 3 ? "#eff6ff" : "#0f172a";
+    return { className: "scoreCell over", style: { background: bg, color } };
+  }
+  return { className: "scoreCell", style: undefined };
+}
 
 export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
@@ -69,25 +118,18 @@ export default function PublicEventScoresPage() {
     run();
   }, [courseId, eventId]);
 
-  const formatDate = (value: string) => {
-    const dt = new Date(value);
-    if (Number.isNaN(dt.getTime())) return value;
-    return dt.toLocaleDateString();
-  };
-
-  const formatNum = (value: number | null) => (typeof value === "number" ? value : "—");
-  const getHoleLabels = (numholes: number | null, startinghole: number | null) => {
-    if (numholes === 9) return startinghole === 10 ? [10, 11, 12, 13, 14, 15, 16, 17, 18] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    return startinghole === 10
-      ? [10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-      : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-  };
-  const getHoleScores = (row: ScoreRow, labels: number[]) => {
-    if (row.numholes === 9 && row.startinghole === 10) {
-      return labels.map((_, idx) => (row as any)[`hole${idx + 1}`] ?? null);
+  const groupedByFlight = useMemo(() => {
+    const map = new Map<string, { flightName: string; labels: number[]; rows: ScoreRow[] }>();
+    for (const row of scores) {
+      const name = row.flightname?.trim() || "All Players";
+      const key = `${name}::${row.numholes ?? 9}::${row.startinghole ?? 1}`;
+      const labels = getHoleLabels(row.numholes, row.startinghole);
+      const current = map.get(key);
+      if (current) current.rows.push(row);
+      else map.set(key, { flightName: name, labels, rows: [row] });
     }
-    return labels.map((hole) => (row as any)[`hole${hole}`] ?? null);
-  };
+    return Array.from(map.values());
+  }, [scores]);
 
   return (
     <div className="page">
@@ -99,56 +141,57 @@ export default function PublicEventScoresPage() {
       {error ? <div className="error">{error}</div> : null}
 
       {event ? (
-        <div className="card">
+        <div className="card wideCard">
           <div className="title">{event.eventname}</div>
           <div className="meta">
-            {new Date(event.start_dt).toLocaleDateString()} – {new Date(event.end_dt).toLocaleDateString()}
+            {new Date(event.start_dt).toLocaleDateString()} - {new Date(event.end_dt).toLocaleDateString()}
           </div>
 
           {scores.length === 0 ? (
             <div className="empty">No scores posted</div>
           ) : (
-            <div className="scoreList">
-              <div className="scoreHeader">
-                <div>Player</div>
-                <div>Date</div>
-                <div>Holes</div>
-                <div>Gross</div>
-                <div>Net</div>
-                <div>Adj</div>
-              </div>
-              {scores.map((s) => (
-                <div key={s.card_id} className="scoreCard">
-                  <div className="scoreRow">
-                    <div className="snameCell">
-                      <Link className="sname" to={`/public/${courseId}/members/${s.member_id}`}>
-                        {(s.lastname || "").trim()}, {(s.firstname || "").trim()}
-                      </Link>
+            <div className="detailsList">
+              {groupedByFlight.map((group, idx) => (
+                <div key={`${group.flightName}-${idx}`} className="flightSection">
+                  <div className="flightHeader">{group.flightName}</div>
+                  <div className="detailHeadRow">
+                    <span>Name</span>
+                    <span>Card Date</span>
+                    <span>Hdcp</span>
+                    <div className="holesHeadGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
+                      {group.labels.map((h) => (
+                        <span key={`head-${idx}-${h}`}>{h}</span>
+                      ))}
                     </div>
-                    <div className="sdate">{formatDate(s.card_dt)}</div>
-                    <div className="snum">{formatNum(s.numholes)}</div>
-                    <div className="snum">{formatNum(s.gross)}</div>
-                    <div className="snum">{formatNum(s.net)}</div>
-                    <div className="snum">{formatNum(s.adjustedscore)}</div>
+                    <span>Gross</span>
+                    <span>Net</span>
                   </div>
-                  {(() => {
-                    const labels = getHoleLabels(s.numholes, s.startinghole);
-                    const values = getHoleScores(s, labels);
-                    return (
-                      <div className="holesWrap">
-                        <div className="holesGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(22px, 1fr))` }}>
-                          {labels.map((h) => (
-                            <div key={`h-${s.card_id}-${h}`} className="holeHead">{h}</div>
-                          ))}
-                        </div>
-                        <div className="holesGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(22px, 1fr))` }}>
-                          {values.map((v, idx) => (
-                            <div key={`v-${s.card_id}-${idx}`} className="holeVal">{typeof v === "number" ? v : "—"}</div>
-                          ))}
-                        </div>
+                  {group.rows.map((row) => (
+                    <div key={row.card_id} className="detailRow">
+                      <div className="detailMeta">
+                        <Link className="memberTag" to={`/public/${courseId}/members/${row.member_id}`}>
+                          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                        </Link>
                       </div>
-                    );
-                  })()}
+                      <div className="dateCell">{new Date(row.card_dt).toLocaleDateString()}</div>
+                      <div className="statCell">{typeof row.handicap === "number" ? row.handicap : "-"}</div>
+                      <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
+                        {group.labels.map((h) => {
+                          const storage = storageHoleNumber(h, row.numholes, row.startinghole);
+                          const score = (row as any)[`hole${storage}`] as number | null | undefined;
+                          const par = (row as any)[`par${storage}`] as number | null | undefined;
+                          const meta = getScoreMeta(score, par);
+                          return (
+                            <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
+                              {typeof score === "number" ? score : "-"}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
+                      <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -159,12 +202,12 @@ export default function PublicEventScoresPage() {
       <style>{`
         .page { display: grid; gap: 12px; }
         .backLink {
-          color: #0f172a;
+          color: #111827;
           text-decoration: none;
           font-weight: 600;
           font-size: 12px;
-          background: #f3f4f6;
-          border: 1px solid #e5e7eb;
+          background: #fff;
+          border: 1px solid #d1d5db;
           padding: 6px 10px;
           border-radius: 999px;
           display: inline-flex;
@@ -172,74 +215,70 @@ export default function PublicEventScoresPage() {
           width: fit-content;
         }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        .title { font-size: 18px; font-weight: 700; color: #111827; }
+        .wideCard { max-width: 100%; }
+        .title { font-size: 16px; font-weight: 700; color: #111827; }
         .meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
-        .scoreList { margin-top: 12px; display: grid; gap: 6px; }
-        .scoreHeader,
-        .scoreRow {
+        .detailsList { display: grid; gap: 8px; margin-top: 10px; }
+        .flightSection { display: grid; gap: 2px; }
+        .flightHeader { font-size: 12px; font-weight: 800; color: #1e3a8a; padding: 2px 0 4px; border-bottom: 1px solid #dbeafe; }
+        .detailHeadRow {
           display: grid;
-          grid-template-columns: minmax(160px, 1fr) 90px 56px 56px 56px 56px;
+          grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px;
           gap: 8px;
           align-items: center;
-        }
-        .scoreHeader {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
           color: #6b7280;
+          font-size: 10px;
           font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 2px 0;
         }
-        .scoreRow {
-          padding: 8px 10px;
-          font-size: 13px;
+        .holesHeadGrid { display: grid; gap: 2px; text-align: center; }
+        .detailRow {
+          display: grid;
+          grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px;
+          gap: 8px;
+          align-items: center;
+          padding: 4px 0;
+          border-bottom: 1px solid #e5e7eb;
         }
-        .scoreCard {
-          background: #f8fafc;
-          border: 1px solid #e2e8f0;
-          border-radius: 10px;
-        }
-        .snameCell { min-width: 0; }
-        .sname {
-          font-weight: 600;
-          color: #0f172a;
-          text-decoration: none;
-          display: block;
+        .detailMeta { min-width: 0; font-size: 11px; }
+        .memberTag {
+          color: #1f2937;
+          font-weight: 700;
+          white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          white-space: nowrap;
+          text-decoration: none;
+          display: block;
         }
-        .sdate { color: #475569; font-size: 12px; }
-        .snum { text-align: right; font-variant-numeric: tabular-nums; }
-        .holesWrap {
-          border-top: 1px solid #e2e8f0;
-          padding: 8px 10px 10px;
-          display: grid;
-          gap: 4px;
-        }
-        .holesGrid { display: grid; gap: 4px; }
-        .holeHead {
-          font-size: 10px;
-          text-align: center;
-          color: #64748b;
-          font-weight: 700;
-        }
-        .holeVal {
-          text-align: center;
-          font-size: 12px;
-          font-weight: 700;
-          color: #0f172a;
-          background: #ffffff;
-          border: 1px solid #dbeafe;
-          border-radius: 6px;
+        .dateCell { color: #6b7280; font-size: 11px; white-space: nowrap; text-align: left; }
+        .scoreGrid { display: grid; gap: 2px; align-items: stretch; }
+        .scoreCell {
+          border: 1px solid #e5e7eb;
+          border-radius: 3px;
           padding: 2px 0;
-          font-variant-numeric: tabular-nums;
+          font-size: 11px;
+          color: #111827;
+          background: #fff;
+          font-weight: 600;
+          text-align: center;
+          display: grid;
+          place-items: center;
+          line-height: 1;
         }
+        .scoreCell.neutral { background: #f8fafc; }
+        .scoreCell.birdie { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .scoreCell.eagle { background: #fecaca; color: #7f1d1d; border-color: #fca5a5; font-weight: 700; }
+        .statCell { text-align: center; font-size: 11px; color: #374151; font-weight: 600; }
         .empty { font-size: 12px; color: #6b7280; padding: 6px 0; }
-        @media (max-width: 520px) {
-          .scoreHeader,
-          .scoreRow { grid-template-columns: minmax(120px, 1fr) 82px 48px 48px 48px 48px; }
-          .scoreRow { font-size: 12px; }
-          .sdate { font-size: 11px; }
+        .muted { color: #6b7280; font-size: 12px; }
+        .error { color: #a00; font-size: 12px; }
+        @media (max-width: 900px) {
+          .detailHeadRow { display: none; }
+          .detailRow { grid-template-columns: 1fr; align-items: start; }
+          .scoreGrid { grid-template-columns: repeat(9, minmax(24px, 1fr)) !important; }
+          .dateCell { text-align: left; }
         }
       `}</style>
     </div>

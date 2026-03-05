@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { z } from "zod";
 import { pool } from "../db/pool";
 
 // Basic helpers
@@ -198,7 +199,7 @@ export async function updateEventCard(req: Request, res: Response) {
     }
     if (parsed.data.card_dt !== undefined) {
       fields.push("card_dt=?");
-      values.push(parsed.data.card_dt);
+      values.push(parsed.data.card_dt === null ? null : parseISODateTime(parsed.data.card_dt));
     }
     for (let i = 1; i <= 18; i += 1) {
       const key = `hole${i}` as keyof typeof parsed.data;
@@ -216,6 +217,26 @@ export async function updateEventCard(req: Request, res: Response) {
     );
     if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
     res.json({ card_id: cardId });
+  } catch (err: any) {
+    res.status(err.message === "Unauthorized" ? 401 : err.message === "Forbidden" ? 403 : 400).json({ error: err.message });
+  }
+}
+
+// DELETE /api/events/:id/cards/:cardId
+export async function deleteEventCard(req: Request, res: Response) {
+  try {
+    requireUserId(req);
+    const courseId = requireCourseId(req);
+    const eventId = Number(req.params.id);
+    const cardId = Number(req.params.cardId);
+    if (!Number.isFinite(eventId) || !Number.isFinite(cardId)) throw new Error("Invalid id");
+
+    const [result]: any = await pool.execute(
+      `DELETE FROM eventCard WHERE card_id = ? AND event_id = ? AND course_id = ?`,
+      [cardId, eventId, courseId]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.json({ ok: true });
   } catch (err: any) {
     res.status(err.message === "Unauthorized" ? 401 : err.message === "Forbidden" ? 403 : 400).json({ error: err.message });
   }
@@ -264,6 +285,7 @@ export async function createEventCard(req: Request, res: Response) {
       if (typeof val === "number") holes.push(val);
     }
     const gross = parsed.data.gross ?? (holes.length ? holes.reduce((a, b) => a + b, 0) : null);
+    const cardDt = parsed.data.card_dt == null ? null : parseISODateTime(parsed.data.card_dt);
 
     const [result]: any = await pool.execute(
       `INSERT INTO eventCard
@@ -280,7 +302,7 @@ export async function createEventCard(req: Request, res: Response) {
         eventId,
         gross,
         parsed.data.net ?? null,
-        parsed.data.card_dt ?? null,
+        cardDt,
         parsed.data.hole1 ?? null,
         parsed.data.hole2 ?? null,
         parsed.data.hole3 ?? null,

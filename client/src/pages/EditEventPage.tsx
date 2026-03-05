@@ -51,6 +51,10 @@ const emptySubEventForm = {
   addedmoney: "",
 };
 
+function isStrokeType(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().includes("stroke");
+}
+
 function toInputDate(value: string | null | undefined) {
   if (!value) return "";
   const d = new Date(value);
@@ -323,7 +327,11 @@ export default function EditEventPage() {
             ) : subEvents.length ? (
               <div className="subEventList">
                 {subEvents.map((sub) => (
-                  <Link key={sub.subevent_id} className="subEventLink" to={`/subevents/${sub.subevent_id}`}>
+                  <Link
+                    key={sub.subevent_id}
+                    className="subEventLink"
+                    to={isStrokeType(sub.eventtypename) ? `/subevents/${sub.subevent_id}/stroke` : `/subevents/${sub.subevent_id}`}
+                  >
                     <span className="subEventTitle">{sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}</span>
                     <span className="subEventMeta">
                       Roster: {sub.rostername ?? sub.roster_id ?? "—"} | Amount/Player:{" "}

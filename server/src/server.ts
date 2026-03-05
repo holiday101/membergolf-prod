@@ -55,6 +55,8 @@ app.get("/public/:courseId/events", async (req, res) => {
         handicap_yn,
         eventMain.nine_id,
         n.ninename,
+        n.numholes,
+        n.startinghole,
         NULL AS user_id
       FROM eventMain
       LEFT JOIN courseNine n ON n.nine_id = eventMain.nine_id
@@ -156,31 +158,55 @@ app.get("/public/:courseId/events/:eventId/winnings", async (req, res) => {
     const [rows] = await pool.query<any[]>(
       `
       SELECT
-        ml.moneylist_id,
-        ml.member_id,
+        w.moneylist_id,
+        w.member_id,
         m.firstname,
         m.lastname,
-        ml.amount,
-        ml.flight_id,
+        w.amount,
+        w.flight_id,
         f.flightname AS flight_name,
-        ml.place,
-        ml.description,
-        ml.payout_type
-      FROM eventMoneyList ml
-      JOIN memberMain m ON m.member_id = ml.member_id
-      LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
-      LEFT JOIN rosterFlight f ON f.flight_id = ml.flight_id
+        w.place,
+        w.description,
+        w.payout_type
+      FROM (
+        SELECT
+          ml.moneylist_id,
+          ml.member_id,
+          ml.amount,
+          ml.flight_id,
+          ml.place,
+          ml.description,
+          ml.payout_type
+        FROM eventMoneyList ml
+        LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
+        WHERE (ml.event_id = ? OR se.event_id = ?)
+          AND ml.amount <> 0
+
+        UNION ALL
+
+        SELECT
+          op.eventotherpay_id AS moneylist_id,
+          op.member_id,
+          op.amount,
+          NULL AS flight_id,
+          NULL AS place,
+          op.description,
+          'OTHER' AS payout_type
+        FROM eventOtherPay op
+        WHERE op.event_id = ?
+          AND op.amount <> 0
+      ) w
+      JOIN memberMain m ON m.member_id = w.member_id
+      LEFT JOIN rosterFlight f ON f.flight_id = w.flight_id
       WHERE m.course_id = ?
-        AND (ml.event_id = ? OR se.event_id = ?)
-        AND ml.amount <> 0
       ORDER BY
-        (ml.flight_id IS NULL),
-        ml.flight_id,
-        CASE WHEN ml.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
-        FIELD(ml.payout_type, 'GROSS', 'NET', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
-        ml.amount DESC
+        (w.flight_id IS NULL),
+        w.flight_id,
+        CASE WHEN w.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
+        FIELD(w.payout_type, 'GROSS', 'NET', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
+        w.amount DESC
       `,
-      [courseId, eventId, eventId]
+      [eventId, eventId, eventId, courseId]
     );
 
     res.json(rows);
@@ -210,17 +236,33 @@ app.get("/public/:courseId/events/:eventId/scores", async (req, res) => {
         c.gross,
         c.net,
         c.adjustedscore,
+        c.handicap,
+        rf.flight_id,
+        rf.flightname,
         c.numholes,
         n.startinghole,
         c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
-        c.hole10, c.hole11, c.hole12, c.hole13, c.hole14, c.hole15, c.hole16, c.hole17, c.hole18
+        c.hole10, c.hole11, c.hole12, c.hole13, c.hole14, c.hole15, c.hole16, c.hole17, c.hole18,
+        n.hole1 AS par1, n.hole2 AS par2, n.hole3 AS par3, n.hole4 AS par4, n.hole5 AS par5,
+        n.hole6 AS par6, n.hole7 AS par7, n.hole8 AS par8, n.hole9 AS par9,
+        n.hole10 AS par10, n.hole11 AS par11, n.hole12 AS par12, n.hole13 AS par13, n.hole14 AS par14,
+        n.hole15 AS par15, n.hole16 AS par16, n.hole17 AS par17, n.hole18 AS par18
       FROM eventCard c
       JOIN memberMain m ON m.member_id = c.member_id
+      LEFT JOIN (
+        SELECT se.event_id, se.roster_id
+        FROM subEventMain se
+        JOIN subEventType st ON st.eventtype_id = se.eventtype_id
+        WHERE se.event_id = ? AND LOWER(COALESCE(st.eventtypename, '')) LIKE '%skin%'
+        ORDER BY se.subevent_id ASC
+        LIMIT 1
+      ) sx ON sx.event_id = c.event_id
+      LEFT JOIN rosterFlight rf ON rf.roster_id = sx.roster_id AND c.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
-      ORDER BY c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
+      ORDER BY (rf.flightname IS NULL), rf.flightname ASC, c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
-      [courseId, eventId]
+      [eventId, courseId, eventId]
     );
 
     res.json(rows);
@@ -1689,6 +1731,997 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
     res.json(row);
   } catch (err) {
     console.error("subevent detail error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/subevents/:id/skins", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        es.eventskin_id,
+        es.member_id,
+        m.firstname,
+        m.lastname,
+        es.flight_id,
+        rf.flightname,
+        es.hole,
+        es.score,
+        es.amount,
+        (es.hole - 1 + COALESCE((
+          SELECT MAX(n.startinghole)
+          FROM eventCard ec
+          LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
+          WHERE ec.card_id = es.card_id
+        ), 1)) AS holenum
+      FROM eventSkin es
+      INNER JOIN memberMain m ON m.member_id = es.member_id
+      INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
+      WHERE es.subevent_id = ?
+      ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
+      `,
+      [subeventId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("subevent skins list error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, event_id, roster_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        ec.card_id,
+        ec.member_id,
+        m.firstname,
+        m.lastname,
+        rf.flight_id,
+        rf.flightname,
+        ec.card_dt,
+        ec.gross,
+        ec.net,
+        ec.handicap,
+        ec.nine_id,
+        COALESCE(n.numholes, 9) AS numholes,
+        COALESCE(n.startinghole, 1) AS startinghole,
+        ec.hole1, ec.hole2, ec.hole3, ec.hole4, ec.hole5, ec.hole6, ec.hole7, ec.hole8, ec.hole9,
+        n.hole1 AS par1, n.hole2 AS par2, n.hole3 AS par3, n.hole4 AS par4, n.hole5 AS par5,
+        n.hole6 AS par6, n.hole7 AS par7, n.hole8 AS par8, n.hole9 AS par9
+      FROM eventCard ec
+      INNER JOIN memberMain m ON m.member_id = ec.member_id
+      INNER JOIN rosterMemberLink rml ON rml.member_id = ec.member_id AND rml.roster_id = ?
+      INNER JOIN rosterFlight rf ON rf.roster_id = ? AND ec.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
+      LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
+      WHERE ec.event_id = ?
+      ORDER BY rf.flightname ASC, m.lastname ASC, m.firstname ASC, ec.card_dt ASC, ec.card_id ASC
+      `,
+      [sub.roster_id, sub.roster_id, sub.event_id]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("subevent skins cards error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/skins/post", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spSkinCodeX(?)", [subeventId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent skins post error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/skins/unpost", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spUnPost(?)", [subeventId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent skins unpost error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const skinId = Number(req.params.skinId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(skinId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({
+      amount: z.number(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT es.eventskin_id, s.course_id
+      FROM eventSkin es
+      INNER JOIN subEventMain s ON s.subevent_id = es.subevent_id
+      WHERE es.subevent_id = ? AND es.eventskin_id = ?
+      LIMIT 1
+      `,
+      [subeventId, skinId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("UPDATE eventSkin SET amount = ? WHERE eventskin_id = ?", [
+      parsed.data.amount,
+      skinId,
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent skins amount update error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/stroke/autoflight", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!isAdmin(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, roster_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (!sub.roster_id) {
+      return res.status(400).json({ error: "Roster is required before auto flighting" });
+    }
+
+    await pool.query("CALL sp_SubEventFlight_Insert(?)", [subeventId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent stroke autoflight error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+type StrokePayRow = {
+  row_id: number;
+  flight_id: number | null;
+  card_id: number | null;
+  member_id: number | null;
+  score: number | null;
+  lastname: string | null;
+  firstname: string | null;
+};
+
+function strokeWinnerKey(row: { card_id: number | null; member_id: number | null }, fallback: string) {
+  if (typeof row.card_id === "number") return `card:${row.card_id}`;
+  if (typeof row.member_id === "number") return `member:${row.member_id}`;
+  return fallback;
+}
+
+function strokeSortByScoreNameCard(a: StrokePayRow, b: StrokePayRow) {
+  const aScore = typeof a.score === "number" ? a.score : Number.MAX_SAFE_INTEGER;
+  const bScore = typeof b.score === "number" ? b.score : Number.MAX_SAFE_INTEGER;
+  if (aScore !== bScore) return aScore - bScore;
+
+  const aName = `${(a.lastname ?? "").trim().toLowerCase()}|${(a.firstname ?? "").trim().toLowerCase()}`;
+  const bName = `${(b.lastname ?? "").trim().toLowerCase()}|${(b.firstname ?? "").trim().toLowerCase()}`;
+  if (aName !== bName) return aName.localeCompare(bName);
+
+  const aCard = typeof a.card_id === "number" ? a.card_id : Number.MAX_SAFE_INTEGER;
+  const bCard = typeof b.card_id === "number" ? b.card_id : Number.MAX_SAFE_INTEGER;
+  if (aCard !== bCard) return aCard - bCard;
+
+  return a.row_id - b.row_id;
+}
+
+function assignStrokeAwards(rows: StrokePayRow[], activeKeys: Set<string>, payoutByPlace: Map<number, number>) {
+  const ranked = [...rows]
+    .map((row, idx) => ({ row, key: strokeWinnerKey(row, `row:${idx}`) }))
+    .filter((r) => activeKeys.has(r.key))
+    .sort((a, b) => strokeSortByScoreNameCard(a.row, b.row));
+
+  const awards = new Map<string, { place: number | null; amount: number | null }>();
+  let rankCursor = 1;
+  let i = 0;
+  while (i < ranked.length) {
+    const score = ranked[i].row.score;
+    let j = i;
+    while (j + 1 < ranked.length && ranked[j + 1].row.score === score) j += 1;
+
+    const groupSize = j - i + 1;
+    const placeStart = rankCursor;
+    const placeEnd = rankCursor + groupSize - 1;
+
+    let payoutSum = 0;
+    for (let place = placeStart; place <= placeEnd; place += 1) {
+      const v = payoutByPlace.get(place);
+      payoutSum += typeof v === "number" && Number.isFinite(v) ? v : 0;
+    }
+    const eachAmount = payoutSum > 0 ? payoutSum / groupSize : null;
+
+    for (let k = i; k <= j; k += 1) {
+      awards.set(ranked[k].key, { place: placeStart, amount: eachAmount });
+    }
+
+    rankCursor += groupSize;
+    i = j + 1;
+  }
+
+  return awards;
+}
+
+async function normalizeStrokePayouts(subeventId: number) {
+  const [grossRowsRaw] = await pool.query<any[]>(
+    `
+    SELECT
+      g.gross_id AS row_id,
+      g.flight_id,
+      g.card_id,
+      g.member_id,
+      g.score,
+      m.lastname,
+      m.firstname
+    FROM subEventPayGross g
+    LEFT JOIN memberMain m ON m.member_id = g.member_id
+    WHERE g.subevent_id = ?
+    `,
+    [subeventId]
+  );
+
+  const [netRowsRaw] = await pool.query<any[]>(
+    `
+    SELECT
+      n.net_id AS row_id,
+      n.flight_id,
+      n.card_id,
+      n.member_id,
+      n.score,
+      m.lastname,
+      m.firstname
+    FROM subEventPayNet n
+    LEFT JOIN memberMain m ON m.member_id = n.member_id
+    WHERE n.subevent_id = ?
+    `,
+    [subeventId]
+  );
+
+  const [payoutRows] = await pool.query<any[]>(
+    `
+    SELECT flight_id, place, amount
+    FROM subEventPayOut
+    WHERE subevent_id = ?
+    ORDER BY (flight_id IS NULL), flight_id ASC, place ASC
+    `,
+    [subeventId]
+  );
+
+  const payoutByFlight = new Map<string, Map<number, number>>();
+  for (const row of payoutRows) {
+    const key = String(row.flight_id ?? "na");
+    const place = Number(row.place);
+    const amount = Number(row.amount ?? 0);
+    if (!Number.isFinite(place) || place <= 0) continue;
+    const map = payoutByFlight.get(key) ?? new Map<number, number>();
+    map.set(place, Number.isFinite(amount) ? amount : 0);
+    payoutByFlight.set(key, map);
+  }
+
+  const grossByFlight = new Map<string, StrokePayRow[]>();
+  for (const row of grossRowsRaw as StrokePayRow[]) {
+    const key = String(row.flight_id ?? "na");
+    const arr = grossByFlight.get(key) ?? [];
+    arr.push(row);
+    grossByFlight.set(key, arr);
+  }
+
+  const netByFlight = new Map<string, StrokePayRow[]>();
+  for (const row of netRowsRaw as StrokePayRow[]) {
+    const key = String(row.flight_id ?? "na");
+    const arr = netByFlight.get(key) ?? [];
+    arr.push(row);
+    netByFlight.set(key, arr);
+  }
+
+  const flights = new Set<string>([...grossByFlight.keys(), ...netByFlight.keys()]);
+
+  for (const flightKey of flights) {
+    const payoutByPlace = payoutByFlight.get(flightKey) ?? new Map<number, number>();
+    const grossRows = (grossByFlight.get(flightKey) ?? []).sort(strokeSortByScoreNameCard);
+    const netRows = (netByFlight.get(flightKey) ?? []).sort(strokeSortByScoreNameCard);
+
+    const grossActive = new Set(grossRows.map((row, idx) => strokeWinnerKey(row, `gross:${idx}`)));
+    const netActive = new Set(netRows.map((row, idx) => strokeWinnerKey(row, `net:${idx}`)));
+
+    for (let pass = 0; pass < 20; pass += 1) {
+      const grossAwards = assignStrokeAwards(grossRows, grossActive, payoutByPlace);
+      const netAwards = assignStrokeAwards(netRows, netActive, payoutByPlace);
+
+      let changed = false;
+      for (const key of grossActive) {
+        if (!netActive.has(key)) continue;
+        const g = grossAwards.get(key);
+        const n = netAwards.get(key);
+        const gAmt = Number(g?.amount ?? 0);
+        const nAmt = Number(n?.amount ?? 0);
+        if (!(gAmt > 0 && nAmt > 0)) continue;
+
+        // Single card can only win one side: keep higher amount, tie stays Gross.
+        if (gAmt >= nAmt) {
+          netActive.delete(key);
+        } else {
+          grossActive.delete(key);
+        }
+        changed = true;
+      }
+
+      if (!changed) break;
+    }
+
+    const finalGross = assignStrokeAwards(grossRows, grossActive, payoutByPlace);
+    const finalNet = assignStrokeAwards(netRows, netActive, payoutByPlace);
+
+    for (let idx = 0; idx < grossRows.length; idx += 1) {
+      const row = grossRows[idx];
+      const key = strokeWinnerKey(row, `gross:${idx}`);
+      const award = finalGross.get(key);
+      await pool.execute("UPDATE subEventPayGross SET place = ?, amount = ? WHERE gross_id = ?", [
+        award?.place ?? null,
+        award?.amount ?? null,
+        row.row_id,
+      ]);
+    }
+
+    for (let idx = 0; idx < netRows.length; idx += 1) {
+      const row = netRows[idx];
+      const key = strokeWinnerKey(row, `net:${idx}`);
+      const award = finalNet.get(key);
+      await pool.execute("UPDATE subEventPayNet SET place = ?, amount = ? WHERE net_id = ?", [
+        award?.place ?? null,
+        award?.amount ?? null,
+        row.row_id,
+      ]);
+    }
+  }
+}
+
+type LegacyStrokeRow = {
+  row_id: number;
+  flight_id: number | null;
+  card_id: number | null;
+  score: number | null;
+  place: number | null;
+  amount: number | null;
+  used_yn: number | null;
+};
+
+function legacyScoreValue(score: number | null) {
+  return typeof score === "number" && Number.isFinite(score) ? score : Number.MAX_SAFE_INTEGER;
+}
+
+function legacyAmountValue(amount: number | null) {
+  return typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+}
+
+function recalcLegacySide(rows: LegacyStrokeRow[], payoutByPlace: Map<number, number>) {
+  let vPlace = 0;
+  for (const row of rows) {
+    if (row.used_yn === 1 && typeof row.place === "number" && row.place > vPlace) vPlace = row.place;
+  }
+  const usedAtVPlace = rows.filter((r) => r.used_yn === 1 && r.place === vPlace && (r.place ?? 0) !== 0).length;
+  vPlace = vPlace + usedAtVPlace - 1;
+  if (vPlace < 0) vPlace = 0;
+
+  const activeRows = rows
+    .filter((r) => r.used_yn !== 1)
+    .sort((a, b) => {
+      const byScore = legacyScoreValue(a.score) - legacyScoreValue(b.score);
+      if (byScore !== 0) return byScore;
+      return a.row_id - b.row_id;
+    });
+
+  let vOldScore = 0;
+  let vTies = 0;
+  let vCurrentPlace = 1;
+
+  for (const row of activeRows) {
+    vPlace += 1;
+    row.place = vPlace;
+
+    const score = legacyScoreValue(row.score);
+    if (vOldScore === score) {
+      vTies += 1;
+      continue;
+    }
+
+    let vPlaceAmount = 0;
+    if (vTies === 0) {
+      const targetPlace = vPlace - 1;
+      vPlaceAmount = legacyAmountValue(payoutByPlace.get(targetPlace) ?? 0);
+      for (const active of activeRows) {
+        if ((active.place ?? 0) === targetPlace) {
+          active.amount = vPlaceAmount;
+          active.place = targetPlace;
+        }
+      }
+    } else {
+      const start = vCurrentPlace;
+      const end = vPlace - 1;
+      let sum = 0;
+      for (let p = start; p <= end; p += 1) sum += legacyAmountValue(payoutByPlace.get(p) ?? 0);
+      vPlaceAmount = sum / (vTies + 1);
+      for (const active of activeRows) {
+        const place = active.place ?? 0;
+        if (place >= start && place <= end) {
+          active.amount = vPlaceAmount;
+          active.place = start;
+        }
+      }
+    }
+
+    vOldScore = score;
+    vTies = 0;
+    vCurrentPlace = vPlace;
+  }
+
+  if (vTies > 0) {
+    const sumAtPlace = legacyAmountValue(payoutByPlace.get(vCurrentPlace) ?? 0);
+    const vPlaceAmount = sumAtPlace / (vTies + 1);
+    for (const active of activeRows) {
+      if ((active.place ?? 0) >= vCurrentPlace) {
+        active.amount = vPlaceAmount;
+        active.place = vCurrentPlace;
+      }
+    }
+  } else {
+    const cut = vPlace - 1;
+    for (const active of activeRows) {
+      if ((active.place ?? 0) >= cut) {
+        active.amount = 0;
+      }
+    }
+  }
+}
+
+async function applyLegacyStrokeFallback(subeventId: number) {
+  const [grossRowsRaw] = await pool.query<any[]>(
+    `
+    SELECT gross_id AS row_id, flight_id, card_id, score, place, amount, used_yn
+    FROM subEventPayGross
+    WHERE subevent_id = ?
+    `,
+    [subeventId]
+  );
+  const [netRowsRaw] = await pool.query<any[]>(
+    `
+    SELECT net_id AS row_id, flight_id, card_id, score, place, amount, used_yn
+    FROM subEventPayNet
+    WHERE subevent_id = ?
+    `,
+    [subeventId]
+  );
+  const [payoutRows] = await pool.query<any[]>(
+    `
+    SELECT flight_id, place, amount
+    FROM subEventPayOut
+    WHERE subevent_id = ?
+    `,
+    [subeventId]
+  );
+
+  const payoutByFlight = new Map<string, Map<number, number>>();
+  for (const row of payoutRows) {
+    const flightKey = String(row.flight_id ?? "na");
+    const place = Number(row.place);
+    if (!Number.isFinite(place) || place <= 0) continue;
+    const amount = Number(row.amount ?? 0);
+    const map = payoutByFlight.get(flightKey) ?? new Map<number, number>();
+    map.set(place, Number.isFinite(amount) ? amount : 0);
+    payoutByFlight.set(flightKey, map);
+  }
+
+  const grossByFlight = new Map<string, LegacyStrokeRow[]>();
+  for (const row of grossRowsRaw as LegacyStrokeRow[]) {
+    const key = String(row.flight_id ?? "na");
+    const arr = grossByFlight.get(key) ?? [];
+    arr.push({ ...row, used_yn: 0, place: 0, amount: 0 });
+    grossByFlight.set(key, arr);
+  }
+
+  const netByFlight = new Map<string, LegacyStrokeRow[]>();
+  for (const row of netRowsRaw as LegacyStrokeRow[]) {
+    const key = String(row.flight_id ?? "na");
+    const arr = netByFlight.get(key) ?? [];
+    arr.push({ ...row, used_yn: 0, place: 0, amount: 0 });
+    netByFlight.set(key, arr);
+  }
+
+  const flights = new Set<string>([...grossByFlight.keys(), ...netByFlight.keys()]);
+
+  for (const flightKey of flights) {
+    const payoutByPlace = payoutByFlight.get(flightKey) ?? new Map<number, number>();
+    const grossRows = grossByFlight.get(flightKey) ?? [];
+    const netRows = netByFlight.get(flightKey) ?? [];
+
+    recalcLegacySide(grossRows, payoutByPlace);
+    recalcLegacySide(netRows, payoutByPlace);
+
+    const activeGross = () => grossRows.filter((r) => r.used_yn !== 1);
+    const activeNet = () => netRows.filter((r) => r.used_yn !== 1);
+
+    const topByAmount = (rows: LegacyStrokeRow[]) => {
+      const active = rows.filter((r) => r.used_yn !== 1);
+      if (!active.length) return null;
+      active.sort((a, b) => {
+        const byAmount = legacyAmountValue(b.amount) - legacyAmountValue(a.amount);
+        if (byAmount !== 0) return byAmount;
+        const byScore = legacyScoreValue(a.score) - legacyScoreValue(b.score);
+        if (byScore !== 0) return byScore;
+        return a.row_id - b.row_id;
+      });
+      return active[0] ?? null;
+    };
+
+    while (activeGross().length > 0 || activeNet().length > 0) {
+      const grossTop = topByAmount(grossRows);
+      const netTop = topByAmount(netRows);
+      const grossHigh = legacyAmountValue(grossTop?.amount ?? 0);
+      const netHigh = legacyAmountValue(netTop?.amount ?? 0);
+
+      if (grossHigh === 0 && netHigh === 0) {
+        for (const row of activeGross()) row.used_yn = 1;
+        for (const row of activeNet()) {
+          row.used_yn = 1;
+          row.place = 0;
+          row.amount = 0;
+        }
+        continue;
+      }
+
+      if (grossHigh >= netHigh && grossTop) {
+        const targetScore = legacyScoreValue(grossTop.score);
+        const selectedCards = new Set<number>();
+        for (const row of activeGross()) {
+          if (legacyScoreValue(row.score) === targetScore) {
+            row.used_yn = 1;
+            if (typeof row.card_id === "number") selectedCards.add(row.card_id);
+          }
+        }
+
+        for (const row of activeNet()) {
+          if (typeof row.card_id === "number" && selectedCards.has(row.card_id)) {
+            row.used_yn = 1;
+            row.place = 0;
+            row.amount = 0;
+          }
+        }
+        for (const row of activeNet()) {
+          row.place = 0;
+          row.amount = 0;
+        }
+        recalcLegacySide(netRows, payoutByPlace);
+      } else if (netTop) {
+        const targetScore = legacyScoreValue(netTop.score);
+        const selectedCards = new Set<number>();
+        for (const row of activeNet()) {
+          if (legacyScoreValue(row.score) === targetScore) {
+            row.used_yn = 1;
+            if (typeof row.card_id === "number") selectedCards.add(row.card_id);
+          }
+        }
+
+        for (const row of activeGross()) {
+          if (typeof row.card_id === "number" && selectedCards.has(row.card_id)) {
+            row.used_yn = 1;
+            row.place = 0;
+            row.amount = 0;
+          }
+        }
+        for (const row of activeGross()) {
+          row.place = 0;
+          row.amount = 0;
+        }
+        recalcLegacySide(grossRows, payoutByPlace);
+      }
+    }
+
+    for (const row of grossRows) {
+      const amount = legacyAmountValue(row.amount) > 0 ? row.amount : null;
+      await pool.execute("UPDATE subEventPayGross SET place = ?, amount = ?, used_yn = ? WHERE gross_id = ?", [
+        row.place ?? 0,
+        amount,
+        row.used_yn ?? 0,
+        row.row_id,
+      ]);
+    }
+    for (const row of netRows) {
+      const amount = legacyAmountValue(row.amount) > 0 ? row.amount : null;
+      await pool.execute("UPDATE subEventPayNet SET place = ?, amount = ?, used_yn = ? WHERE net_id = ?", [
+        row.place ?? 0,
+        amount,
+        row.used_yn ?? 0,
+        row.row_id,
+      ]);
+    }
+  }
+}
+
+app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [grossRows] = await pool.query<any[]>(
+      `
+      SELECT
+        g.gross_id,
+        g.card_id,
+        g.member_id,
+        m.firstname,
+        m.lastname,
+        g.flight_id,
+        rf.flightname,
+        g.score,
+        g.place,
+        g.amount,
+        g.used_yn
+      FROM subEventPayGross g
+      LEFT JOIN memberMain m ON m.member_id = g.member_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
+      WHERE g.subevent_id = ?
+      ORDER BY (g.flight_id IS NULL), rf.flightname ASC, g.place ASC, g.score ASC, m.lastname ASC, m.firstname ASC
+      `,
+      [subeventId]
+    );
+
+    const [netRows] = await pool.query<any[]>(
+      `
+      SELECT
+        n.net_id,
+        n.card_id,
+        n.member_id,
+        m.firstname,
+        m.lastname,
+        n.flight_id,
+        rf.flightname,
+        n.score,
+        n.place,
+        n.amount,
+        n.used_yn
+      FROM subEventPayNet n
+      LEFT JOIN memberMain m ON m.member_id = n.member_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
+      WHERE n.subevent_id = ?
+      ORDER BY (n.flight_id IS NULL), rf.flightname ASC, n.place ASC, n.score ASC, m.lastname ASC, m.firstname ASC
+      `,
+      [subeventId]
+    );
+
+    const [payoutRows] = await pool.query<any[]>(
+      `
+      SELECT
+        p.place,
+        p.amount,
+        p.flight_id,
+        rf.flightname
+      FROM subEventPayOut p
+      LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
+      WHERE p.subevent_id = ?
+      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      `,
+      [subeventId]
+    );
+
+    res.json({ gross: grossRows, net: netRows, payouts: payoutRows });
+  } catch (err) {
+    console.error("subevent stroke list error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      `
+      SELECT subevent_id, course_id, eventtype_id
+      FROM subEventMain
+      WHERE subevent_id = ?
+      LIMIT 1
+      `,
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    let mode: "net" | "gross" | "gross_net" = "gross_net";
+    if (sub.eventtype_id === 5) {
+      await pool.query("CALL spPickNet(?)", [subeventId]);
+      mode = "net";
+    } else if (sub.eventtype_id === 6) {
+      await pool.query("CALL spPickGross(?)", [subeventId]);
+      mode = "gross";
+    } else {
+      await pool.query("CALL spPick(?)", [subeventId]);
+      mode = "gross_net";
+    }
+
+    const [diagRows] = await pool.query<any[]>(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM subEventPayOut WHERE subevent_id = ?) AS payout_rows,
+        (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ?) AS gross_rows,
+        (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ?) AS net_rows,
+        (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS gross_winner_rows,
+        (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS net_winner_rows,
+        (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ? AND used_yn = 1) AS gross_used_rows,
+        (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ? AND used_yn = 1) AS net_used_rows
+      `,
+      [subeventId, subeventId, subeventId, subeventId, subeventId, subeventId, subeventId]
+    );
+
+    let diagnostics = diagRows?.[0] ?? null;
+    let fallbackApplied = false;
+    const grossWinners = Number(diagnostics?.gross_winner_rows ?? 0);
+    const netWinners = Number(diagnostics?.net_winner_rows ?? 0);
+    const payoutRows = Number(diagnostics?.payout_rows ?? 0);
+
+    if (grossWinners + netWinners === 0 && payoutRows > 0) {
+      console.warn("stroke post produced no winner rows; applying legacy fallback", { subeventId, mode, diagnostics });
+      await applyLegacyStrokeFallback(subeventId);
+      fallbackApplied = true;
+
+      const [diagRowsAfter] = await pool.query<any[]>(
+        `
+        SELECT
+          (SELECT COUNT(*) FROM subEventPayOut WHERE subevent_id = ?) AS payout_rows,
+          (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ?) AS gross_rows,
+          (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ?) AS net_rows,
+          (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS gross_winner_rows,
+          (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS net_winner_rows,
+          (SELECT COUNT(*) FROM subEventPayGross WHERE subevent_id = ? AND used_yn = 1) AS gross_used_rows,
+          (SELECT COUNT(*) FROM subEventPayNet WHERE subevent_id = ? AND used_yn = 1) AS net_used_rows
+        `,
+        [subeventId, subeventId, subeventId, subeventId, subeventId, subeventId, subeventId]
+      );
+      diagnostics = diagRowsAfter?.[0] ?? diagnostics;
+    }
+
+    return res.json({ ok: true, mode, diagnostics, fallbackApplied });
+  } catch (err) {
+    console.error("subevent stroke post error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/stroke/unpost", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spUnPost(?)", [subeventId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent stroke unpost error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/stroke/gross/:grossId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const grossId = Number(req.params.grossId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(grossId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({
+      amount: z.number().nullable(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT g.gross_id, s.course_id
+      FROM subEventPayGross g
+      INNER JOIN subEventMain s ON s.subevent_id = g.subevent_id
+      WHERE g.subevent_id = ? AND g.gross_id = ?
+      LIMIT 1
+      `,
+      [subeventId, grossId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("UPDATE subEventPayGross SET amount = ? WHERE gross_id = ?", [
+      parsed.data.amount,
+      grossId,
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent stroke gross update error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/stroke/net/:netId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const netId = Number(req.params.netId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(netId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({
+      amount: z.number().nullable(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT n.net_id, s.course_id
+      FROM subEventPayNet n
+      INNER JOIN subEventMain s ON s.subevent_id = n.subevent_id
+      WHERE n.subevent_id = ? AND n.net_id = ?
+      LIMIT 1
+      `,
+      [subeventId, netId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("UPDATE subEventPayNet SET amount = ? WHERE net_id = ?", [
+      parsed.data.amount,
+      netId,
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent stroke net update error", err);
     res.status(500).json({ error: "Server error" });
   }
 });

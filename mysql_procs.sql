@@ -359,10 +359,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP
@@ -486,10 +487,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP
@@ -2112,10 +2114,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP
@@ -2238,10 +2241,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP
@@ -2766,17 +2770,17 @@ BEGIN
 
     -- hole 1..9 (gross)
     SELECT MIN(hole1) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole1 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole1 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2787,17 +2791,17 @@ BEGIN
     -- Repeat for holes 2..9
     -- hole 2
     SELECT MIN(hole2) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole2 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole2 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2807,17 +2811,17 @@ BEGIN
 
     -- hole 3
     SELECT MIN(hole3) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole3 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole3 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2827,17 +2831,17 @@ BEGIN
 
     -- hole 4
     SELECT MIN(hole4) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole4 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole4 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2847,17 +2851,17 @@ BEGIN
 
     -- hole 5
     SELECT MIN(hole5) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole5 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole5 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2867,17 +2871,17 @@ BEGIN
 
     -- hole 6
     SELECT MIN(hole6) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole6 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole6 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2887,17 +2891,17 @@ BEGIN
 
     -- hole 7
     SELECT MIN(hole7) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole7 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole7 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2907,17 +2911,17 @@ BEGIN
 
     -- hole 8
     SELECT MIN(hole8) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole8 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole8 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2927,17 +2931,17 @@ BEGIN
 
     -- hole 9
     SELECT MIN(hole9) INTO v_minhole FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     SELECT COUNT(DISTINCT member_id) INTO v_countflight FROM eventCard
      WHERE event_id = v_eventid AND hole9 = v_minhole
-       AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+       AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
     IF v_countflight = 1 THEN
       SELECT member_id, card_id INTO v_memberid, v_cardid
         FROM eventCard
        WHERE hole9 = v_minhole AND event_id = v_eventid
-         AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+         AND handicap >= v_hdcp1 AND handicap < v_hdcp2
          AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid)
        LIMIT 1;
       INSERT INTO eventSkin (event_id,member_id,subevent_id,flight_id,hole,score,amount,card_id)
@@ -2947,7 +2951,7 @@ BEGIN
 
     SELECT COUNT(*) INTO v_countflight
       FROM eventCard
-     WHERE event_id = v_eventid AND handicap BETWEEN v_hdcp1 AND v_hdcp2
+     WHERE event_id = v_eventid AND handicap >= v_hdcp1 AND handicap < v_hdcp2
        AND member_id IN (SELECT member_id FROM rosterMemberLink WHERE roster_id = v_rosterid);
 
     IF v_countwinners <> 0 AND v_countflight <> 0 THEN
@@ -2993,6 +2997,7 @@ $$
 DELIMITER $$
 CREATE PROCEDURE spUnPost(IN p_subeventid INT)
 BEGIN
+  DELETE FROM eventSkin WHERE subevent_id = p_subeventid;
   DELETE FROM subEventBBPayGross WHERE subevent_id = p_subeventid;
   DELETE FROM subEventBBPayNet WHERE subevent_id = p_subeventid;
   DELETE FROM subEventPayGross WHERE subevent_id = p_subeventid;
@@ -3047,10 +3052,11 @@ BEGIN
      AND flight_id = p_flightid
      AND place = v_place
      AND place <> 0;
-
   IF v_place < 0 THEN
     SET v_place = 0;
   END IF;
+
+  SET v_done = 0;
 
   OPEN cur;
   read_loop: LOOP
