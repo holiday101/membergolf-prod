@@ -397,10 +397,28 @@ app.get("/public/:courseId/course", async (req, res) => {
     );
     const course = rows?.[0];
     if (!course) return res.status(404).json({ error: "Not found" });
-    const logo_url = course.logo ? await presignGet(course.logo) : null;
-    const titlesponsor_url = course.titlesponsor ? await presignGet(course.titlesponsor) : null;
+
+    // Keep public course metadata available even if an S3 asset fails to sign.
+    let logo_url: string | null = null;
+    let titlesponsor_url: string | null = null;
+    try {
+      logo_url = course.logo ? await presignGet(course.logo) : null;
+    } catch (err) {
+      console.error("public course logo presign error", { courseId, logo: course.logo, err });
+    }
+    try {
+      titlesponsor_url = course.titlesponsor ? await presignGet(course.titlesponsor) : null;
+    } catch (err) {
+      console.error("public course sponsor presign error", {
+        courseId,
+        titlesponsor: course.titlesponsor,
+        err,
+      });
+    }
+
     res.json({ ...course, logo_url, titlesponsor_url });
-  } catch {
+  } catch (err) {
+    console.error("public course error", err);
     res.status(500).json({ error: "Server error" });
   }
 });

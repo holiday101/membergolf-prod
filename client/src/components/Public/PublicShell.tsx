@@ -237,8 +237,8 @@ export default function PublicShell() {
         </nav>
       </aside>
 
-      <main className="content">
-        <div className="content-inner">
+      <main className={`content ${isCalendarRoute ? "calendar-full" : ""}`}>
+        <div className={`content-inner ${isCalendarRoute ? "calendar-full" : ""}`}>
           <Outlet />
         </div>
       </main>
@@ -411,8 +411,18 @@ export default function PublicShell() {
           line-height: 1.35;
         }
 
-        .content { padding: 16px; grid-column: 2; }
+        .content { padding: 16px; grid-column: 2; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
+        .content.calendar-full {
+          padding: 16px 0;
+          overflow: hidden;
+        }
+        .content-inner.calendar-full {
+          max-width: none;
+          margin: 0;
+          width: 100%;
+          min-height: 0;
+        }
         @media (min-width: 900px) {
           .overlay { display: none; }
           .app { grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; }
