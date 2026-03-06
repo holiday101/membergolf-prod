@@ -62,6 +62,8 @@ type ScoreRow = {
   par18?: number | null;
 };
 
+type SortField = "gross" | "name" | "net" | "handicap";
+
 function getHoleLabels(numholes: number | null, startinghole: number | null) {
   if (numholes === 9) return startinghole === 10 ? [10, 11, 12, 13, 14, 15, 16, 17, 18] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
   return startinghole === 10
@@ -90,12 +92,43 @@ function getScoreMeta(score: number | null | undefined, par: number | null | und
   return { className: "scoreCell", style: undefined };
 }
 
+function memberName(row: ScoreRow) {
+  return `${(row.lastname || "").trim()}, ${(row.firstname || "").trim()}`;
+}
+
+function compareNullableNumber(a: number | null, b: number | null) {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  return a - b;
+}
+
+function compareScoreRows(a: ScoreRow, b: ScoreRow, sortField: SortField) {
+  if (sortField === "name") {
+    return memberName(a).localeCompare(memberName(b), undefined, { sensitivity: "base" });
+  }
+  if (sortField === "gross") {
+    const diff = compareNullableNumber(a.gross, b.gross);
+    if (diff !== 0) return diff;
+  }
+  if (sortField === "net") {
+    const diff = compareNullableNumber(a.net, b.net);
+    if (diff !== 0) return diff;
+  }
+  if (sortField === "handicap") {
+    const diff = compareNullableNumber(a.handicap, b.handicap);
+    if (diff !== 0) return diff;
+  }
+  return memberName(a).localeCompare(memberName(b), undefined, { sensitivity: "base" });
+}
+
 export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [sortField, setSortField] = useState<SortField>("gross");
 
   useEffect(() => {
     const run = async () => {
@@ -128,8 +161,11 @@ export default function PublicEventScoresPage() {
       if (current) current.rows.push(row);
       else map.set(key, { flightName: name, labels, rows: [row] });
     }
-    return Array.from(map.values());
-  }, [scores]);
+    return Array.from(map.values()).map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((a, b) => compareScoreRows(a, b, sortField)),
+    }));
+  }, [scores, sortField]);
 
   return (
     <div className="page">
@@ -150,51 +186,65 @@ export default function PublicEventScoresPage() {
           {scores.length === 0 ? (
             <div className="empty">No scores posted</div>
           ) : (
-            <div className="detailsList">
-              {groupedByFlight.map((group, idx) => (
-                <div key={`${group.flightName}-${idx}`} className="flightSection">
-                  <div className="flightHeader">{group.flightName}</div>
-                  <div className="detailHeadRow">
-                    <span>Name</span>
-                    <span>Card Date</span>
-                    <span>Hdcp</span>
-                    <div className="holesHeadGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
-                      {group.labels.map((h) => (
-                        <span key={`head-${idx}-${h}`}>{h}</span>
-                      ))}
+            <>
+              <div className="sortBar">
+                <label className="sortLabel">
+                  Sort By
+                  <select value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}>
+                    <option value="gross">Gross (asc)</option>
+                    <option value="name">Name (A-Z)</option>
+                    <option value="net">Net (asc)</option>
+                    <option value="handicap">Hdcp (asc)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="detailsList">
+                {groupedByFlight.map((group, idx) => (
+                  <div key={`${group.flightName}-${idx}`} className="flightSection">
+                    <div className="flightHeader">{group.flightName}</div>
+                    <div className="detailHeadRow">
+                      <span>Name</span>
+                      <span>Card Date</span>
+                      <span>Hdcp</span>
+                      <div className="holesHeadGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
+                        {group.labels.map((h) => (
+                          <span key={`head-${idx}-${h}`}>{h}</span>
+                        ))}
+                      </div>
+                      <span>Gross</span>
+                      <span>Net</span>
                     </div>
-                    <span>Gross</span>
-                    <span>Net</span>
+                    {group.rows.map((row) => (
+                      <div key={row.card_id} className="detailRow">
+                        <div className="detailMeta">
+                          <Link className="memberTag" to={`/public/${courseId}/members/${row.member_id}`}>
+                            {memberName(row)}
+                          </Link>
+                        </div>
+                        <div className="dateCell">{new Date(row.card_dt).toLocaleDateString()}</div>
+                        <div className="statCell">{typeof row.handicap === "number" ? row.handicap : "-"}</div>
+                        <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
+                          {group.labels.map((h) => {
+                            const storage = storageHoleNumber(h, row.numholes, row.startinghole);
+                            const score = (row as any)[`hole${storage}`] as number | null | undefined;
+                            const par = (row as any)[`par${storage}`] as number | null | undefined;
+                            const meta = getScoreMeta(score, par);
+                            return (
+                              <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
+                                {typeof score === "number" ? score : "-"}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
+                        <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
+                      </div>
+                    ))}
                   </div>
-                  {group.rows.map((row) => (
-                    <div key={row.card_id} className="detailRow">
-                      <div className="detailMeta">
-                        <Link className="memberTag" to={`/public/${courseId}/members/${row.member_id}`}>
-                          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                        </Link>
-                      </div>
-                      <div className="dateCell">{new Date(row.card_dt).toLocaleDateString()}</div>
-                      <div className="statCell">{typeof row.handicap === "number" ? row.handicap : "-"}</div>
-                      <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
-                        {group.labels.map((h) => {
-                          const storage = storageHoleNumber(h, row.numholes, row.startinghole);
-                          const score = (row as any)[`hole${storage}`] as number | null | undefined;
-                          const par = (row as any)[`par${storage}`] as number | null | undefined;
-                          const meta = getScoreMeta(score, par);
-                          return (
-                            <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
-                              {typeof score === "number" ? score : "-"}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
-                      <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       ) : null}
@@ -218,13 +268,23 @@ export default function PublicEventScoresPage() {
         .wideCard { max-width: 100%; }
         .title { font-size: 16px; font-weight: 700; color: #111827; }
         .meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        .sortBar { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+        .sortLabel { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+        .sortLabel select {
+          font-size: 12px;
+          color: #111827;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          border-radius: 8px;
+          padding: 5px 8px;
+        }
         .detailsList { display: grid; gap: 8px; margin-top: 10px; }
         .flightSection { display: grid; gap: 2px; }
         .flightHeader { font-size: 12px; font-weight: 800; color: #1e3a8a; padding: 2px 0 4px; border-bottom: 1px solid #dbeafe; }
         .detailHeadRow {
           display: grid;
-          grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px;
-          gap: 8px;
+          grid-template-columns: minmax(160px, 220px) minmax(86px, 96px) 52px 1fr 52px 52px;
+          gap: 6px;
           align-items: center;
           color: #6b7280;
           font-size: 10px;
@@ -236,8 +296,8 @@ export default function PublicEventScoresPage() {
         .holesHeadGrid { display: grid; gap: 2px; text-align: center; }
         .detailRow {
           display: grid;
-          grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px;
-          gap: 8px;
+          grid-template-columns: minmax(160px, 220px) minmax(86px, 96px) 52px 1fr 52px 52px;
+          gap: 6px;
           align-items: center;
           padding: 4px 0;
           border-bottom: 1px solid #e5e7eb;

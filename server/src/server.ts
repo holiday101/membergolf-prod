@@ -392,7 +392,7 @@ app.get("/public/:courseId/course", async (req, res) => {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
     const [rows] = await pool.query<any[]>(
-      "SELECT course_id, coursename, leagueinfo, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT course_id, coursename, leagueinfo, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn, autoflight_yn FROM courseMain WHERE course_id = ? LIMIT 1",
       [courseId]
     );
     const course = rows?.[0];
@@ -410,7 +410,7 @@ app.get("/course", authMiddleware, async (req, res) => {
     const payload = (req as any).user as JwtPayload;
     if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
     const [rows] = await pool.query<any[]>(
-      "SELECT course_id, coursename, decimalhandicap_yn FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT course_id, coursename, decimalhandicap_yn, autoflight_yn FROM courseMain WHERE course_id = ? LIMIT 1",
       [payload.courseId]
     );
     const course = rows?.[0];
@@ -1356,6 +1356,7 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
     cardsmax: z.number().int().optional().nullable(),
     handicap_yn: z.number().int().optional().nullable(),
     decimalhandicap_yn: z.number().int().optional().nullable(),
+    autoflight_yn: z.number().int().optional().nullable(),
     active_yn: z.number().int().optional().nullable(),
     logo: z.string().max(512).optional().nullable(),
     titlesponsor: z.string().max(512).optional().nullable(),
@@ -1365,8 +1366,8 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
 
   const [result] = await pool.execute<mysql.ResultSetHeader>(
     `INSERT INTO courseMain
-      (coursename, leagueinfo, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, active_yn, logo, titlesponsor)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (coursename, leagueinfo, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, autoflight_yn, active_yn, logo, titlesponsor)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       parsed.data.coursename.trim(),
       parsed.data.leagueinfo ?? null,
@@ -1377,6 +1378,7 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
       parsed.data.cardsmax ?? null,
       parsed.data.handicap_yn ?? null,
       parsed.data.decimalhandicap_yn ?? null,
+      parsed.data.autoflight_yn ?? 1,
       parsed.data.active_yn ?? 1,
       parsed.data.logo ?? null,
       parsed.data.titlesponsor ?? null,
@@ -1401,6 +1403,7 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
     cardsmax: z.number().int().optional().nullable(),
     handicap_yn: z.number().int().optional().nullable(),
     decimalhandicap_yn: z.number().int().optional().nullable(),
+    autoflight_yn: z.number().int().optional().nullable(),
     active_yn: z.number().int().optional().nullable(),
     logo: z.string().max(512).optional().nullable(),
     titlesponsor: z.string().max(512).optional().nullable(),
@@ -1646,10 +1649,12 @@ app.get("/subevents", authMiddleware, async (req, res) => {
         s.roster_id,
         r.rostername,
         s.amount,
-        s.addedmoney
+        s.addedmoney,
+        c.autoflight_yn
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      LEFT JOIN courseMain c ON c.course_id = s.course_id
       LEFT JOIN rosterMain r ON r.roster_id = s.roster_id
       WHERE 1=1
       ${payload?.courseId && !isGlobal(payload) ? "AND s.course_id = ?" : ""}
@@ -1714,10 +1719,12 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.eventnumhole_id,
         s.roster_id,
         s.amount,
-        s.addedmoney
+        s.addedmoney,
+        c.autoflight_yn
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      LEFT JOIN courseMain c ON c.course_id = s.course_id
       WHERE s.subevent_id = ?
       LIMIT 1
       `,
@@ -1942,6 +1949,440 @@ app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
   }
 });
 
+async function resolveBestBallNetTableName() {
+  const [rows] = await pool.query<any[]>(
+    `
+    SELECT TABLE_NAME AS table_name
+    FROM information_schema.tables
+    WHERE table_schema = DATABASE()
+      AND TABLE_NAME IN ("subEventBBPayNet", "subEventBBPaynet")
+    ORDER BY TABLE_NAME = "subEventBBPayNet" DESC
+    LIMIT 1
+    `
+  );
+  return rows?.[0]?.table_name ?? "subEventBBPayNet";
+}
+
+app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, event_id, roster_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const bestBallNetTable = await resolveBestBallNetTableName();
+
+    const [cards] = await pool.query<any[]>(
+      `
+      SELECT
+        ec.card_id,
+        ec.member_id,
+        m.firstname,
+        m.lastname,
+        ec.handicap,
+        rf.flight_id,
+        rf.flightname
+      FROM eventCard ec
+      LEFT JOIN memberMain m ON m.member_id = ec.member_id
+      LEFT JOIN rosterFlight rf ON rf.roster_id = ? AND ec.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
+      WHERE ec.event_id = ?
+      ORDER BY m.lastname ASC, m.firstname ASC, ec.card_id ASC
+      `,
+      [sub.roster_id ?? null, sub.event_id]
+    );
+
+    const [pairings] = await pool.query<any[]>(
+      `
+      SELECT
+        eb.bestball_id,
+        eb.card1_id,
+        eb.card2_id,
+        eb.member1_id,
+        eb.member2_id,
+        m1.firstname AS member1_firstname,
+        m1.lastname AS member1_lastname,
+        m2.firstname AS member2_firstname,
+        m2.lastname AS member2_lastname,
+        eb.handicap1,
+        eb.handicap2,
+        eb.handicap,
+        eb.gross,
+        eb.net,
+        rf.flight_id,
+        rf.flightname
+      FROM eventBestBall eb
+      LEFT JOIN memberMain m1 ON m1.member_id = eb.member1_id
+      LEFT JOIN memberMain m2 ON m2.member_id = eb.member2_id
+      LEFT JOIN rosterFlight rf ON rf.roster_id = ? AND eb.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
+      WHERE eb.event_id = ?
+      ORDER BY rf.flightname ASC, m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
+      `,
+      [sub.roster_id ?? null, sub.event_id]
+    );
+
+    const [gross] = await pool.query<any[]>(
+      `
+      SELECT
+        g.gross_id,
+        g.bestball_id,
+        g.flight_id,
+        rf.flightname,
+        g.score,
+        g.place,
+        g.amount,
+        g.used_yn,
+        m1.firstname AS member1_firstname,
+        m1.lastname AS member1_lastname,
+        m2.firstname AS member2_firstname,
+        m2.lastname AS member2_lastname
+      FROM subEventBBPayGross g
+      LEFT JOIN memberMain m1 ON m1.member_id = g.member1_id
+      LEFT JOIN memberMain m2 ON m2.member_id = g.member2_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
+      WHERE g.subevent_id = ?
+      ORDER BY (g.flight_id IS NULL), rf.flightname ASC, g.place ASC, g.score ASC, m1.lastname ASC, m1.firstname ASC
+      `,
+      [subeventId]
+    );
+
+    const [net] = await pool.query<any[]>(
+      `
+      SELECT
+        n.net_id,
+        n.bestball_id,
+        n.flight_id,
+        rf.flightname,
+        n.score,
+        n.place,
+        n.amount,
+        n.used_yn,
+        m1.firstname AS member1_firstname,
+        m1.lastname AS member1_lastname,
+        m2.firstname AS member2_firstname,
+        m2.lastname AS member2_lastname
+      FROM ${bestBallNetTable} n
+      LEFT JOIN memberMain m1 ON m1.member_id = n.member1_id
+      LEFT JOIN memberMain m2 ON m2.member_id = n.member2_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
+      WHERE n.subevent_id = ?
+      ORDER BY (n.flight_id IS NULL), rf.flightname ASC, n.place ASC, n.score ASC, m1.lastname ASC, m1.firstname ASC
+      `,
+      [subeventId]
+    );
+
+    const [payouts] = await pool.query<any[]>(
+      `
+      SELECT
+        p.place,
+        p.amount,
+        p.flight_id,
+        rf.flightname
+      FROM subEventPayOut p
+      LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
+      WHERE p.subevent_id = ?
+      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      `,
+      [subeventId]
+    );
+
+    return res.json({ cards, pairings, gross, net, payouts });
+  } catch (err) {
+    console.error("subevent best ball list error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/bestball/pairings", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({
+      card1_id: z.number().int(),
+      card2_id: z.number().int(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+    if (parsed.data.card1_id === parsed.data.card2_id) {
+      return res.status(400).json({ error: "Pairing requires two different cards" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, event_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [cardRows] = await pool.query<any[]>(
+      `
+      SELECT card_id, member_id, handicap
+      FROM eventCard
+      WHERE event_id = ? AND card_id IN (?, ?)
+      `,
+      [sub.event_id, parsed.data.card1_id, parsed.data.card2_id]
+    );
+    if (!cardRows || cardRows.length !== 2) {
+      return res.status(400).json({ error: "Cards must belong to the same event" });
+    }
+
+    const cardById = new Map<number, any>();
+    for (const row of cardRows) cardById.set(Number(row.card_id), row);
+    const card1 = cardById.get(parsed.data.card1_id);
+    const card2 = cardById.get(parsed.data.card2_id);
+    if (!card1 || !card2) {
+      return res.status(400).json({ error: "Cards must belong to the same event" });
+    }
+
+    const handicap1 = card1.handicap != null ? Number(card1.handicap) : null;
+    const handicap2 = card2.handicap != null ? Number(card2.handicap) : null;
+    const pairHandicap =
+      handicap1 == null && handicap2 == null
+        ? null
+        : Number((((handicap1 ?? 0) + (handicap2 ?? 0)) / 2).toFixed(2));
+
+    const [insertResult]: any = await pool.execute(
+      `
+      INSERT INTO eventBestBall
+        (event_id, member1_id, member2_id, card1_id, card2_id, handicap1, handicap2, handicap)
+      VALUES
+        (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [
+        sub.event_id,
+        card1.member_id ?? null,
+        card2.member_id ?? null,
+        parsed.data.card1_id,
+        parsed.data.card2_id,
+        handicap1,
+        handicap2,
+        pairHandicap,
+      ]
+    );
+
+    await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    return res.status(201).json({ bestball_id: insertResult.insertId });
+  } catch (err) {
+    console.error("subevent best ball pairing create error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.delete("/subevents/:id/bestball/pairings/:bestballId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const bestballId = Number(req.params.bestballId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(bestballId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, event_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      "SELECT bestball_id FROM eventBestBall WHERE bestball_id = ? AND event_id = ? LIMIT 1",
+      [bestballId, sub.event_id]
+    );
+    if (!rows?.length) return res.status(404).json({ error: "Not found" });
+
+    await pool.execute("DELETE FROM eventBestBall WHERE bestball_id = ?", [bestballId]);
+    await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent best ball pairing delete error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, event_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const bestBallNetTable = await resolveBestBallNetTableName();
+
+    await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    await pool.query("CALL spBBPick(?)", [subeventId]);
+
+    const [diagRows] = await pool.query<any[]>(
+      `
+      SELECT
+        (SELECT COUNT(*) FROM eventBestBall WHERE event_id = ?) AS pairing_rows,
+        (SELECT COUNT(*) FROM subEventPayOut WHERE subevent_id = ?) AS payout_rows,
+        (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ?) AS gross_rows,
+        (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ?) AS net_rows,
+        (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS gross_winner_rows,
+        (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS net_winner_rows
+      `,
+      [sub.event_id, subeventId, subeventId, subeventId, subeventId, subeventId]
+    );
+
+    return res.json({ ok: true, diagnostics: diagRows?.[0] ?? null });
+  } catch (err) {
+    console.error("subevent best ball post error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/bestball/unpost", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spUnPost(?)", [subeventId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent best ball unpost error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/bestball/gross/:grossId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const grossId = Number(req.params.grossId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(grossId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({ amount: z.number().nullable() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT g.gross_id, s.course_id
+      FROM subEventBBPayGross g
+      INNER JOIN subEventMain s ON s.subevent_id = g.subevent_id
+      WHERE g.subevent_id = ? AND g.gross_id = ?
+      LIMIT 1
+      `,
+      [subeventId, grossId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("UPDATE subEventBBPayGross SET amount = ? WHERE gross_id = ?", [
+      parsed.data.amount,
+      grossId,
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent best ball gross amount update error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/bestball/net/:netId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const netId = Number(req.params.netId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(netId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({ amount: z.number().nullable() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const bestBallNetTable = await resolveBestBallNetTableName();
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT n.net_id, s.course_id
+      FROM ${bestBallNetTable} n
+      INNER JOIN subEventMain s ON s.subevent_id = n.subevent_id
+      WHERE n.subevent_id = ? AND n.net_id = ?
+      LIMIT 1
+      `,
+      [subeventId, netId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute(`UPDATE ${bestBallNetTable} SET amount = ? WHERE net_id = ?`, [
+      parsed.data.amount,
+      netId,
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent best ball net amount update error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.post("/subevents/:id/stroke/autoflight", authMiddleware, async (req, res) => {
   try {
     const payload = (req as any).user as JwtPayload;
@@ -1955,13 +2396,22 @@ app.post("/subevents/:id/stroke/autoflight", authMiddleware, async (req, res) =>
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id, roster_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      `
+      SELECT s.subevent_id, s.course_id, s.roster_id, c.autoflight_yn
+      FROM subEventMain s
+      LEFT JOIN courseMain c ON c.course_id = s.course_id
+      WHERE s.subevent_id = ?
+      LIMIT 1
+      `,
       [subeventId]
     );
     const sub = subRows?.[0];
     if (!sub) return res.status(404).json({ error: "Not found" });
     if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
       return res.status(403).json({ error: "Forbidden" });
+    }
+    if (Number(sub.autoflight_yn ?? 1) !== 1) {
+      return res.status(403).json({ error: "Auto Flight is disabled for this course" });
     }
     if (!sub.roster_id) {
       return res.status(400).json({ error: "Roster is required before auto flighting" });

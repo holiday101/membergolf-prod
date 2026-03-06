@@ -13,6 +13,7 @@ type Course = {
   cardsmax: number | null;
   handicap_yn: number | null;
   decimalhandicap_yn: number | null;
+  autoflight_yn: number | null;
   active_yn: number | null;
   logo: string | null;
   titlesponsor: string | null;
@@ -74,6 +75,7 @@ type FormState = {
   cardsmax: string;
   handicap_yn: string;
   decimalhandicap_yn: string;
+  autoflight_yn: string;
   active_yn: string;
   logo: string;
   titlesponsor: string;
@@ -89,6 +91,7 @@ const emptyForm: FormState = {
   cardsmax: "12",
   handicap_yn: "",
   decimalhandicap_yn: "",
+  autoflight_yn: "1",
   active_yn: "1",
   logo: "",
   titlesponsor: "",
@@ -132,6 +135,7 @@ export default function CourseEditorPage() {
       cardsmax: course.cardsmax != null ? String(course.cardsmax) : "",
       handicap_yn: course.handicap_yn != null ? String(course.handicap_yn) : "",
       decimalhandicap_yn: course.decimalhandicap_yn != null ? String(course.decimalhandicap_yn) : "",
+      autoflight_yn: course.autoflight_yn != null ? String(course.autoflight_yn) : "1",
       active_yn: course.active_yn != null ? String(course.active_yn) : "1",
       logo: course.logo ?? "",
       titlesponsor: course.titlesponsor ?? "",
@@ -235,6 +239,7 @@ export default function CourseEditorPage() {
         cardsmax: form.cardsmax ? Number(form.cardsmax) : null,
         handicap_yn: form.handicap_yn ? Number(form.handicap_yn) : null,
         decimalhandicap_yn: form.decimalhandicap_yn ? Number(form.decimalhandicap_yn) : null,
+        autoflight_yn: form.autoflight_yn ? Number(form.autoflight_yn) : null,
         active_yn: form.active_yn ? Number(form.active_yn) : null,
         logo: form.logo || null,
         titlesponsor: form.titlesponsor || null,
@@ -520,6 +525,15 @@ export default function CourseEditorPage() {
                         }
                       />
                       <span className="checkboxLabel">Decimal Handicap Y/N</span>
+                    </label>
+
+                    <label className="formLabel checkbox">
+                      <input
+                        type="checkbox"
+                        checked={form.autoflight_yn === "1"}
+                        onChange={(e) => setField("autoflight_yn", e.target.checked ? "1" : "0")}
+                      />
+                      <span className="checkboxLabel">Auto Flight Y/N</span>
                     </label>
 
                     {isGlobal ? (

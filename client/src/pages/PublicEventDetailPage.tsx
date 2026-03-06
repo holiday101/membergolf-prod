@@ -199,7 +199,7 @@ export default function PublicEventDetailPage() {
           <div className="winningsLayout">
             <div className="leftColumn">
               {grossNetByFlight.length === 0 ? (
-                <div className="empty">No gross/net posted</div>
+                null
               ) : (
                 grossNetByFlight.map((flight, idx) => (
                   <div key={`flight-${idx}`} className="typeCard">
@@ -248,7 +248,7 @@ export default function PublicEventDetailPage() {
 
             <div className="rightColumn">
               {otherPayoutGroups.length === 0 ? (
-                <div className="empty">No other payouts</div>
+                null
               ) : (
                 otherPayoutGroups.flatMap((group) => {
                   if (group.type === "SKINS" || group.type === "SKIN") {
@@ -309,14 +309,13 @@ export default function PublicEventDetailPage() {
 
           {files.length > 0 ? (
             <div className="files">
-              <div className="filesTitle">Files</div>
               <div className="fileList">
                 {files.map((f) => {
                   const isImage =
                     (f.content_type || "").startsWith("image/") ||
                     /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.filename);
                   return (
-                    <div key={f.eventfile_id} className="fileItem">
+                    <div key={f.eventfile_id} className={`fileItem${isImage ? " fileItemImage" : ""}`}>
                       {isImage ? (
                         <a href={f.url} target="_blank" rel="noreferrer">
                           <img src={f.url} alt={f.filename} className="fileImage" />
@@ -423,7 +422,6 @@ export default function PublicEventDetailPage() {
         .empty { color: #9ca3af; font-size: 12px; padding: 8px 10px; }
         .emptyRow { color: #9ca3af; font-size: 11px; padding: 7px 10px; border-bottom: 1px solid #edf2f7; }
         .files { margin-top: 14px; display: grid; gap: 8px; }
-        .filesTitle { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #9ca3af; }
         .fileList { display: grid; gap: 6px; }
         .fileItem {
           background: #f9fafb;
@@ -435,6 +433,14 @@ export default function PublicEventDetailPage() {
           display: grid;
           gap: 6px;
           border: 1px solid #e5e7eb;
+        }
+        .fileItemImage {
+          background: transparent;
+          border: 0;
+          padding: 0;
+        }
+        .fileItemImage .fileImage {
+          border: 0;
         }
         .fileItem a { color: #374151; text-decoration: none; }
         .fileImage {

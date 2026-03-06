@@ -55,6 +55,17 @@ function isStrokeType(value: string | null | undefined) {
   return (value ?? "").toLowerCase().includes("stroke");
 }
 
+function isBestBallType(value: string | null | undefined) {
+  const normalized = (value ?? "").toLowerCase();
+  return normalized.includes("best ball") || normalized.includes("bestball");
+}
+
+function subEventRoute(subeventId: number, eventTypeName: string | null | undefined) {
+  if (isStrokeType(eventTypeName)) return `/subevents/${subeventId}/stroke`;
+  if (isBestBallType(eventTypeName)) return `/subevents/${subeventId}/bestball`;
+  return `/subevents/${subeventId}`;
+}
+
 function toInputDate(value: string | null | undefined) {
   if (!value) return "";
   const d = new Date(value);
@@ -330,7 +341,7 @@ export default function EditEventPage() {
                   <Link
                     key={sub.subevent_id}
                     className="subEventLink"
-                    to={isStrokeType(sub.eventtypename) ? `/subevents/${sub.subevent_id}/stroke` : `/subevents/${sub.subevent_id}`}
+                    to={subEventRoute(sub.subevent_id, sub.eventtypename)}
                   >
                     <span className="subEventTitle">{sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}</span>
                     <span className="subEventMeta">

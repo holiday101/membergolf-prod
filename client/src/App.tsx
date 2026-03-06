@@ -9,6 +9,7 @@ import MemberListPage from "./pages/MemberListPage";
 import MemberDetailPage from "./pages/MemberDetailPage";
 import SubEventDetailPage from "./pages/SubEventDetailPage";
 import SubEventStrokePage from "./pages/SubEventStrokePage";
+import SubEventBestBallPage from "./pages/SubEventBestBallPage";
 import SubEventCreatePage from "./pages/SubEventCreatePage";
 import RosterListPage from "./pages/RosterListPage";
 import UserListPage from "./pages/UserListPage";
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/members/:memberId" element={<MemberDetailPage />} />
         <Route path="/subevents/new" element={<SubEventCreatePage />} />
         <Route path="/subevents/:id/stroke" element={<SubEventStrokePage />} />
+        <Route path="/subevents/:id/bestball" element={<SubEventBestBallPage />} />
         <Route path="/subevents/:id" element={<SubEventDetailPage />} />
         <Route path="/rosters" element={<RosterListPage />} />
         <Route path="/courses" element={<CourseListPage />} />

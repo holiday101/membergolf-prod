@@ -12,6 +12,7 @@ type SubEventDetail = {
   roster_id: number | null;
   amount: number | null;
   addedmoney: number | null;
+  autoflight_yn?: number | null;
 };
 
 type GrossRow = {
@@ -339,6 +340,7 @@ export default function SubEventStrokePage() {
   }, []);
 
   const isAdmin = Boolean(me?.user?.isAdmin || me?.user?.globalYn === 1);
+  const autoFlightEnabledForCourse = (data?.autoflight_yn ?? 1) === 1;
 
   const save = async () => {
     if (!id) return;
@@ -432,6 +434,10 @@ export default function SubEventStrokePage() {
 
   const autoFlight = async () => {
     if (!id || !isAdmin) return;
+    if (!autoFlightEnabledForCourse) {
+      setError("Auto Flight is disabled for this course.");
+      return;
+    }
     if (!form.roster_id) {
       setError("Please select a roster before Auto Flight.");
       return;
@@ -558,7 +564,7 @@ export default function SubEventStrokePage() {
                     </option>
                   ))}
                 </select>
-                {isAdmin ? (
+                {isAdmin && autoFlightEnabledForCourse ? (
                   <button
                     className={`btn ${autoFlightDone ? "success" : ""}`.trim()}
                     onClick={autoFlight}

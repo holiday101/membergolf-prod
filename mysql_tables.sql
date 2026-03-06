@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS courseMain (
   slogan VARCHAR(4000) NULL,
   website VARCHAR(500) NULL,
   decimalhandicap_yn INT NULL,
+  autoflight_yn INT NOT NULL DEFAULT 1,
   payout DOUBLE NULL,
   active_yn INT NULL,
   PRIMARY KEY (course_id)
