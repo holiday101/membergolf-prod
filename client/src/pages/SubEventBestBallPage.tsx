@@ -20,27 +20,24 @@ type PairingOption = {
   firstname: string | null;
   lastname: string | null;
   handicap: number | null;
-  flight_id: number | null;
-  flightname: string | null;
+  card_dt: string | null;
+  gross: number | null;
+  net: number | null;
 };
 
 type PairingRow = {
   bestball_id: number;
   card1_id: number | null;
   card2_id: number | null;
-  member1_id: number | null;
-  member2_id: number | null;
   member1_firstname: string | null;
   member1_lastname: string | null;
   member2_firstname: string | null;
   member2_lastname: string | null;
-  handicap1: number | null;
-  handicap2: number | null;
   handicap: number | null;
   gross: number | null;
   net: number | null;
-  flight_id: number | null;
   flightname: string | null;
+  flight_id: number | null;
 };
 
 type GrossRow = {
@@ -48,14 +45,13 @@ type GrossRow = {
   bestball_id: number | null;
   flight_id: number | null;
   flightname: string | null;
-  score: number | null;
-  place: number | null;
-  amount: number | null;
-  used_yn: number | null;
   member1_firstname: string | null;
   member1_lastname: string | null;
   member2_firstname: string | null;
   member2_lastname: string | null;
+  score: number | null;
+  place: number | null;
+  amount: number | null;
 };
 
 type NetRow = {
@@ -63,21 +59,20 @@ type NetRow = {
   bestball_id: number | null;
   flight_id: number | null;
   flightname: string | null;
-  score: number | null;
-  place: number | null;
-  amount: number | null;
-  used_yn: number | null;
   member1_firstname: string | null;
   member1_lastname: string | null;
   member2_firstname: string | null;
   member2_lastname: string | null;
+  score: number | null;
+  place: number | null;
+  amount: number | null;
 };
 
 type PayoutRow = {
   place: number | null;
   amount: number | null;
-  flight_id: number | null;
   flightname: string | null;
+  flight_id: number | null;
 };
 
 function isBestBallType(name: string | null | undefined) {
@@ -85,41 +80,57 @@ function isBestBallType(name: string | null | undefined) {
   return normalized.includes("best ball") || normalized.includes("bestball");
 }
 
-function memberName(lastname: string | null | undefined, firstname: string | null | undefined) {
-  const last = (lastname ?? "").trim();
-  const first = (firstname ?? "").trim();
-  if (last || first) return `${last}${last && first ? ", " : ""}${first}`;
-  return "Unknown";
+function hasWinningAmount(amount: number | string | null | undefined) {
+  const n = typeof amount === "number" ? amount : Number(amount ?? 0);
+  return Number.isFinite(n) && n > 0;
+}
+
+function memberName(last: string | null | undefined, first: string | null | undefined) {
+  const l = (last ?? "").trim();
+  const f = (first ?? "").trim();
+  if (!l && !f) return "Unknown";
+  return l + (l && f ? ", " : "") + f;
+}
+
+function pairName(
+  member1Last: string | null | undefined,
+  member1First: string | null | undefined,
+  member2Last: string | null | undefined,
+  member2First: string | null | undefined
+) {
+  return `${memberName(member1Last, member1First)} / ${memberName(member2Last, member2First)}`;
+}
+
+function formatCardDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString();
 }
 
 export default function SubEventBestBallPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+
   const [data, setData] = useState<SubEventDetail | null>(null);
   const [types, setTypes] = useState<Array<{ eventtype_id: number; eventtypename: string | null }>>([]);
   const [rosters, setRosters] = useState<Array<{ roster_id: number; rostername: string | null }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [bestBallBusy, setBestBallBusy] = useState(false);
-  const [bestBallLoading, setBestBallLoading] = useState(false);
-  const [error, setError] = useState<string>("");
+  const [form, setForm] = useState({ eventtype_id: "", roster_id: "", amount: "", addedmoney: "" });
 
-  const [pairingOptions, setPairingOptions] = useState<PairingOption[]>([]);
+  const [cards, setCards] = useState<PairingOption[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
   const [gross, setGross] = useState<GrossRow[]>([]);
   const [net, setNet] = useState<NetRow[]>([]);
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
+
+  const [pairingForm, setPairingForm] = useState({ card1_id: "", card2_id: "" });
   const [grossAmountEdits, setGrossAmountEdits] = useState<Record<number, string>>({});
   const [netAmountEdits, setNetAmountEdits] = useState<Record<number, string>>({});
 
-  const [pairingForm, setPairingForm] = useState({ card1_id: "", card2_id: "" });
-  const [form, setForm] = useState({
-    eventtype_id: "",
-    eventnumhole_id: "",
-    roster_id: "",
-    amount: "",
-    addedmoney: "",
-  });
+  const [loading, setLoading] = useState(true);
+  const [bestBallLoading, setBestBallLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const loadBestBall = async () => {
     if (!id) return;
@@ -128,30 +139,23 @@ export default function SubEventBestBallPage() {
       const res = await apiFetch(`/subevents/${id}/bestball`);
       if (!res.ok) throw new Error(await res.text());
       const json = await res.json();
+      setCards((json.cards ?? []) as PairingOption[]);
+      setPairings((json.pairings ?? []) as PairingRow[]);
       const grossRows = (json.gross ?? []) as GrossRow[];
       const netRows = (json.net ?? []) as NetRow[];
-      setPairings((json.pairings ?? []) as PairingRow[]);
-      setPairingOptions((json.cards ?? []) as PairingOption[]);
       setGross(grossRows);
       setNet(netRows);
       setPayouts((json.payouts ?? []) as PayoutRow[]);
 
-      const nextGrossEdits: Record<number, string> = {};
-      for (const row of grossRows) nextGrossEdits[row.gross_id] = row.amount != null ? String(row.amount) : "";
-      setGrossAmountEdits(nextGrossEdits);
+      const g: Record<number, string> = {};
+      for (const row of grossRows) g[row.gross_id] = row.amount != null ? String(row.amount) : "";
+      setGrossAmountEdits(g);
 
-      const nextNetEdits: Record<number, string> = {};
-      for (const row of netRows) nextNetEdits[row.net_id] = row.amount != null ? String(row.amount) : "";
-      setNetAmountEdits(nextNetEdits);
+      const n: Record<number, string> = {};
+      for (const row of netRows) n[row.net_id] = row.amount != null ? String(row.amount) : "";
+      setNetAmountEdits(n);
     } catch (e: any) {
-      setError(e.message ?? "Failed to load best ball data");
-      setPairings([]);
-      setPairingOptions([]);
-      setGross([]);
-      setNet([]);
-      setPayouts([]);
-      setGrossAmountEdits({});
-      setNetAmountEdits({});
+      setError(e.message ?? "Failed to load best ball");
     } finally {
       setBestBallLoading(false);
     }
@@ -171,14 +175,12 @@ export default function SubEventBestBallPage() {
         if (!detailRes.ok) throw new Error(await detailRes.text());
         if (!typeRes.ok) throw new Error(await typeRes.text());
         if (!rosterRes.ok) throw new Error(await rosterRes.text());
-
         const detail = (await detailRes.json()) as SubEventDetail;
         setData(detail);
         setTypes(await typeRes.json());
         setRosters(await rosterRes.json());
         setForm({
           eventtype_id: detail.eventtype_id ? String(detail.eventtype_id) : "",
-          eventnumhole_id: detail.eventnumhole_id ? String(detail.eventnumhole_id) : "",
           roster_id: detail.roster_id ? String(detail.roster_id) : "",
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
@@ -206,7 +208,6 @@ export default function SubEventBestBallPage() {
         method: "PUT",
         body: JSON.stringify({
           eventtype_id: form.eventtype_id ? Number(form.eventtype_id) : null,
-          eventnumhole_id: form.eventnumhole_id ? Number(form.eventnumhole_id) : null,
           roster_id: form.roster_id ? Number(form.roster_id) : null,
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
@@ -214,7 +215,7 @@ export default function SubEventBestBallPage() {
       });
       if (!res.ok) throw new Error(await res.text());
     } catch (e: any) {
-      setError(e.message ?? "Failed to save subevent");
+      setError(e.message ?? "Failed to save");
     } finally {
       setBusy(false);
     }
@@ -224,7 +225,6 @@ export default function SubEventBestBallPage() {
     if (!id) return;
     if (!window.confirm("Delete this sub event?")) return;
     setBusy(true);
-    setError("");
     try {
       const res = await apiFetch(`/subevents/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(await res.text());
@@ -240,16 +240,9 @@ export default function SubEventBestBallPage() {
     if (!id) return;
     const card1 = Number(pairingForm.card1_id);
     const card2 = Number(pairingForm.card2_id);
-    if (!Number.isFinite(card1) || !Number.isFinite(card2)) {
-      setError("Select both cards for the pairing");
-      return;
-    }
-    if (card1 === card2) {
-      setError("Pairings require two different cards");
-      return;
-    }
-
-    setBestBallBusy(true);
+    if (!Number.isFinite(card1) || !Number.isFinite(card2)) return setError("Select both players");
+    if (card1 === card2) return setError("Select two different players");
+    setBusy(true);
     setError("");
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/pairings`, {
@@ -262,14 +255,14 @@ export default function SubEventBestBallPage() {
     } catch (e: any) {
       setError(e.message ?? "Failed to add pairing");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
   const removePairing = async (bestballId: number) => {
     if (!id) return;
     if (!window.confirm("Delete this pairing?")) return;
-    setBestBallBusy(true);
+    setBusy(true);
     setError("");
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/pairings/${bestballId}`, { method: "DELETE" });
@@ -278,37 +271,44 @@ export default function SubEventBestBallPage() {
     } catch (e: any) {
       setError(e.message ?? "Failed to delete pairing");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
   const postBestBall = async () => {
     if (!id) return;
-    setBestBallBusy(true);
+    setBusy(true);
     setError("");
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/post`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
+      const postResult = await res.json().catch(() => null);
       await loadBestBall();
+
+      const grossWinnerRows = Number(postResult?.diagnostics?.gross_winner_rows ?? 0);
+      const netWinnerRows = Number(postResult?.diagnostics?.net_winner_rows ?? 0);
+      const fallbackApplied = Boolean(postResult?.fallbackApplied);
+      if (!fallbackApplied && grossWinnerRows + netWinnerRows === 0) {
+        setError("Post Best Ball completed but returned no winners.");
+      }
     } catch (e: any) {
-      setError(e.message ?? "Failed to post best ball");
+      setError(e.message ?? "Failed to post");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
   const unpostBestBall = async () => {
     if (!id) return;
-    setBestBallBusy(true);
-    setError("");
+    setBusy(true);
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/unpost`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
       await loadBestBall();
     } catch (e: any) {
-      setError(e.message ?? "Failed to un-post best ball");
+      setError(e.message ?? "Failed to un-post");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
@@ -316,13 +316,8 @@ export default function SubEventBestBallPage() {
     if (!id) return;
     const raw = (grossAmountEdits[grossId] ?? "").trim();
     const amount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(amount)) {
-      setError("Invalid gross amount");
-      return;
-    }
-
-    setBestBallBusy(true);
-    setError("");
+    if (raw !== "" && !Number.isFinite(amount)) return setError("Invalid gross amount");
+    setBusy(true);
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/gross/${grossId}`, {
         method: "PATCH",
@@ -333,7 +328,7 @@ export default function SubEventBestBallPage() {
     } catch (e: any) {
       setError(e.message ?? "Failed to save gross amount");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
@@ -341,13 +336,8 @@ export default function SubEventBestBallPage() {
     if (!id) return;
     const raw = (netAmountEdits[netId] ?? "").trim();
     const amount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(amount)) {
-      setError("Invalid net amount");
-      return;
-    }
-
-    setBestBallBusy(true);
-    setError("");
+    if (raw !== "" && !Number.isFinite(amount)) return setError("Invalid net amount");
+    setBusy(true);
     try {
       const res = await apiFetch(`/subevents/${id}/bestball/net/${netId}`, {
         method: "PATCH",
@@ -358,403 +348,343 @@ export default function SubEventBestBallPage() {
     } catch (e: any) {
       setError(e.message ?? "Failed to save net amount");
     } finally {
-      setBestBallBusy(false);
+      setBusy(false);
     }
   };
 
   const cardOptionLabel = (card: PairingOption) => {
     const name = memberName(card.lastname, card.firstname);
-    const handicap = card.handicap != null ? `HDCP ${card.handicap}` : "HDCP —";
-    return `${name} (${handicap})`;
+    const date = formatCardDate(card.card_dt);
+    const score = card.gross ?? "-";
+    return name + " (" + date + " | " + String(score) + ")";
   };
 
-  const payoutsByFlight = useMemo(() => {
-    const grouped = new Map<string, PayoutRow[]>();
-    for (const row of payouts) {
-      const key = String(row.flight_id ?? "na") + "::" + String(row.flightname ?? "Unassigned");
-      const existing = grouped.get(key) ?? [];
-      existing.push(row);
-      grouped.set(key, existing);
+  const flightComparisons = useMemo(() => {
+    const flights = new Map<string, {
+      flight_id: number | null;
+      flightname: string | null;
+      gross: GrossRow[];
+      net: NetRow[];
+    }>();
+
+    for (const row of gross) {
+      const key = String(row.flight_id ?? "na");
+      const current =
+        flights.get(key) ??
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+      current.gross.push(row);
+      flights.set(key, current);
     }
-    return Array.from(grouped.entries()).map(([key, rows]) => {
-      const parts = key.split("::");
-      return {
-        flight_id: parts[0] === "na" ? null : Number(parts[0]),
-        flightname: parts.slice(1).join("::") || null,
-        rows,
-      };
-    });
+
+    for (const row of net) {
+      const key = String(row.flight_id ?? "na");
+      const current =
+        flights.get(key) ??
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+      current.net.push(row);
+      flights.set(key, current);
+    }
+
+    return Array.from(flights.values())
+      .sort((a, b) => {
+        if (a.flight_id == null && b.flight_id != null) return 1;
+        if (a.flight_id != null && b.flight_id == null) return -1;
+        const nameA = (a.flightname ?? "").toLowerCase();
+        const nameB = (b.flightname ?? "").toLowerCase();
+        if (nameA !== nameB) return nameA.localeCompare(nameB);
+        return (a.flight_id ?? Number.MAX_SAFE_INTEGER) - (b.flight_id ?? Number.MAX_SAFE_INTEGER);
+      })
+      .map((flight) => {
+        const nameOf = (row: {
+          member1_lastname: string | null;
+          member1_firstname: string | null;
+          member2_lastname: string | null;
+          member2_firstname: string | null;
+        }) =>
+          pairName(row.member1_lastname, row.member1_firstname, row.member2_lastname, row.member2_firstname).toLowerCase();
+
+        const grossByBestBall = new Map<number, GrossRow>();
+        for (const row of flight.gross) {
+          if (typeof row.bestball_id === "number") grossByBestBall.set(row.bestball_id, row);
+        }
+
+        const sortedGross = [...flight.gross].sort((a, b) => {
+          const aScore = typeof a.score === "number" ? a.score : Number.MAX_SAFE_INTEGER;
+          const bScore = typeof b.score === "number" ? b.score : Number.MAX_SAFE_INTEGER;
+          if (aScore !== bScore) return aScore - bScore;
+          return nameOf(a).localeCompare(nameOf(b));
+        });
+
+        const sortedNet = [...flight.net].sort((a, b) => {
+          const aGross = typeof a.bestball_id === "number" ? grossByBestBall.get(a.bestball_id) : undefined;
+          const bGross = typeof b.bestball_id === "number" ? grossByBestBall.get(b.bestball_id) : undefined;
+          const aScore = typeof aGross?.score === "number" ? aGross.score : Number.MAX_SAFE_INTEGER;
+          const bScore = typeof bGross?.score === "number" ? bGross.score : Number.MAX_SAFE_INTEGER;
+          if (aScore !== bScore) return aScore - bScore;
+          return nameOf(a).localeCompare(nameOf(b));
+        });
+
+        const normalizedGross = sortedGross.map((r) => ({
+          ...r,
+          place: typeof r.place === "number" && r.place > 0 ? r.place : null,
+          amount: hasWinningAmount(r.amount as any) ? Number(r.amount) : null,
+        }));
+
+        const normalizedNet = sortedNet.map((r) => ({
+          ...r,
+          place: typeof r.place === "number" && r.place > 0 ? r.place : null,
+          amount: hasWinningAmount(r.amount as any) ? Number(r.amount) : null,
+        }));
+
+        const max = Math.max(normalizedGross.length, normalizedNet.length);
+        const rows = Array.from({ length: max }, (_, i) => ({
+          gross: normalizedGross[i] ?? null,
+          net: normalizedNet[i] ?? null,
+        }));
+
+        return { ...flight, rows };
+      });
+  }, [gross, net]);
+
+  const payoutFlightNameById = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const f of flightComparisons) {
+      if (typeof f.flight_id === "number" && f.flightname && f.flightname.trim()) {
+        map.set(f.flight_id, f.flightname.trim());
+      }
+    }
+    return map;
+  }, [flightComparisons]);
+
+  const groupedPayouts = useMemo(() => {
+    const groups = new Map<string, PayoutRow[]>();
+    for (const row of payouts) {
+      const key = String(row.flight_id ?? "na");
+      const arr = groups.get(key) ?? [];
+      arr.push(row);
+      groups.set(key, arr);
+    }
+    return Array.from(groups.entries()).map(([key, rows]) => ({
+      flight_id: key === "na" ? null : Number(key),
+      flightname: (rows.find((r) => (r.flightname ?? "").trim())?.flightname ?? null) as string | null,
+      rows,
+    }));
   }, [payouts]);
 
   return (
     <div className="page">
       <div className="eventHeader">
-        <Link className="backLink" to={data?.event_id ? `/events/${data.event_id}` : "/events"}>
-          ← Back to Event
-        </Link>
+        <Link className="backLink" to={data?.event_id ? `/events/${data.event_id}` : "/events"}>← Back to Event</Link>
         <div className="eventTitle">{data?.eventname ?? "Event"}</div>
       </div>
 
-      {loading ? <div className="muted">Loading…</div> : null}
+      {loading ? <div className="muted">Loading...</div> : null}
       {error ? <div className="error">{error}</div> : null}
 
       {data ? (
         <>
           <div className="card">
             <div className="titleRow">
-              <div className="title">
-                {data.eventtypename ? `Sub Event - ${data.eventtypename}` : `Sub Event #${data.subevent_id}`}
-              </div>
+              <div className="title">{data.eventtypename ? `Sub Event - ${data.eventtypename}` : `Sub Event #${data.subevent_id}`}</div>
             </div>
-
-            {!isBestBallType(data.eventtypename) ? (
-              <div className="warning">This sub event is not currently a Best Ball type.</div>
-            ) : null}
-
-            <div className="row">
-              <div className="label">Event</div>
-              <div className="value">{data.eventname ?? data.event_id ?? "—"}</div>
-            </div>
-            <div className="row">
-              <div className="label">Type</div>
-              <select
-                value={form.eventtype_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, eventtype_id: e.target.value }))}
-              >
-                <option value="">Select type</option>
-                {types.map((type) => (
-                  <option key={type.eventtype_id} value={String(type.eventtype_id)}>
-                    {type.eventtypename ?? `Type ${type.eventtype_id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="row">
-              <div className="label">Roster</div>
-              <select
-                value={form.roster_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, roster_id: e.target.value }))}
-              >
-                <option value="">Select roster</option>
-                {rosters.map((roster) => (
-                  <option key={roster.roster_id} value={String(roster.roster_id)}>
-                    {roster.rostername ?? `Roster ${roster.roster_id}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="row">
-              <div className="label">Amount per Player</div>
-              <input value={form.amount} onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))} />
-            </div>
-            <div className="row">
-              <div className="label">Added Money</div>
-              <input
-                value={form.addedmoney}
-                onChange={(e) => setForm((prev) => ({ ...prev, addedmoney: e.target.value }))}
-              />
-            </div>
-
+            <div className="row"><div className="label">Type</div><select value={form.eventtype_id} onChange={(e) => setForm((p) => ({ ...p, eventtype_id: e.target.value }))}><option value="">Select type</option>{types.map((t) => <option key={t.eventtype_id} value={String(t.eventtype_id)}>{t.eventtypename ?? `Type ${t.eventtype_id}`}</option>)}</select></div>
+            <div className="row"><div className="label">Roster</div><select value={form.roster_id} onChange={(e) => setForm((p) => ({ ...p, roster_id: e.target.value }))}><option value="">Select roster</option>{rosters.map((r) => <option key={r.roster_id} value={String(r.roster_id)}>{r.rostername ?? `Roster ${r.roster_id}`}</option>)}</select></div>
+            <div className="row"><div className="label">Amount per Player</div><input value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} /></div>
+            <div className="row"><div className="label">Added Money</div><input value={form.addedmoney} onChange={(e) => setForm((p) => ({ ...p, addedmoney: e.target.value }))} /></div>
             <div className="actionsRow">
-              <div className="actionsLeft" />
-              <div className="actionsRight">
-                <button className="btn primary" onClick={save} disabled={busy}>
-                  {busy ? "Saving…" : "Save"}
-                </button>
-                <button className="btn danger" onClick={deleteSubEvent} disabled={busy} aria-label="Delete sub event">
-                  🗑
-                </button>
-              </div>
+              <div className="actionsLeft"><button className="btn" onClick={unpostBestBall} disabled={busy}>{busy ? "Working..." : "Un-Post Scores"}</button><button className="btn primary" onClick={postBestBall} disabled={busy}>{busy ? "Working..." : "Post Scores"}</button></div>
+              <div className="actionsRight"><button className="btn primary" onClick={save} disabled={busy}>{busy ? "Saving..." : "Save"}</button><button className="btn danger" onClick={deleteSubEvent} disabled={busy}>Delete</button></div>
             </div>
           </div>
 
-          <div className="card wideCard">
-            <div className="titleRow">
-              <div className="title">Best Ball Pairings</div>
-              <div className="actionsRight">
-                <button className="btn" onClick={unpostBestBall} disabled={bestBallBusy}>
-                  {bestBallBusy ? "Working…" : "Un-Post Scores"}
-                </button>
-                <button className="btn primary" onClick={postBestBall} disabled={bestBallBusy}>
-                  {bestBallBusy ? "Working…" : "Post Best Ball"}
-                </button>
-              </div>
-            </div>
-
-            <div className="pairingEditor">
-              <select
-                value={pairingForm.card1_id}
-                onChange={(e) => setPairingForm((prev) => ({ ...prev, card1_id: e.target.value }))}
-              >
-                <option value="">Select player 1</option>
-                {pairingOptions.map((card) => (
-                  <option key={`card1-${card.card_id}`} value={String(card.card_id)}>
-                    {cardOptionLabel(card)}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={pairingForm.card2_id}
-                onChange={(e) => setPairingForm((prev) => ({ ...prev, card2_id: e.target.value }))}
-              >
-                <option value="">Select player 2</option>
-                {pairingOptions.map((card) => (
-                  <option key={`card2-${card.card_id}`} value={String(card.card_id)}>
-                    {cardOptionLabel(card)}
-                  </option>
-                ))}
-              </select>
-              <button className="btn primary" onClick={addPairing} disabled={bestBallBusy || bestBallLoading}>
-                Add Pairing
-              </button>
-            </div>
-
-            {bestBallLoading ? <div className="muted">Loading best ball…</div> : null}
-
-            {!bestBallLoading ? (
-              <div className="tableWrap">
-                <div className="tableHead pairingsHead">
-                  <span>Team</span>
-                  <span>Cards</span>
-                  <span>Handicap</span>
-                  <span>Gross</span>
-                  <span>Net</span>
-                  <span>Flight</span>
-                  <span />
+          {isBestBallType(data.eventtypename) ? (
+            <>
+              <div className="card wideCard">
+                <div className="titleRow"><div className="title">Pairings</div></div>
+                <div className="pairingRow">
+                  <select value={pairingForm.card1_id} onChange={(e) => setPairingForm((p) => ({ ...p, card1_id: e.target.value }))}>
+                    <option value="">Select player 1</option>
+                    {cards.map((c) => <option key={`c1-${c.card_id}`} value={String(c.card_id)}>{cardOptionLabel(c)}</option>)}
+                  </select>
+                  <select value={pairingForm.card2_id} onChange={(e) => setPairingForm((p) => ({ ...p, card2_id: e.target.value }))}>
+                    <option value="">Select player 2</option>
+                    {cards.map((c) => <option key={`c2-${c.card_id}`} value={String(c.card_id)}>{cardOptionLabel(c)}</option>)}
+                  </select>
+                  <button className="btn primary" onClick={addPairing} disabled={busy || bestBallLoading}>Add Pairing</button>
                 </div>
-                {pairings.map((row) => (
-                  <div className="tableRow pairingsRow" key={row.bestball_id}>
-                    <span>
-                      {memberName(row.member1_lastname, row.member1_firstname)} / {memberName(row.member2_lastname, row.member2_firstname)}
-                    </span>
-                    <span>
-                      #{row.card1_id ?? "—"} + #{row.card2_id ?? "—"}
-                    </span>
-                    <span>{row.handicap != null ? Number(row.handicap).toFixed(2) : "—"}</span>
-                    <span>{row.gross ?? "—"}</span>
-                    <span>{row.net ?? "—"}</span>
-                    <span>{row.flightname ?? row.flight_id ?? "—"}</span>
-                    <span>
-                      <button className="btn danger mini" onClick={() => removePairing(row.bestball_id)} disabled={bestBallBusy}>
-                        Remove
-                      </button>
-                    </span>
-                  </div>
-                ))}
-                {pairings.length === 0 ? <div className="muted">No pairings yet.</div> : null}
-              </div>
-            ) : null}
-          </div>
-
-          <div className="card wideCard">
-            <div className="title">Best Ball Payouts</div>
-
-            {payoutsByFlight.length ? (
-              <div className="payoutGrid">
-                {payoutsByFlight.map((group) => (
-                  <div className="payoutCard" key={`payout-${group.flight_id ?? "na"}-${group.flightname ?? ""}`}>
-                    <div className="payoutTitle">{group.flightname ?? group.flight_id ?? "Unassigned"}</div>
-                    {group.rows.map((row, idx) => (
-                      <div className="payoutRow" key={`payout-${group.flight_id ?? "na"}-${idx}`}>
-                        <span>Place {row.place ?? "—"}</span>
-                        <span>{row.amount != null ? Number(row.amount).toFixed(2) : "—"}</span>
-                      </div>
-                    ))}
+                {pairings.map((p) => (
+                  <div key={p.bestball_id} className="pairingTableRow">
+                    <span>{pairName(p.member1_lastname, p.member1_firstname, p.member2_lastname, p.member2_firstname)}</span>
+                    <span>{p.gross ?? "-"}/{p.net ?? "-"}</span>
+                    <span>{p.flightname ?? p.flight_id ?? "-"}</span>
+                    <button className="btn danger" onClick={() => removePairing(p.bestball_id)} disabled={busy}>Remove</button>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="muted">No payout rows yet.</div>
-            )}
 
-            <div className="splitTables">
-              <div>
-                <div className="tableTitle">Gross</div>
-                <div className="tableHead payHead">
-                  <span>Team</span>
-                  <span>Score</span>
-                  <span>Place</span>
-                  <span>Amount</span>
-                  <span />
-                </div>
-                {gross.map((row) => (
-                  <div className="tableRow payRow" key={row.gross_id}>
-                    <span>
-                      {memberName(row.member1_lastname, row.member1_firstname)} / {memberName(row.member2_lastname, row.member2_firstname)}
-                    </span>
-                    <span>{row.score ?? "—"}</span>
-                    <span>{row.place ?? "—"}</span>
-                    <span>
-                      <input
-                        value={grossAmountEdits[row.gross_id] ?? ""}
-                        onChange={(e) => setGrossAmountEdits((prev) => ({ ...prev, [row.gross_id]: e.target.value }))}
-                      />
-                    </span>
-                    <span>
-                      <button className="btn" onClick={() => saveGrossAmount(row.gross_id)} disabled={bestBallBusy}>
-                        Save
-                      </button>
-                    </span>
-                  </div>
-                ))}
-                {gross.length === 0 ? <div className="muted">No gross rows.</div> : null}
-              </div>
+              <div className="card wideCard">
+                <div className="titleRow"><div className="title">Best Ball Payouts</div></div>
+                {bestBallLoading ? <div className="muted">Loading payouts...</div> : null}
 
-              <div>
-                <div className="tableTitle">Net</div>
-                <div className="tableHead payHead">
-                  <span>Team</span>
-                  <span>Score</span>
-                  <span>Place</span>
-                  <span>Amount</span>
-                  <span />
-                </div>
-                {net.map((row) => (
-                  <div className="tableRow payRow" key={row.net_id}>
-                    <span>
-                      {memberName(row.member1_lastname, row.member1_firstname)} / {memberName(row.member2_lastname, row.member2_firstname)}
-                    </span>
-                    <span>{row.score ?? "—"}</span>
-                    <span>{row.place ?? "—"}</span>
-                    <span>
-                      <input
-                        value={netAmountEdits[row.net_id] ?? ""}
-                        onChange={(e) => setNetAmountEdits((prev) => ({ ...prev, [row.net_id]: e.target.value }))}
-                      />
-                    </span>
-                    <span>
-                      <button className="btn" onClick={() => saveNetAmount(row.net_id)} disabled={bestBallBusy}>
-                        Save
-                      </button>
-                    </span>
+                {!bestBallLoading ? (
+                  <div className="tablesWrap">
+                    <div className="tableSection">
+                      {flightComparisons.map((flight) => (
+                        <div key={`flight-compare-${flight.flight_id ?? "na"}`} className="compareFlight">
+                          <div className="compareFlightTitle">{flight.flightname ?? `Flight ${flight.flight_id ?? "Unassigned"}`}</div>
+                          <div className="compareHead">
+                            <div className="compareColHead"><span>Member</span><span>Gross</span><span>Place</span><span>Amount</span></div>
+                            <div className="compareColHead"><span>Member</span><span>Net</span><span>Place</span><span>Amount</span></div>
+                          </div>
+                          {flight.rows.map((pair, idx) => (
+                            <div key={`compare-row-${flight.flight_id ?? "na"}-${idx}`} className="compareRow compactRow">
+                              <div className={`compareCol grossCol compactCol ${pair.gross && hasWinningAmount(pair.gross.amount as any) ? "winnerCol" : ""}`}>
+                                {pair.gross ? (
+                                  <>
+                                    <div className="cellMember">{pairName(pair.gross.member1_lastname, pair.gross.member1_firstname, pair.gross.member2_lastname, pair.gross.member2_firstname)}</div>
+                                    <div className="cellValue">{pair.gross.score ?? "-"}</div>
+                                    <div className="cellValue">{pair.gross.place ?? "-"}</div>
+                                    <div className="cellAmount">
+                                      <input value={grossAmountEdits[pair.gross.gross_id] ?? ""} onChange={(e) => setGrossAmountEdits((prev) => ({ ...prev, [pair.gross!.gross_id]: e.target.value }))} />
+                                      <button className="btn btn-sm" onClick={() => saveGrossAmount(pair.gross!.gross_id)} disabled={busy}>Save</button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="entryEmpty">-</div><div className="entryEmpty">-</div><div className="entryEmpty">-</div><div className="entryEmpty">-</div>
+                                  </>
+                                )}
+                              </div>
+                              <div className={`compareCol netCol compactCol ${pair.net && hasWinningAmount(pair.net.amount as any) ? "winnerCol" : ""}`}>
+                                {pair.net ? (
+                                  <>
+                                    <div className="cellMember">{pairName(pair.net.member1_lastname, pair.net.member1_firstname, pair.net.member2_lastname, pair.net.member2_firstname)}</div>
+                                    <div className="cellValue">{pair.net.score ?? "-"}</div>
+                                    <div className="cellValue">{pair.net.place ?? "-"}</div>
+                                    <div className="cellAmount">
+                                      <input value={netAmountEdits[pair.net.net_id] ?? ""} onChange={(e) => setNetAmountEdits((prev) => ({ ...prev, [pair.net!.net_id]: e.target.value }))} />
+                                      <button className="btn btn-sm" onClick={() => saveNetAmount(pair.net!.net_id)} disabled={busy}>Save</button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="entryEmpty">-</div><div className="entryEmpty">-</div><div className="entryEmpty">-</div><div className="entryEmpty">-</div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                      {!flightComparisons.length ? <div className="muted">No best ball payout rows.</div> : null}
+                    </div>
+
+                    <div className="tableSection">
+                      <div className="subTitle">Payout Table</div>
+                      {groupedPayouts.map((group) => (
+                        <div key={`payout-${group.flight_id ?? "na"}`} className="payoutGroup">
+                          <div className="payoutGroupTitle">Flight: {group.flightname ?? (typeof group.flight_id === "number" ? (payoutFlightNameById.get(group.flight_id) ?? group.flight_id) : "Unassigned")}</div>
+                          <div className="payoutRows">
+                            {group.rows.map((row, idx) => (
+                              <div key={`payout-${group.flight_id ?? "na"}-${idx}`} className="payoutRow">
+                                <span>Place {row.place ?? "-"}</span>
+                                <span>{row.amount != null ? Number(row.amount).toFixed(2) : "-"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {!payouts.length ? <div className="muted">No payout table rows.</div> : null}
+                    </div>
                   </div>
-                ))}
-                {net.length === 0 ? <div className="muted">No net rows.</div> : null}
+                ) : null}
               </div>
-            </div>
-          </div>
+            </>
+          ) : null}
         </>
       ) : null}
 
       <style>{`
         .page { display: grid; gap: 12px; }
-        .eventHeader { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-        .backLink { color: #2563eb; text-decoration: none; font-weight: 600; }
-        .eventTitle { font-size: 20px; font-weight: 800; color: #111827; }
-        .card {
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-radius: 12px;
-          padding: 12px;
-          display: grid;
-          gap: 10px;
-        }
-        .wideCard { overflow: hidden; }
-        .titleRow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .title { font-size: 16px; font-weight: 800; color: #111827; }
-        .label { font-size: 12px; font-weight: 700; color: #4b5563; }
-        .value { font-size: 13px; color: #111827; }
-        .row { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 10px; }
-        .row input, .row select, .pairingEditor select, .payRow input {
-          height: 32px;
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          padding: 0 8px;
-          font-size: 13px;
-          width: 100%;
-          min-width: 0;
-        }
-        .actionsRow { display: flex; justify-content: space-between; align-items: center; }
-        .actionsLeft, .actionsRight { display: flex; gap: 8px; align-items: center; }
-        .btn {
-          border: 1px solid #d1d5db;
-          background: #fff;
-          border-radius: 8px;
-          padding: 7px 10px;
-          font-size: 12px;
-          font-weight: 700;
+        .eventHeader { display: flex; align-items: center; gap: 10px; }
+        .eventTitle { font-size: 16px; font-weight: 700; color: #111827; }
+        .backLink {
           color: #111827;
-          cursor: pointer;
-        }
-        .btn:hover { background: #f8fafc; }
-        .btn.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
-        .btn.primary:hover { background: #1d4ed8; }
-        .btn.danger { border-color: #ef4444; color: #ef4444; background: #fff; }
-        .btn.danger:hover { background: #fef2f2; }
-        .btn.mini { padding: 5px 8px; font-size: 11px; }
-        .warning {
-          background: #fffbeb;
-          color: #92400e;
-          border: 1px solid #fcd34d;
-          border-radius: 8px;
+          text-decoration: none;
+          font-weight: 600;
           font-size: 12px;
-          padding: 8px;
-        }
-        .pairingEditor {
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-          gap: 8px;
+          background: #fff;
+          border: 1px solid #d1d5db;
+          padding: 6px 10px;
+          border-radius: 999px;
+          display: inline-flex;
           align-items: center;
+          width: fit-content;
         }
-        .tableWrap, .splitTables { display: grid; gap: 6px; }
-        .splitTables { grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
-        .tableHead, .tableRow {
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; max-width: 520px; display:grid; gap:8px; }
+        .wideCard { max-width: 100%; }
+        .titleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .title { font-size: 16px; font-weight: 700; color: #111827; }
+        .subTitle { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 8px; }
+        .row { display:grid; grid-template-columns: 120px 1fr; gap:10px; align-items:center; }
+        .label { color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+        .actionsRow { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
+        .actionsLeft, .actionsRight { display: flex; gap: 8px; align-items: center; }
+        .pairingRow { display:grid; grid-template-columns: 1fr 1fr auto; gap:8px; }
+        .pairingTableRow { display:grid; grid-template-columns: 1.8fr .5fr .7fr auto; gap:8px; align-items:center; border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; }
+        .tablesWrap { display: grid; gap: 14px; }
+        .tableSection { display: grid; gap: 6px; }
+        .compareFlight { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
+        .compareFlightTitle { font-size: 12px; font-weight: 800; color: #1f2937; }
+        .compareHead { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
+        .compareColHead {
           display: grid;
-          align-items: center;
+          grid-template-columns: minmax(130px, 1fr) 56px 56px minmax(120px, 140px);
           gap: 8px;
-          font-size: 12px;
-        }
-        .pairingsHead, .pairingsRow { grid-template-columns: 1.7fr 0.8fr 0.6fr 0.5fr 0.5fr 0.8fr 80px; }
-        .payHead, .payRow { grid-template-columns: 1.6fr 0.5fr 0.5fr minmax(80px, 1fr) 70px; }
-        .tableHead {
-          color: #6b7280;
-          font-weight: 800;
-          text-transform: uppercase;
           font-size: 10px;
-          letter-spacing: 0.04em;
+          font-weight: 700;
+          color: #6b7280;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
         }
-        .tableRow {
-          background: #f8fafc;
-          border: 1px solid #e5e7eb;
-          border-radius: 8px;
-          padding: 6px 8px;
-        }
-        .tableTitle { font-size: 13px; font-weight: 800; color: #111827; margin-bottom: 4px; }
-        .payoutGrid {
+        .compareRow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-bottom: 1px solid #eef2f7; padding: 4px 0; }
+        .compareRow:last-child { border-bottom: 0; }
+        .compareCol {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          grid-template-columns: minmax(130px, 1fr) 56px 56px minmax(120px, 140px);
           gap: 8px;
+          align-items: center;
+          padding: 0;
+          background: transparent;
+          border: 0;
         }
-        .payoutCard {
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 8px;
-          background: #f8fafc;
-          display: grid;
-          gap: 6px;
-        }
-        .payoutTitle { font-weight: 700; color: #111827; }
-        .payoutRow {
-          display: flex;
-          justify-content: space-between;
-          font-size: 12px;
-          color: #374151;
-        }
-        .muted { color: #6b7280; font-size: 12px; }
-        .error {
-          color: #991b1b;
-          background: #fef2f2;
-          border: 1px solid #fecaca;
-          border-radius: 8px;
-          padding: 8px;
-          font-size: 12px;
-        }
+        .winnerCol { background: #dbeafe; border-radius: 4px; }
+        .compactCol { min-height: 24px; }
+        .cellMember { font-size: 12px; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cellValue { font-size: 12px; color: #111827; text-align: left; }
+        .cellAmount { display: inline-grid; grid-template-columns: 74px auto; gap: 6px; align-items: center; }
+        .cellAmount input { padding: 3px 6px; font-size: 11px; }
+        .btn.btn-sm { padding: 4px 8px; font-size: 11px; }
+        .entryEmpty { font-size: 12px; color: #9ca3af; }
+        .payoutGroup { border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px; }
+        .payoutGroupTitle { font-size: 12px; font-weight: 700; color: #1f2937; margin-bottom: 4px; }
+        .payoutRows { display: grid; gap: 4px; }
+        .payoutRow { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #374151; }
+        select,input { padding: 6px 8px; border-radius:8px; border:1px solid #d1d5db; min-width:0; font-size: 12px; }
+        .btn { border:1px solid #d1d5db; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; font-size: 12px; }
+        .btn.primary { background:#2563eb; color:#fff; border-color:#2563eb; }
+        .btn.danger { border-color:#ef4444; color:#ef4444; }
+        .muted { color:#6b7280; font-size: 12px; }
+        .error { color:#991b1b; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:8px; font-size: 12px; }
         @media (max-width: 900px) {
-          .row { grid-template-columns: 1fr; }
-          .pairingEditor { grid-template-columns: 1fr; }
-          .splitTables { grid-template-columns: 1fr; }
-          .pairingsHead, .payHead { display: none; }
-          .pairingsRow, .payRow { grid-template-columns: 1fr; }
+          .row{grid-template-columns:1fr;}
+          .pairingRow{grid-template-columns:1fr;}
+          .pairingTableRow{grid-template-columns:1fr;}
+          .compareHead { display: none; }
+          .compareRow { grid-template-columns: 1fr; }
+          .compareCol { grid-template-columns: 1fr 56px 56px 1fr; gap: 6px; }
+          .cellAmount { grid-template-columns: 1fr auto; }
+          .cellMember { white-space: normal; }
         }
       `}</style>
     </div>

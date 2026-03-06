@@ -21,6 +21,7 @@ type SubEventType = { eventtype_id: number; eventtypename: string | null };
 type SubEventRoster = { roster_id: number; rostername: string | null };
 type SubEventRow = {
   subevent_id: number;
+  eventtype_id: number | null;
   eventtypename: string | null;
   roster_id: number | null;
   rostername: string | null;
@@ -55,14 +56,33 @@ function isStrokeType(value: string | null | undefined) {
   return (value ?? "").toLowerCase().includes("stroke");
 }
 
+function isStrokeNetType(value: string | null | undefined) {
+  const normalized = (value ?? "").toLowerCase();
+  return normalized.includes("stroke") && normalized.includes("net");
+}
+
 function isBestBallType(value: string | null | undefined) {
   const normalized = (value ?? "").toLowerCase();
   return normalized.includes("best ball") || normalized.includes("bestball");
 }
 
-function subEventRoute(subeventId: number, eventTypeName: string | null | undefined) {
+function isChicagoType(value: string | null | undefined) {
+  return (value ?? "").toLowerCase().includes("chicago");
+}
+
+function subEventRoute(
+  subeventId: number,
+  eventTypeId: number | null | undefined,
+  eventTypeName: string | null | undefined
+) {
+  if (eventTypeId === 5) return `/subevents/${subeventId}/stroke-net`;
+  if (eventTypeId === 1 || eventTypeId === 6) return `/subevents/${subeventId}/stroke`;
+  if (eventTypeId === 2 || eventTypeId === 10) return `/subevents/${subeventId}/bestball`;
+  if (eventTypeId === 4 || eventTypeId === 9) return `/subevents/${subeventId}/chicago`;
+  if (isStrokeNetType(eventTypeName)) return `/subevents/${subeventId}/stroke-net`;
   if (isStrokeType(eventTypeName)) return `/subevents/${subeventId}/stroke`;
   if (isBestBallType(eventTypeName)) return `/subevents/${subeventId}/bestball`;
+  if (isChicagoType(eventTypeName)) return `/subevents/${subeventId}/chicago`;
   return `/subevents/${subeventId}`;
 }
 
@@ -191,6 +211,16 @@ export default function EditEventPage() {
 
   async function saveSubEvent() {
     if (!id) return;
+    if (!subEventForm.eventtype_id) {
+      setSubEventError("Please select a type.");
+      setSubEventSuccess("");
+      return;
+    }
+    if (!subEventForm.roster_id) {
+      setSubEventError("Please select a roster.");
+      setSubEventSuccess("");
+      return;
+    }
     setSubEventBusy(true);
     setSubEventError("");
     setSubEventSuccess("");
@@ -341,7 +371,7 @@ export default function EditEventPage() {
                   <Link
                     key={sub.subevent_id}
                     className="subEventLink"
-                    to={subEventRoute(sub.subevent_id, sub.eventtypename)}
+                    to={subEventRoute(sub.subevent_id, sub.eventtype_id, sub.eventtypename)}
                   >
                     <span className="subEventTitle">{sub.eventtypename ?? `Sub Event #${sub.subevent_id}`}</span>
                     <span className="subEventMeta">
@@ -409,7 +439,11 @@ export default function EditEventPage() {
               </div>
 
               <div className="actions">
-                <button className="btn primary" onClick={saveSubEvent} disabled={subEventBusy}>
+                <button
+                  className="btn primary"
+                  onClick={saveSubEvent}
+                  disabled={subEventBusy || !subEventForm.eventtype_id || !subEventForm.roster_id}
+                >
                   {subEventBusy ? "Saving…" : "Add sub event"}
                 </button>
                 {subEventSuccess ? <div className="toast success">{subEventSuccess}</div> : null}

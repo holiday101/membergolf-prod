@@ -1949,6 +1949,57 @@ app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
   }
 });
 
+async function recalculateBestBallGross(eventId: number) {
+  await pool.query(
+    `
+    UPDATE eventBestBall eb
+    LEFT JOIN eventCard c1 ON c1.card_id = eb.card1_id
+    LEFT JOIN eventCard c2 ON c2.card_id = eb.card2_id
+    SET
+      eb.gross =
+        COALESCE(LEAST(c1.hole1, c2.hole1), c1.hole1, c2.hole1, 0) +
+        COALESCE(LEAST(c1.hole2, c2.hole2), c1.hole2, c2.hole2, 0) +
+        COALESCE(LEAST(c1.hole3, c2.hole3), c1.hole3, c2.hole3, 0) +
+        COALESCE(LEAST(c1.hole4, c2.hole4), c1.hole4, c2.hole4, 0) +
+        COALESCE(LEAST(c1.hole5, c2.hole5), c1.hole5, c2.hole5, 0) +
+        COALESCE(LEAST(c1.hole6, c2.hole6), c1.hole6, c2.hole6, 0) +
+        COALESCE(LEAST(c1.hole7, c2.hole7), c1.hole7, c2.hole7, 0) +
+        COALESCE(LEAST(c1.hole8, c2.hole8), c1.hole8, c2.hole8, 0) +
+        COALESCE(LEAST(c1.hole9, c2.hole9), c1.hole9, c2.hole9, 0) +
+        COALESCE(LEAST(c1.hole10, c2.hole10), c1.hole10, c2.hole10, 0) +
+        COALESCE(LEAST(c1.hole11, c2.hole11), c1.hole11, c2.hole11, 0) +
+        COALESCE(LEAST(c1.hole12, c2.hole12), c1.hole12, c2.hole12, 0) +
+        COALESCE(LEAST(c1.hole13, c2.hole13), c1.hole13, c2.hole13, 0) +
+        COALESCE(LEAST(c1.hole14, c2.hole14), c1.hole14, c2.hole14, 0) +
+        COALESCE(LEAST(c1.hole15, c2.hole15), c1.hole15, c2.hole15, 0) +
+        COALESCE(LEAST(c1.hole16, c2.hole16), c1.hole16, c2.hole16, 0) +
+        COALESCE(LEAST(c1.hole17, c2.hole17), c1.hole17, c2.hole17, 0) +
+        COALESCE(LEAST(c1.hole18, c2.hole18), c1.hole18, c2.hole18, 0),
+      eb.score =
+        COALESCE(LEAST(c1.hole1, c2.hole1), c1.hole1, c2.hole1, 0) +
+        COALESCE(LEAST(c1.hole2, c2.hole2), c1.hole2, c2.hole2, 0) +
+        COALESCE(LEAST(c1.hole3, c2.hole3), c1.hole3, c2.hole3, 0) +
+        COALESCE(LEAST(c1.hole4, c2.hole4), c1.hole4, c2.hole4, 0) +
+        COALESCE(LEAST(c1.hole5, c2.hole5), c1.hole5, c2.hole5, 0) +
+        COALESCE(LEAST(c1.hole6, c2.hole6), c1.hole6, c2.hole6, 0) +
+        COALESCE(LEAST(c1.hole7, c2.hole7), c1.hole7, c2.hole7, 0) +
+        COALESCE(LEAST(c1.hole8, c2.hole8), c1.hole8, c2.hole8, 0) +
+        COALESCE(LEAST(c1.hole9, c2.hole9), c1.hole9, c2.hole9, 0) +
+        COALESCE(LEAST(c1.hole10, c2.hole10), c1.hole10, c2.hole10, 0) +
+        COALESCE(LEAST(c1.hole11, c2.hole11), c1.hole11, c2.hole11, 0) +
+        COALESCE(LEAST(c1.hole12, c2.hole12), c1.hole12, c2.hole12, 0) +
+        COALESCE(LEAST(c1.hole13, c2.hole13), c1.hole13, c2.hole13, 0) +
+        COALESCE(LEAST(c1.hole14, c2.hole14), c1.hole14, c2.hole14, 0) +
+        COALESCE(LEAST(c1.hole15, c2.hole15), c1.hole15, c2.hole15, 0) +
+        COALESCE(LEAST(c1.hole16, c2.hole16), c1.hole16, c2.hole16, 0) +
+        COALESCE(LEAST(c1.hole17, c2.hole17), c1.hole17, c2.hole17, 0) +
+        COALESCE(LEAST(c1.hole18, c2.hole18), c1.hole18, c2.hole18, 0)
+    WHERE eb.event_id = ?
+    `,
+    [eventId]
+  );
+}
+
 async function resolveBestBallNetTableName() {
   const [rows] = await pool.query<any[]>(
     `
@@ -1983,6 +2034,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
     }
 
     const bestBallNetTable = await resolveBestBallNetTableName();
+    await recalculateBestBallGross(sub.event_id);
 
     const [cards] = await pool.query<any[]>(
       `
@@ -1992,6 +2044,9 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
         m.firstname,
         m.lastname,
         ec.handicap,
+        ec.card_dt,
+        ec.gross,
+        ec.net,
         rf.flight_id,
         rf.flightname
       FROM eventCard ec
@@ -2180,6 +2235,7 @@ app.post("/subevents/:id/bestball/pairings", authMiddleware, async (req, res) =>
     );
 
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    await recalculateBestBallGross(sub.event_id);
     return res.status(201).json({ bestball_id: insertResult.insertId });
   } catch (err) {
     console.error("subevent best ball pairing create error", err);
@@ -2217,6 +2273,7 @@ app.delete("/subevents/:id/bestball/pairings/:bestballId", authMiddleware, async
 
     await pool.execute("DELETE FROM eventBestBall WHERE bestball_id = ?", [bestballId]);
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    await recalculateBestBallGross(sub.event_id);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent best ball pairing delete error", err);
@@ -2246,6 +2303,7 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
     const bestBallNetTable = await resolveBestBallNetTableName();
 
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
+    await recalculateBestBallGross(sub.event_id);
     await pool.query("CALL spBBPick(?)", [subeventId]);
 
     const [diagRows] = await pool.query<any[]>(
@@ -2261,7 +2319,36 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
       [sub.event_id, subeventId, subeventId, subeventId, subeventId, subeventId]
     );
 
-    return res.json({ ok: true, diagnostics: diagRows?.[0] ?? null });
+    let diagnostics = diagRows?.[0] ?? null;
+    let fallbackApplied = false;
+    const grossWinners = Number(diagnostics?.gross_winner_rows ?? 0);
+    const netWinners = Number(diagnostics?.net_winner_rows ?? 0);
+    const payoutRows = Number(diagnostics?.payout_rows ?? 0);
+
+    if (grossWinners + netWinners === 0 && payoutRows > 0) {
+      console.warn("best ball post produced no winner rows; applying legacy fallback", {
+        subeventId,
+        diagnostics,
+      });
+      await pool.query("CALL spBBFlightPick(?)", [subeventId]);
+      fallbackApplied = true;
+
+      const [diagRowsAfter] = await pool.query<any[]>(
+        `
+        SELECT
+          (SELECT COUNT(*) FROM eventBestBall WHERE event_id = ?) AS pairing_rows,
+          (SELECT COUNT(*) FROM subEventPayOut WHERE subevent_id = ?) AS payout_rows,
+          (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ?) AS gross_rows,
+          (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ?) AS net_rows,
+          (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS gross_winner_rows,
+          (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS net_winner_rows
+        `,
+        [sub.event_id, subeventId, subeventId, subeventId, subeventId, subeventId]
+      );
+      diagnostics = diagRowsAfter?.[0] ?? diagnostics;
+    }
+
+    return res.json({ ok: true, diagnostics, fallbackApplied });
   } catch (err) {
     console.error("subevent best ball post error", err);
     return res.status(500).json({ error: "Server error" });
@@ -2379,6 +2466,167 @@ app.patch("/subevents/:id/bestball/net/:netId", authMiddleware, async (req, res)
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent best ball net amount update error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/subevents/:id/chicago", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        c.chicago_id,
+        c.card_id,
+        c.member_id,
+        m.firstname,
+        m.lastname,
+        c.flight_id,
+        rf.flightname,
+        c.score,
+        c.place,
+        c.amount,
+        c.used_yn
+      FROM subEventPayChicago c
+      LEFT JOIN memberMain m ON m.member_id = c.member_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = c.flight_id
+      WHERE c.subevent_id = ?
+      ORDER BY (c.flight_id IS NULL), rf.flightname ASC, c.place ASC, c.score ASC, m.lastname ASC, m.firstname ASC
+      `,
+      [subeventId]
+    );
+
+    const [payoutRows] = await pool.query<any[]>(
+      `
+      SELECT
+        p.place,
+        p.amount,
+        p.flight_id,
+        rf.flightname
+      FROM subEventPayOut p
+      LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
+      WHERE p.subevent_id = ?
+      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      `,
+      [subeventId]
+    );
+
+    return res.json({ rows, payouts: payoutRows });
+  } catch (err) {
+    console.error("subevent chicago list error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/chicago/post", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spChicago(?)", [subeventId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent chicago post error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/chicago/unpost", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.query("CALL spUnPost(?)", [subeventId]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent chicago unpost error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/subevents/:id/chicago/:chicagoId", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    const chicagoId = Number(req.params.chicagoId);
+    if (!Number.isFinite(subeventId) || !Number.isFinite(chicagoId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const schema = z.object({ amount: z.number().nullable() });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT c.chicago_id, s.course_id
+      FROM subEventPayChicago c
+      INNER JOIN subEventMain s ON s.subevent_id = c.subevent_id
+      WHERE c.subevent_id = ? AND c.chicago_id = ?
+      LIMIT 1
+      `,
+      [subeventId, chicagoId]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("UPDATE subEventPayChicago SET amount = ? WHERE chicago_id = ?", [
+      parsed.data.amount,
+      chicagoId,
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent chicago amount update error", err);
     return res.status(500).json({ error: "Server error" });
   }
 });

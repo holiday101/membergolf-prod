@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>League Info Render Helper</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+    .bar { display: flex; gap: 10px; margin-bottom: 12px; }
+    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #bbb; background: #fff; cursor: pointer; }
+    .msg { font-size: 13px; color: #444; }
+    #content { border: 1px solid #ccc; padding: 14px; max-width: 900px; background: #fff; color: #111; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #999; padding: 6px; vertical-align: top; color: #111; }
+    ul { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>League Info Render Helper</h2>
+  <div class="bar">
+    <button id="copyHtml">Copy Sanitized Rich Content</button>
+    <button id="copyText">Copy Plain Text</button>
+  </div>
+  <div class="msg">Paste into League Info with normal paste. If it disappears again, use plain text.</div>
+
+  <div id="content">
+    <p>Thank You Murdock Auto Group for being the 2026 Birch Creek Men’s Assoc. Club Championship Sponsor</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th colspan="2">2026 Flights</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Champ Flight Blue Tees</strong></td><td><strong>C Flight White Tees</strong></td></tr>
+        <tr><td>+5 to 2 (9 Hole)</td><td>7 to 9 (9 Hole)</td></tr>
+        <tr><td>+10 to 4 (18 Hole)</td><td>13 to 18 (18 Hole)</td></tr>
+
+        <tr><td><strong>A Flight Blue Tees</strong></td><td><strong>D Flight White Tees</strong></td></tr>
+        <tr><td>3 to 4 (9 Hole)</td><td>10 to 13 (9 Hole)</td></tr>
+        <tr><td>5 to 6 (18 Hole)</td><td>19 to 26 (18 Hole)</td></tr>
+
+        <tr><td><strong>B Flight White Tees</strong></td><td><strong>E Flight White Tees</strong></td></tr>
+        <tr><td>5 to 6 (9 Hole)</td><td>14 to 18 (9 Hole)</td></tr>
+        <tr><td>9 to 12 (18 Hole)</td><td>27 to 36 (18 Hole)</td></tr>
+      </tbody>
+    </table>
+
+    <ul>
+      <li>Seniors 50-65 WHITE TEE same flights as above except E flight Black Tees</li>
+      <li>Super Seniors 67-79 same as above except Black Tees</li>
+      <li>Super Duper Seniors 80+ same as above except Red Tees</li>
+    </ul>
+  </div>
+
+  <script>
+    const content = document.getElementById('content');
+
+    function sanitize(node) {
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll('*').forEach((el) => {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+        el.removeAttribute('color');
+        el.removeAttribute('bgcolor');
+      });
+      return clone;
+    }
+
+    document.getElementById('copyHtml').addEventListener('click', async () => {
+      const clean = sanitize(content);
+      const html = clean.innerHTML;
+      const text = clean.innerText;
+      const item = new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' })
+      });
+      await navigator.clipboard.write([item]);
+      alert('Sanitized rich content copied. Paste into League Info.');
+    });
+
+    document.getElementById('copyText').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(content.innerText);
+      alert('Plain text copied.');
+    });
+  </script>
+</body>
+</html>

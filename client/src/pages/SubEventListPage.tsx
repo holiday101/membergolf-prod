@@ -14,10 +14,21 @@ type SubEventRow = {
   addedmoney: number | null;
 };
 
-function subEventRoute(subeventId: number, eventTypeName: string | null | undefined) {
+function subEventRoute(
+  subeventId: number,
+  eventTypeId: number | null | undefined,
+  eventTypeName: string | null | undefined
+) {
+  if (eventTypeId === 5) return `/subevents/${subeventId}/stroke-net`;
+  if (eventTypeId === 1 || eventTypeId === 6) return `/subevents/${subeventId}/stroke`;
+  if (eventTypeId === 2 || eventTypeId === 10) return `/subevents/${subeventId}/bestball`;
+  if (eventTypeId === 4 || eventTypeId === 9) return `/subevents/${subeventId}/chicago`;
+
   const normalized = (eventTypeName ?? "").toLowerCase();
+  if (normalized.includes("stroke") && normalized.includes("net")) return `/subevents/${subeventId}/stroke-net`;
   if (normalized.includes("stroke")) return `/subevents/${subeventId}/stroke`;
   if (normalized.includes("best ball") || normalized.includes("bestball")) return `/subevents/${subeventId}/bestball`;
+  if (normalized.includes("chicago")) return `/subevents/${subeventId}/chicago`;
   return `/subevents/${subeventId}`;
 }
 
@@ -72,9 +83,9 @@ export default function SubEventListPage() {
             className="tableRow"
             role="button"
             tabIndex={0}
-            onClick={() => navigate(subEventRoute(row.subevent_id, row.eventtypename))}
+            onClick={() => navigate(subEventRoute(row.subevent_id, row.eventtype_id, row.eventtypename))}
             onKeyDown={(evt) => {
-              if (evt.key === "Enter") navigate(subEventRoute(row.subevent_id, row.eventtypename));
+              if (evt.key === "Enter") navigate(subEventRoute(row.subevent_id, row.eventtype_id, row.eventtypename));
             }}
           >
             <span>#{row.subevent_id}</span>

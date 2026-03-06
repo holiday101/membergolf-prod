@@ -117,7 +117,6 @@ export default function CourseEditorPage() {
   const [nines, setNines] = useState<NineRow[]>([]);
 
   const successTimer = useRef<number | null>(null);
-  const leagueInfoRef = useRef<HTMLDivElement | null>(null);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -202,12 +201,6 @@ export default function CourseEditorPage() {
     loadData();
   }, [courseId, navigate]);
 
-  useEffect(() => {
-    if (!leagueInfoRef.current) return;
-    if (leagueInfoRef.current.innerHTML !== form.leagueinfo) {
-      leagueInfoRef.current.innerHTML = form.leagueinfo || "";
-    }
-  }, [form.leagueinfo]);
 
   useEffect(() => {
     return () => {
@@ -410,12 +403,13 @@ export default function CourseEditorPage() {
                 <label className="formLabel">
                   League Info
                   <div
-                    ref={leagueInfoRef}
                     className="wysiwyg"
                     contentEditable
+                    suppressContentEditableWarning
                     role="textbox"
                     aria-multiline="true"
-                    onInput={(e) =>
+                    dangerouslySetInnerHTML={{ __html: form.leagueinfo || "" }}
+                    onBlur={(e) =>
                       setField("leagueinfo", (e.currentTarget as HTMLDivElement).innerHTML)
                     }
                   />
