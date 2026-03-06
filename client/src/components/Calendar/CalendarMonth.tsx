@@ -155,12 +155,13 @@ export default function CalendarMonth() {
     return fmt.format(cursor);
   }, [cursor]);
 
-  const colorIndexById = useMemo(() => {
-    const map = new Map<number, number>();
+  const colorIndexByName = useMemo(() => {
+    const map = new Map<string, number>();
     let i = 0;
     for (const ev of events) {
-      if (!map.has(ev.id)) {
-        map.set(ev.id, i);
+      const key = (ev.eventname ?? "").trim().toLowerCase() || `event-${ev.id}`;
+      if (!map.has(key)) {
+        map.set(key, i);
         i += 1;
       }
     }
@@ -203,7 +204,8 @@ export default function CalendarMonth() {
                 (() => {
                   const isStart = ymd(toLocalDateNoTZ(ev.start_dt)) === cell.key;
                   const isEnd = ymd(toLocalDateNoTZ(ev.end_dt)) === cell.key;
-                  const colorIdx = colorIndexById.get(ev.id) ?? 0;
+                  const colorKey = (ev.eventname ?? "").trim().toLowerCase() || `event-${ev.id}`;
+                  const colorIdx = colorIndexByName.get(colorKey) ?? 0;
                   return (
                 <div
                   className={`event ${isStart ? "event-start" : "event-cont"} ${isEnd ? "event-end" : ""} event-color-${colorIdx % 8}`}
