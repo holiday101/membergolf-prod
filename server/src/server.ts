@@ -2322,7 +2322,7 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
 
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
     await recalculateBestBallGross(sub.event_id);
-    await pool.query("CALL spBBPick(?)", [subeventId]);
+    await pool.query("CALL spBBFlightPick(?)", [subeventId]);
 
     const [diagRows] = await pool.query<any[]>(
       `
@@ -2337,36 +2337,7 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
       [sub.event_id, subeventId, subeventId, subeventId, subeventId, subeventId]
     );
 
-    let diagnostics = diagRows?.[0] ?? null;
-    let fallbackApplied = false;
-    const grossWinners = Number(diagnostics?.gross_winner_rows ?? 0);
-    const netWinners = Number(diagnostics?.net_winner_rows ?? 0);
-    const payoutRows = Number(diagnostics?.payout_rows ?? 0);
-
-    if (grossWinners + netWinners === 0 && payoutRows > 0) {
-      console.warn("best ball post produced no winner rows; applying legacy fallback", {
-        subeventId,
-        diagnostics,
-      });
-      await pool.query("CALL spBBFlightPick(?)", [subeventId]);
-      fallbackApplied = true;
-
-      const [diagRowsAfter] = await pool.query<any[]>(
-        `
-        SELECT
-          (SELECT COUNT(*) FROM eventBestBall WHERE event_id = ?) AS pairing_rows,
-          (SELECT COUNT(*) FROM subEventPayOut WHERE subevent_id = ?) AS payout_rows,
-          (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ?) AS gross_rows,
-          (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ?) AS net_rows,
-          (SELECT COUNT(*) FROM subEventBBPayGross WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS gross_winner_rows,
-          (SELECT COUNT(*) FROM ${bestBallNetTable} WHERE subevent_id = ? AND COALESCE(place, 0) > 0 AND COALESCE(amount, 0) > 0) AS net_winner_rows
-        `,
-        [sub.event_id, subeventId, subeventId, subeventId, subeventId, subeventId]
-      );
-      diagnostics = diagRowsAfter?.[0] ?? diagnostics;
-    }
-
-    return res.json({ ok: true, diagnostics, fallbackApplied });
+    return res.json({ ok: true, diagnostics: diagRows?.[0] ?? null });
   } catch (err) {
     console.error("subevent best ball post error", err);
     return res.status(500).json({ error: "Server error" });
@@ -4294,6 +4265,184 @@ app.delete("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) =>
   }
 });
 
+
+app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+
+  const rosterId = Number(req.params.id);
+  if (!Number.isFinite(rosterId)) return res.status(400).json({ error: "Invalid id" });
+
+  try {
+    const [rosterRows] = await pool.query<any[]>(
+      "SELECT roster_id, rostername, course_id FROM rosterMain WHERE roster_id = ? LIMIT 1",
+      [rosterId]
+    );
+    const roster = rosterRows?.[0];
+    if (!roster) return res.status(404).json({ error: "Not found" });
+    if (roster.course_id !== payload.courseId) return res.status(403).json({ error: "Forbidden" });
+
+    const [onRoster] = await pool.query<any[]>(
+      `
+        SELECT
+          m.member_id,
+          m.firstname,
+          m.lastname,
+          m.rhandicap AS handicap
+        FROM memberMain m
+        WHERE m.course_id = ?
+          AND EXISTS (
+            SELECT 1
+            FROM rosterMemberLink rml
+            WHERE rml.roster_id = ? AND rml.member_id = m.member_id
+          )
+        ORDER BY m.lastname ASC, m.firstname ASC
+      `,
+      [payload.courseId, rosterId]
+    );
+
+    const [notOnRoster] = await pool.query<any[]>(
+      `
+        SELECT
+          m.member_id,
+          m.firstname,
+          m.lastname,
+          m.rhandicap AS handicap
+        FROM memberMain m
+        WHERE m.course_id = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM rosterMemberLink rml
+            WHERE rml.roster_id = ? AND rml.member_id = m.member_id
+          )
+        ORDER BY m.lastname ASC, m.firstname ASC
+      `,
+      [payload.courseId, rosterId]
+    );
+
+    res.json({
+      roster: {
+        roster_id: roster.roster_id,
+        rostername: roster.rostername,
+      },
+      onRoster,
+      notOnRoster,
+    });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/rosters/:id/members", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+
+  const rosterId = Number(req.params.id);
+  if (!Number.isFinite(rosterId)) return res.status(400).json({ error: "Invalid id" });
+
+  const schema = z.object({
+    member_id: z.number().int(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const memberId = parsed.data.member_id;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rosterRows] = await conn.query<any[]>(
+      "SELECT roster_id, course_id FROM rosterMain WHERE roster_id = ? LIMIT 1",
+      [rosterId]
+    );
+    const roster = rosterRows?.[0];
+    if (!roster) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (roster.course_id !== payload.courseId) {
+      await conn.rollback();
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [memberRows] = await conn.query<any[]>(
+      "SELECT member_id, course_id, rhandicap FROM memberMain WHERE member_id = ? LIMIT 1",
+      [memberId]
+    );
+    const member = memberRows?.[0];
+    if (!member || member.course_id !== payload.courseId) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Member not found" });
+    }
+
+    const [existingRows] = await conn.query<any[]>(
+      "SELECT rostermemberlink_id FROM rosterMemberLink WHERE roster_id = ? AND member_id = ? LIMIT 1",
+      [rosterId, memberId]
+    );
+    if (!existingRows.length) {
+      const hdcpValue = member.rhandicap == null ? 0 : Number(member.rhandicap);
+      await conn.execute(
+        "INSERT INTO rosterMemberLink (roster_id, member_id, hdcp) VALUES (?, ?, ?)",
+        [rosterId, memberId, Number.isFinite(hdcpValue) ? Math.trunc(hdcpValue) : 0]
+      );
+    }
+
+    await conn.commit();
+    res.status(201).json({ ok: true });
+  } catch {
+    await conn.rollback();
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    conn.release();
+  }
+});
+
+app.delete("/rosters/:id/members/:memberId", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+
+  const rosterId = Number(req.params.id);
+  const memberId = Number(req.params.memberId);
+  if (!Number.isFinite(rosterId) || !Number.isFinite(memberId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rosterRows] = await conn.query<any[]>(
+      "SELECT roster_id, course_id FROM rosterMain WHERE roster_id = ? LIMIT 1",
+      [rosterId]
+    );
+    const roster = rosterRows?.[0];
+    if (!roster) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (roster.course_id !== payload.courseId) {
+      await conn.rollback();
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [result] = await conn.execute<mysql.ResultSetHeader>(
+      "DELETE FROM rosterMemberLink WHERE roster_id = ? AND member_id = ?",
+      [rosterId, memberId]
+    );
+    if (result.affectedRows === 0) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    await conn.commit();
+    res.status(204).send();
+  } catch {
+    await conn.rollback();
+    res.status(500).json({ error: "Server error" });
+  } finally {
+    conn.release();
+  }
+});
 app.get("/users", authMiddleware, requireAdmin, async (_req, res) => {
   const [rows] = await pool.query<any[]>(
     `

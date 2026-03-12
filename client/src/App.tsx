@@ -14,6 +14,7 @@ import SubEventBestBallPage from "./pages/SubEventBestBallPage";
 import SubEventChicagoPage from "./pages/SubEventChicagoPage";
 import SubEventCreatePage from "./pages/SubEventCreatePage";
 import RosterListPage from "./pages/RosterListPage";
+import RosterMembersPage from "./pages/RosterMembersPage";
 import UserListPage from "./pages/UserListPage";
 import UserEditorPage from "./pages/UserEditorPage";
 import EditEventPage from "./pages/EditEventPage";
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/subevents/:id/chicago" element={<SubEventChicagoPage />} />
         <Route path="/subevents/:id" element={<SubEventDetailPage />} />
         <Route path="/rosters" element={<RosterListPage />} />
+        <Route path="/rosters/:id/members" element={<RosterMembersPage />} />
         <Route path="/courses" element={<CourseListPage />} />
         <Route path="/courses/new" element={<CourseEditorPage />} />
         <Route path="/courses/:courseId/edit" element={<CourseEditorPage />} />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../auth";
 
 type Roster = {
@@ -31,6 +32,7 @@ export default function RosterListPage() {
   const [flightBusy, setFlightBusy] = useState(false);
   const [deleteFlightId, setDeleteFlightId] = useState<number | null>(null);
   const [deleteRosterId, setDeleteRosterId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const loadRosters = async () => {
     setLoading(true);
@@ -194,7 +196,7 @@ export default function RosterListPage() {
             <div className="row header rosterRow">
               <div className="name">Roster</div>
               <div className="status">Active</div>
-              <div className="actionsCol"></div>
+              <div className="actionsCol">Actions</div>
             </div>
             {rosters.map((r) => (
               <div
@@ -217,6 +219,15 @@ export default function RosterListPage() {
                 <div className="name">{r.rostername ?? "—"}</div>
                 <div className="status">{r.active_yn === 0 ? "No" : "Yes"}</div>
                 <div className="actionsCol">
+                  <button
+                    className="btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/rosters/${r.roster_id}/members`);
+                    }}
+                  >
+                    View Members
+                  </button>
                   <button
                     className="iconBtn"
                     onClick={(e) => {
@@ -326,7 +337,7 @@ export default function RosterListPage() {
         .row.clickable { cursor: pointer; }
         .row.clickable:hover { background: #e0f2fe; }
         .row.selected { background: #dbeafe; }
-        .rosterRow { display: grid; grid-template-columns: 1fr 90px 34px; align-items: center; }
+        .rosterRow { display: grid; grid-template-columns: 1fr 90px 140px; align-items: center; }
         .flightsRow { display: grid; grid-template-columns: 1fr 90px 34px; align-items: center; }
         .name { font-weight: 600; font-size: 12px; }
         .status { font-size: 11px; }
@@ -334,7 +345,7 @@ export default function RosterListPage() {
         .subTitle { font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 600; }
         .rowInputs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
         .muted { color: #6b7280; font-size: 12px; }
-        .actionsCol { display: flex; justify-content: flex-end; }
+        .actionsCol { display: flex; justify-content: flex-end; gap: 6px; align-items: center; }
         .iconBtn {
           width: 24px; height: 24px;
           border-radius: 6px;
