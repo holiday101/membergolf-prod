@@ -4548,6 +4548,7 @@ app.put("/users/:id", authMiddleware, requireAdmin, async (req, res) => {
 const clientDistCandidates = [
   process.env.CLIENT_DIST_PATH,
   path.resolve(__dirname, "../../client/dist"),
+  path.resolve(process.cwd(), "client/dist"),
   path.resolve(process.cwd(), "../client/dist"),
 ].filter((p): p is string => Boolean(p));
 
