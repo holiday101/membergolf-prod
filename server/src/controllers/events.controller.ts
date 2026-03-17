@@ -126,6 +126,7 @@ export async function listEventCards(req: Request, res: Response) {
           m.lastname,
           c.gross,
           c.net,
+          c.handicap,
           c.card_dt,
           c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
           c.hole10, c.hole11, c.hole12, c.hole13, c.hole14, c.hole15, c.hole16, c.hole17, c.hole18
@@ -286,14 +287,19 @@ export async function createEventCard(req: Request, res: Response) {
     }
     const gross = parsed.data.gross ?? (holes.length ? holes.reduce((a, b) => a + b, 0) : null);
     const cardDt = parsed.data.card_dt == null ? null : parseISODateTime(parsed.data.card_dt);
+    const [handicapRows]: any = await pool.query(
+      "SELECT rhandicap FROM eventHandicap WHERE event_id = ? AND member_id = ? LIMIT 1",
+      [eventId, parsed.data.member_id]
+    );
+    const handicap = handicapRows?.[0]?.rhandicap ?? null;
 
     const [result]: any = await pool.execute(
       `INSERT INTO eventCard
-        (course_id, member_id, event_id, gross, net, card_dt,
+        (course_id, member_id, event_id, gross, net, handicap, card_dt,
          hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
          hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18, nine_id)
        VALUES
-        (?, ?, ?, ?, ?, ?,
+        (?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -302,6 +308,7 @@ export async function createEventCard(req: Request, res: Response) {
         eventId,
         gross,
         parsed.data.net ?? null,
+        handicap,
         cardDt,
         parsed.data.hole1 ?? null,
         parsed.data.hole2 ?? null,

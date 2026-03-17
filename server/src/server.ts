@@ -43,8 +43,8 @@ const corsMiddleware = cors({
   credentials: true,
 });
 
+app.use(corsMiddleware);
 app.use(express.json());
-app.use("/api", corsMiddleware);
 app.use("/api/events", eventsRouter);
 
 app.get("/public/:courseId/events", async (req, res) => {

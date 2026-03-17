@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiFetch } from "../auth";
+import { formatHandicap } from "../utils/formatHandicap";
 
 type EventRow = {
   id: number;
@@ -45,6 +46,7 @@ type CardRow = {
   lastname: string | null;
   gross: number | null;
   net: number | null;
+  handicap: number | null;
   card_dt: string | null;
   hole1?: number | null;
   hole2?: number | null;
@@ -781,6 +783,8 @@ export default function EnterScoresPage() {
               <div className="tableHead">
                 <span>Name</span>
                 <span>Gross</span>
+                <span>Net</span>
+                <span>Hdcp</span>
                 <span>Date</span>
                 <span></span>
               </div>
@@ -790,6 +794,8 @@ export default function EnterScoresPage() {
                     {(c.lastname || "").trim()}, {(c.firstname || "").trim()}
                   </span>
                   <span>{c.gross ?? "—"}</span>
+                  <span>{c.net ?? "—"}</span>
+                  <span>{formatHandicap(c.handicap)}</span>
                   <span>{c.card_dt ? new Date(c.card_dt).toLocaleDateString() : "—"}</span>
                   <button className="btn small" onClick={() => setSelectedCardId(c.card_id)}>
                     Edit
@@ -847,7 +853,7 @@ export default function EnterScoresPage() {
         .searchInput { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; min-width: 180px; }
         .filterSelect { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; }
         .table { display: grid; gap: 8px; margin-top: 12px; }
-        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr 1fr 1fr auto; align-items: center; }
+        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr 0.8fr 0.8fr 0.9fr 1fr auto; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
         .holesLines { display: grid; gap: 4px; }
