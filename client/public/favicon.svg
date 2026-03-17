@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="mgo-gradient-shell-favicon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b3d2e" />
+      <stop offset="100%" stop-color="#1f8a5b" />
+    </linearGradient>
+  </defs>
+  <path
+    d="M60 10c22 0 40 8 40 24v28c0 26-19 44-40 48-21-4-40-22-40-48V34c0-16 18-24 40-24Z"
+    fill="url(#mgo-gradient-shell-favicon)"
+  />
+  <path
+    d="M60 18c-18 0-32 6-32 18v26c0 22 16 37 32 40 16-3 32-18 32-40V36c0-12-14-18-32-18Z"
+    fill="#f8fafc"
+  />
+  <path d="M46 72c8 6 20 6 28 0" fill="none" stroke="#14532d" stroke-width="4" stroke-linecap="round" />
+  <circle cx="60" cy="76" r="3.5" fill="#0f172a" />
+  <line x1="60" y1="32" x2="60" y2="68" stroke="#0f172a" stroke-width="3" stroke-linecap="round" />
+  <path d="M60 34 L84 40 L60 48 Z" fill="#dc2626" />
+  <path d="M40 88c6 8 14 12 20 12s14-4 20-12" fill="none" stroke="#16a34a" stroke-width="5" stroke-linecap="round" />
+</svg>
