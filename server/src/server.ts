@@ -4553,10 +4553,27 @@ const clientDistCandidates = [
 
 const clientDist = clientDistCandidates.find((p) => fs.existsSync(path.join(p, "index.html")));
 if (clientDist) {
-  app.use(express.static(clientDist));
+  app.use(
+    "/assets",
+    express.static(path.join(clientDist, "assets"), {
+      immutable: true,
+      maxAge: "1y",
+    }),
+  );
+  app.use(
+    express.static(clientDist, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("index.html")) {
+          res.setHeader("Cache-Control", "no-cache, must-revalidate");
+        }
+      },
+    }),
+  );
   app.get(/.*/, (req, res, next) => {
     // Keep API requests out of SPA fallback, but allow deep links like /public/:courseId.
     if (req.path.startsWith("/api")) return next();
+    res.setHeader("Cache-Control", "no-cache, must-revalidate");
     return res.sendFile(path.join(clientDist, "index.html"));
   });
 }

@@ -220,7 +220,7 @@ export default function RosterListPage() {
                 <div className="status">{r.active_yn === 0 ? "No" : "Yes"}</div>
                 <div className="actionsCol">
                   <button
-                    className="btn"
+                    className="btn viewMembersBtn"
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/rosters/${r.roster_id}/members`);
@@ -330,6 +330,7 @@ export default function RosterListPage() {
         .actions { display: flex; gap: 8px; }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .viewMembersBtn:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
         .list { display: grid; gap: 2px; }
         .row { display: flex; justify-content: space-between; padding: 2px 6px; line-height: 1.2; color: #6b7280; }
         .row:nth-child(even) { background: #f0f7ff; }
