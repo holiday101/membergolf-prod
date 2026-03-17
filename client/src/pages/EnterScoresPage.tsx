@@ -782,10 +782,10 @@ export default function EnterScoresPage() {
             <div className="table">
               <div className="tableHead">
                 <span>Name</span>
-                <span>Gross</span>
-                <span>Net</span>
-                <span>Hdcp</span>
-                <span>Date</span>
+                <span className="centerCell">Gross</span>
+                <span className="centerCell">Net</span>
+                <span className="centerCell">Hdcp</span>
+                <span className="centerCell">Date</span>
                 <span></span>
               </div>
               {displayCards.map((c) => (
@@ -795,7 +795,7 @@ export default function EnterScoresPage() {
                   </span>
                   <span>{c.gross ?? "—"}</span>
                   <span>{c.net ?? "—"}</span>
-                  <span>{formatHandicap(c.handicap)}</span>
+                  <span className="rightCell">{formatHandicap(c.handicap)}</span>
                   <span>{c.card_dt ? new Date(c.card_dt).toLocaleDateString() : "—"}</span>
                   <button className="btn small" onClick={() => setSelectedCardId(c.card_id)}>
                     Edit
@@ -856,6 +856,8 @@ export default function EnterScoresPage() {
         .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr 0.8fr 0.8fr 0.9fr 1fr auto; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
+        .centerCell { text-align: center; }
+        .rightCell { text-align: right; }
         .holesLines { display: grid; gap: 4px; }
         .holesHead {
           font-size: 10px;

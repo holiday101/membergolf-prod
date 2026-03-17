@@ -3688,8 +3688,8 @@ app.put("/members/:id", authMiddleware, async (req, res) => {
     values.push(parsed.data.email ? parsed.data.email.toLowerCase().trim() : null);
   }
   if (parsed.data.handicap !== undefined) {
-    fields.push("rhandicap=?");
-    values.push(parsed.data.handicap ?? null);
+    fields.push("handicap=?", "rhandicap=?");
+    values.push(parsed.data.handicap ?? null, parsed.data.handicap ?? null);
   }
   if (parsed.data.handicap18 !== undefined) {
     fields.push("handicap18=?");
@@ -4068,12 +4068,13 @@ app.post("/members", authMiddleware, async (req, res) => {
 
   try {
     const [result] = await pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO memberMain (course_id, firstname, lastname, email, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO memberMain (course_id, firstname, lastname, email, handicap, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [
         payload.courseId,
         parsed.data.firstname.trim(),
         parsed.data.lastname.trim(),
         parsed.data.email ? parsed.data.email.toLowerCase().trim() : null,
+        parsed.data.handicap ?? null,
         parsed.data.handicap ?? null,
         parsed.data.handicap18 ?? null,
       ]
