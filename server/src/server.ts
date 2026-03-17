@@ -17,22 +17,34 @@ import { presignGet, presignPut, deleteObject } from "./s3";
 dotenv.config();
 
 const app = express();
-const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+const configuredOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
-
-app.use(express.json());
-app.use(
-  cors({
-    origin(origin, callback) {
-      // Allow non-browser requests and configured browser origins.
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
+const allowedOrigins = new Set(
+  configuredOrigins.flatMap((origin) => {
+    try {
+      const url = new URL(origin);
+      if (url.hostname.startsWith("www.")) {
+        return [origin, `${url.protocol}//${url.hostname.slice(4)}${url.port ? `:${url.port}` : ""}`];
+      }
+      return [origin, `${url.protocol}//www.${url.hostname}${url.port ? `:${url.port}` : ""}`];
+    } catch {
+      return [origin];
+    }
   })
 );
+const corsMiddleware = cors({
+  origin(origin, callback) {
+    // Allow non-browser requests and configured browser origins.
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+});
+
+app.use(express.json());
+app.use("/api", corsMiddleware);
 app.use("/api/events", eventsRouter);
 
 app.get("/public/:courseId/events", async (req, res) => {
