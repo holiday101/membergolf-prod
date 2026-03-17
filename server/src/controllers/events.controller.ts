@@ -35,6 +35,135 @@ function parseISODateTime(s: unknown): string {
   )}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
+type NineCalcRow = {
+  nine_id: number | null;
+  numholes: number | null;
+  sloperating: number | null;
+  courserating: number | null;
+};
+
+type CardDerivedValues = {
+  nineId: number | null;
+  numholes: number | null;
+  handicap: number | null;
+  net: number | null;
+  adjustedScore: number | null;
+  hdiff: number | null;
+};
+
+async function getEffectiveNine(
+  courseId: number,
+  eventId: number,
+  requestedNineId: number | null | undefined
+): Promise<NineCalcRow | null> {
+  let effectiveNineId = requestedNineId ?? null;
+  if (effectiveNineId == null) {
+    const [eventRows]: any = await pool.query(
+      "SELECT nine_id FROM eventMain WHERE event_id = ? AND course_id = ? LIMIT 1",
+      [eventId, courseId]
+    );
+    effectiveNineId = eventRows?.[0]?.nine_id ?? null;
+  }
+  if (effectiveNineId == null) return null;
+
+  const [nineRows]: any = await pool.query(
+    `
+      SELECT nine_id, numholes, sloperating, courserating
+      FROM courseNine
+      WHERE nine_id = ? AND course_id = ?
+      LIMIT 1
+    `,
+    [effectiveNineId, courseId]
+  );
+  return nineRows?.[0] ?? null;
+}
+
+async function getApplicableHandicap(
+  courseId: number,
+  eventId: number,
+  memberId: number | null,
+  numholes: number | null
+): Promise<number | null> {
+  if (!memberId) return null;
+
+  const [eventHandicapRows]: any = await pool.query(
+    `
+      SELECT handicap, handicap18, rhandicap, rhandicap18
+      FROM eventHandicap
+      WHERE event_id = ? AND member_id = ?
+      LIMIT 1
+    `,
+    [eventId, memberId]
+  );
+  const eventHandicap = eventHandicapRows?.[0];
+  if (eventHandicap) {
+    if (numholes === 18) {
+      if (eventHandicap.handicap18 != null) return Number(eventHandicap.handicap18);
+      if (eventHandicap.rhandicap18 != null) return Math.round(Number(eventHandicap.rhandicap18));
+    }
+    if (eventHandicap.handicap != null) return Number(eventHandicap.handicap);
+    if (eventHandicap.rhandicap != null) return Math.round(Number(eventHandicap.rhandicap));
+  }
+
+  const [memberRows]: any = await pool.query(
+    `
+      SELECT handicap, handicap18, rhandicap
+      FROM memberMain
+      WHERE member_id = ? AND course_id = ?
+      LIMIT 1
+    `,
+    [memberId, courseId]
+  );
+  const member = memberRows?.[0];
+  if (!member) return null;
+  if (numholes === 18) {
+    if (member.handicap18 != null) return Number(member.handicap18);
+    if (member.rhandicap != null) return Math.round(Number(member.rhandicap) * 2);
+  }
+  if (member.handicap != null) return Number(member.handicap);
+  if (member.rhandicap != null) return Math.round(Number(member.rhandicap));
+  return null;
+}
+
+function computeAdjustedScore(gross: number | null): number | null {
+  return gross == null ? null : gross;
+}
+
+function computeHdiff(
+  adjustedScore: number | null,
+  slopeRating: number | null,
+  courseRating: number | null
+): number | null {
+  if (adjustedScore == null || slopeRating == null || courseRating == null) return null;
+  const slope = Number(slopeRating);
+  const rating = Number(courseRating);
+  if (!Number.isFinite(adjustedScore) || !Number.isFinite(slope) || !Number.isFinite(rating) || slope === 0) {
+    return null;
+  }
+  return Number((((adjustedScore - rating) * 113) / slope).toFixed(2));
+}
+
+async function buildDerivedCardValues(
+  courseId: number,
+  eventId: number,
+  memberId: number | null,
+  requestedNineId: number | null | undefined,
+  gross: number | null
+): Promise<CardDerivedValues> {
+  const nine = await getEffectiveNine(courseId, eventId, requestedNineId);
+  const numholes = nine?.numholes ?? null;
+  const handicap = await getApplicableHandicap(courseId, eventId, memberId, numholes);
+  const adjustedScore = computeAdjustedScore(gross);
+  return {
+    nineId: nine?.nine_id ?? (requestedNineId ?? null),
+    numholes,
+    handicap,
+    net: gross != null && handicap != null ? gross - handicap : null,
+    adjustedScore,
+    hdiff: computeHdiff(adjustedScore, nine?.sloperating ?? null, nine?.courserating ?? null),
+  };
+}
+
 // GET /api/events?start=...&end=...
 export async function listEvents(req: Request, res: Response) {
   try {
@@ -126,7 +255,10 @@ export async function listEventCards(req: Request, res: Response) {
           m.lastname,
           c.gross,
           c.net,
+          c.adjustedscore,
           c.handicap,
+          c.hdiff,
+          c.numholes,
           c.card_dt,
           c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
           c.hole10, c.hole11, c.hole12, c.hole13, c.hole14, c.hole15, c.hole16, c.hole17, c.hole18
@@ -180,6 +312,18 @@ export async function updateEventCard(req: Request, res: Response) {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
+    const [existingRows]: any = await pool.query(
+      `
+        SELECT member_id, nine_id, gross
+        FROM eventCard
+        WHERE card_id = ? AND event_id = ? AND course_id = ?
+        LIMIT 1
+      `,
+      [cardId, eventId, courseId]
+    );
+    const existing = existingRows?.[0];
+    if (!existing) return res.status(404).json({ error: "Not found" });
+
     const fields: string[] = [];
     const values: any[] = [];
     if (parsed.data.member_id !== undefined) {
@@ -194,10 +338,6 @@ export async function updateEventCard(req: Request, res: Response) {
       fields.push("gross=?");
       values.push(parsed.data.gross);
     }
-    if (parsed.data.net !== undefined) {
-      fields.push("net=?");
-      values.push(parsed.data.net);
-    }
     if (parsed.data.card_dt !== undefined) {
       fields.push("card_dt=?");
       values.push(parsed.data.card_dt === null ? null : parseISODateTime(parsed.data.card_dt));
@@ -210,6 +350,16 @@ export async function updateEventCard(req: Request, res: Response) {
       }
     }
     if (!fields.length) return res.status(400).json({ error: "No fields to update" });
+
+    const effectiveMemberId =
+      parsed.data.member_id !== undefined ? parsed.data.member_id ?? null : existing.member_id ?? null;
+    const effectiveNineId =
+      parsed.data.nine_id !== undefined ? parsed.data.nine_id ?? null : existing.nine_id ?? null;
+    const effectiveGross =
+      parsed.data.gross !== undefined ? parsed.data.gross ?? null : existing.gross ?? null;
+    const derived = await buildDerivedCardValues(courseId, eventId, effectiveMemberId, effectiveNineId, effectiveGross);
+    fields.push("handicap=?", "net=?", "adjustedscore=?", "hdiff=?", "numholes=?");
+    values.push(derived.handicap, derived.net, derived.adjustedScore, derived.hdiff, derived.numholes);
 
     values.push(cardId, eventId, courseId);
     const [result]: any = await pool.execute(
@@ -287,28 +437,32 @@ export async function createEventCard(req: Request, res: Response) {
     }
     const gross = parsed.data.gross ?? (holes.length ? holes.reduce((a, b) => a + b, 0) : null);
     const cardDt = parsed.data.card_dt == null ? null : parseISODateTime(parsed.data.card_dt);
-    const [handicapRows]: any = await pool.query(
-      "SELECT rhandicap FROM eventHandicap WHERE event_id = ? AND member_id = ? LIMIT 1",
-      [eventId, parsed.data.member_id]
+    const derived = await buildDerivedCardValues(
+      courseId,
+      eventId,
+      parsed.data.member_id,
+      parsed.data.nine_id ?? null,
+      gross
     );
-    const handicap = handicapRows?.[0]?.rhandicap ?? null;
 
     const [result]: any = await pool.execute(
       `INSERT INTO eventCard
-        (course_id, member_id, event_id, gross, net, handicap, card_dt,
+        (course_id, member_id, event_id, gross, net, adjustedscore, handicap, hdiff, card_dt,
          hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
-         hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18, nine_id)
+         hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18, nine_id, numholes)
        VALUES
-        (?, ?, ?, ?, ?, ?, ?,
+        (?, ?, ?, ?, ?, ?, ?, ?, ?,
          ?, ?, ?, ?, ?, ?, ?, ?, ?,
-         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         courseId,
         parsed.data.member_id,
         eventId,
         gross,
-        parsed.data.net ?? null,
-        handicap,
+        derived.net,
+        derived.adjustedScore,
+        derived.handicap,
+        derived.hdiff,
         cardDt,
         parsed.data.hole1 ?? null,
         parsed.data.hole2 ?? null,
@@ -328,7 +482,8 @@ export async function createEventCard(req: Request, res: Response) {
         parsed.data.hole16 ?? null,
         parsed.data.hole17 ?? null,
         parsed.data.hole18 ?? null,
-        parsed.data.nine_id ?? null,
+        derived.nineId,
+        derived.numholes,
       ]
     );
     res.status(201).json({ card_id: result.insertId });
