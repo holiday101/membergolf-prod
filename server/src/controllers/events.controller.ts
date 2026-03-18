@@ -90,6 +90,20 @@ type CardDerivedValues = {
   hdiff: number | null;
 };
 
+function totalParForNine(nine: NineCalcRow | null, numholes: number | null): number | null {
+  if (!nine || (numholes !== 9 && numholes !== 18)) return null;
+  let total = 0;
+  let count = 0;
+  for (let i = 1; i <= numholes; i += 1) {
+    const parValue = (nine as any)[`hole${i}`];
+    const par = typeof parValue === "number" ? parValue : parValue == null ? null : Number(parValue);
+    if (par == null || Number.isNaN(par)) continue;
+    total += par;
+    count += 1;
+  }
+  return count ? total : null;
+}
+
 function mergeHoleValues(source: any): HoleMap {
   const holes: HoleMap = {};
   for (let i = 1; i <= 18; i += 1) {
@@ -236,18 +250,12 @@ function computeAdjustedScore(holes: HoleMap, nine: NineCalcRow | null, handicap
   return usedAnyHole ? total : null;
 }
 
-function computeHdiff(
-  adjustedScore: number | null,
-  slopeRating: number | null,
-  courseRating: number | null
-): number | null {
-  if (adjustedScore == null || slopeRating == null || courseRating == null) return null;
-  const slope = Number(slopeRating);
-  const rating = Number(courseRating);
-  if (!Number.isFinite(adjustedScore) || !Number.isFinite(slope) || !Number.isFinite(rating) || slope === 0) {
-    return null;
-  }
-  return Number((((adjustedScore - rating) * 113) / slope).toFixed(2));
+function computeHdiff(adjustedScore: number | null, totalPar: number | null, numholes: number | null): number | null {
+  if (adjustedScore == null || totalPar == null) return null;
+  if (!Number.isFinite(adjustedScore) || !Number.isFinite(totalPar)) return null;
+  const raw = (adjustedScore - totalPar) * 0.96;
+  const normalized = numholes === 18 ? raw / 2 : raw;
+  return Number(normalized.toFixed(2));
 }
 
 async function buildDerivedCardValues(
@@ -263,6 +271,7 @@ async function buildDerivedCardValues(
   const gross = explicitGross ?? sumHoleValues(holes);
   const handicap = await getApplicableHandicap(courseId, eventId, memberId, numholes);
   const adjustedScore = computeAdjustedScore(holes, nine, handicap, numholes);
+  const totalPar = totalParForNine(nine, numholes);
   return {
     nineId: nine?.nine_id ?? (requestedNineId ?? null),
     numholes,
@@ -270,7 +279,7 @@ async function buildDerivedCardValues(
     handicap,
     net: gross != null && handicap != null ? gross - handicap : null,
     adjustedScore,
-    hdiff: computeHdiff(adjustedScore, nine?.sloperating ?? null, nine?.courserating ?? null),
+    hdiff: computeHdiff(adjustedScore, totalPar, numholes),
   };
 }
 

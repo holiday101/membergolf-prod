@@ -84,14 +84,26 @@ function computeAdjustedScore(holes, nine, handicap, numholes) {
   return usedAnyHole ? total : null;
 }
 
-function computeHdiff(adjustedScore, slopeRating, courseRating) {
-  if (adjustedScore == null || slopeRating == null || courseRating == null) return null;
-  const slope = Number(slopeRating);
-  const rating = Number(courseRating);
-  if (!Number.isFinite(adjustedScore) || !Number.isFinite(slope) || !Number.isFinite(rating) || slope === 0) {
-    return null;
+function totalParForNine(nine, numholes) {
+  if (!nine || (numholes !== 9 && numholes !== 18)) return null;
+  let total = 0;
+  let count = 0;
+  for (let i = 1; i <= numholes; i += 1) {
+    const parValue = nine[`hole${i}`];
+    const par = typeof parValue === "number" ? parValue : parValue == null ? null : Number(parValue);
+    if (par == null || Number.isNaN(par)) continue;
+    total += par;
+    count += 1;
   }
-  return Number((((adjustedScore - rating) * 113) / slope).toFixed(2));
+  return count ? total : null;
+}
+
+function computeHdiff(adjustedScore, totalPar, numholes) {
+  if (adjustedScore == null || totalPar == null) return null;
+  if (!Number.isFinite(adjustedScore) || !Number.isFinite(totalPar)) return null;
+  const raw = (adjustedScore - totalPar) * 0.96;
+  const normalized = numholes === 18 ? raw / 2 : raw;
+  return Number(normalized.toFixed(2));
 }
 
 function applicableHandicap(eventHandicap, member, numholes) {
@@ -228,7 +240,8 @@ async function main() {
       const member = memberMap.get(Number(card.member_id)) ?? null;
       const handicap = applicableHandicap(eventHandicap, member, numholes);
       const adjustedScore = computeAdjustedScore(holes, nine, handicap, numholes);
-      const hdiff = computeHdiff(adjustedScore, nine?.sloperating ?? null, nine?.courserating ?? null);
+      const totalPar = totalParForNine(nine, numholes);
+      const hdiff = computeHdiff(adjustedScore, totalPar, numholes);
       const net = gross != null && handicap != null ? gross - handicap : null;
 
       updates.push({
