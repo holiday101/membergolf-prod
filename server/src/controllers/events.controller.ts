@@ -35,21 +35,75 @@ function parseISODateTime(s: unknown): string {
   )}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
+type HoleMap = Record<number, number | null>;
+
 type NineCalcRow = {
   nine_id: number | null;
   numholes: number | null;
   sloperating: number | null;
   courserating: number | null;
+  hole1?: number | null;
+  hole2?: number | null;
+  hole3?: number | null;
+  hole4?: number | null;
+  hole5?: number | null;
+  hole6?: number | null;
+  hole7?: number | null;
+  hole8?: number | null;
+  hole9?: number | null;
+  hole10?: number | null;
+  hole11?: number | null;
+  hole12?: number | null;
+  hole13?: number | null;
+  hole14?: number | null;
+  hole15?: number | null;
+  hole16?: number | null;
+  hole17?: number | null;
+  hole18?: number | null;
+  handicaphole1?: number | null;
+  handicaphole2?: number | null;
+  handicaphole3?: number | null;
+  handicaphole4?: number | null;
+  handicaphole5?: number | null;
+  handicaphole6?: number | null;
+  handicaphole7?: number | null;
+  handicaphole8?: number | null;
+  handicaphole9?: number | null;
+  handicaphole10?: number | null;
+  handicaphole11?: number | null;
+  handicaphole12?: number | null;
+  handicaphole13?: number | null;
+  handicaphole14?: number | null;
+  handicaphole15?: number | null;
+  handicaphole16?: number | null;
+  handicaphole17?: number | null;
+  handicaphole18?: number | null;
 };
 
 type CardDerivedValues = {
   nineId: number | null;
   numholes: number | null;
+  gross: number | null;
   handicap: number | null;
   net: number | null;
   adjustedScore: number | null;
   hdiff: number | null;
 };
+
+function mergeHoleValues(source: any): HoleMap {
+  const holes: HoleMap = {};
+  for (let i = 1; i <= 18; i += 1) {
+    const value = source?.[`hole${i}`];
+    holes[i] = typeof value === "number" ? value : value == null ? null : Number(value);
+    if (holes[i] != null && Number.isNaN(holes[i] as number)) holes[i] = null;
+  }
+  return holes;
+}
+
+function sumHoleValues(holes: HoleMap): number | null {
+  const values = Object.values(holes).filter((value): value is number => typeof value === "number");
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+}
 
 async function getEffectiveNine(
   courseId: number,
@@ -68,7 +122,17 @@ async function getEffectiveNine(
 
   const [nineRows]: any = await pool.query(
     `
-      SELECT nine_id, numholes, sloperating, courserating
+      SELECT
+        nine_id,
+        numholes,
+        sloperating,
+        courserating,
+        hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
+        hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18,
+        handicaphole1, handicaphole2, handicaphole3, handicaphole4, handicaphole5,
+        handicaphole6, handicaphole7, handicaphole8, handicaphole9,
+        handicaphole10, handicaphole11, handicaphole12, handicaphole13, handicaphole14,
+        handicaphole15, handicaphole16, handicaphole17, handicaphole18
       FROM courseNine
       WHERE nine_id = ? AND course_id = ?
       LIMIT 1
@@ -125,8 +189,51 @@ async function getApplicableHandicap(
   return null;
 }
 
-function computeAdjustedScore(gross: number | null): number | null {
-  return gross == null ? null : gross;
+function holeStrokeAllowance(courseHandicap: number, holeRank: number, holeCount: number): number {
+  if (holeCount <= 0) return 0;
+  const rank = Math.min(Math.max(Math.trunc(holeRank), 1), holeCount);
+  if (courseHandicap >= 0) {
+    const base = Math.floor(courseHandicap / holeCount);
+    const remainder = courseHandicap % holeCount;
+    return base + (rank <= remainder ? 1 : 0);
+  }
+
+  const absHandicap = Math.abs(courseHandicap);
+  const base = -Math.floor(absHandicap / holeCount);
+  const remainder = absHandicap % holeCount;
+  return base - (rank <= remainder ? 1 : 0);
+}
+
+function computeAdjustedScore(holes: HoleMap, nine: NineCalcRow | null, handicap: number | null, numholes: number | null): number | null {
+  const holeCount = numholes === 18 ? 18 : numholes === 9 ? 9 : null;
+  if (!holeCount || !nine) return sumHoleValues(holes);
+
+  let total = 0;
+  let usedAnyHole = false;
+  for (let i = 1; i <= holeCount; i += 1) {
+    const posted = holes[i];
+    if (posted == null) continue;
+    usedAnyHole = true;
+
+    const parValue = (nine as any)[`hole${i}`];
+    const par = typeof parValue === "number" ? parValue : parValue == null ? null : Number(parValue);
+    if (par == null || Number.isNaN(par)) {
+      total += posted;
+      continue;
+    }
+
+    let cap = par + 2;
+    if (handicap != null) {
+      const rankValue = (nine as any)[`handicaphole${i}`];
+      const rank = typeof rankValue === "number" ? rankValue : rankValue == null ? i : Number(rankValue);
+      const strokes = holeStrokeAllowance(handicap, Number.isNaN(rank) ? i : rank, holeCount);
+      cap = par + 2 + strokes;
+    }
+
+    total += Math.min(posted, cap);
+  }
+
+  return usedAnyHole ? total : null;
 }
 
 function computeHdiff(
@@ -148,15 +255,18 @@ async function buildDerivedCardValues(
   eventId: number,
   memberId: number | null,
   requestedNineId: number | null | undefined,
-  gross: number | null
+  holes: HoleMap,
+  explicitGross?: number | null
 ): Promise<CardDerivedValues> {
   const nine = await getEffectiveNine(courseId, eventId, requestedNineId);
   const numholes = nine?.numholes ?? null;
+  const gross = explicitGross ?? sumHoleValues(holes);
   const handicap = await getApplicableHandicap(courseId, eventId, memberId, numholes);
-  const adjustedScore = computeAdjustedScore(gross);
+  const adjustedScore = computeAdjustedScore(holes, nine, handicap, numholes);
   return {
     nineId: nine?.nine_id ?? (requestedNineId ?? null),
     numholes,
+    gross,
     handicap,
     net: gross != null && handicap != null ? gross - handicap : null,
     adjustedScore,
@@ -314,7 +424,9 @@ export async function updateEventCard(req: Request, res: Response) {
 
     const [existingRows]: any = await pool.query(
       `
-        SELECT member_id, nine_id, gross
+        SELECT member_id, nine_id, gross,
+               hole1, hole2, hole3, hole4, hole5, hole6, hole7, hole8, hole9,
+               hole10, hole11, hole12, hole13, hole14, hole15, hole16, hole17, hole18
         FROM eventCard
         WHERE card_id = ? AND event_id = ? AND course_id = ?
         LIMIT 1
@@ -323,6 +435,12 @@ export async function updateEventCard(req: Request, res: Response) {
     );
     const existing = existingRows?.[0];
     if (!existing) return res.status(404).json({ error: "Not found" });
+
+    const effectiveMemberId =
+      parsed.data.member_id !== undefined ? parsed.data.member_id ?? null : existing.member_id ?? null;
+    const effectiveNineId =
+      parsed.data.nine_id !== undefined ? parsed.data.nine_id ?? null : existing.nine_id ?? null;
+    const effectiveHoles = mergeHoleValues(existing);
 
     const fields: string[] = [];
     const values: any[] = [];
@@ -334,10 +452,6 @@ export async function updateEventCard(req: Request, res: Response) {
       fields.push("nine_id=?");
       values.push(parsed.data.nine_id);
     }
-    if (parsed.data.gross !== undefined) {
-      fields.push("gross=?");
-      values.push(parsed.data.gross);
-    }
     if (parsed.data.card_dt !== undefined) {
       fields.push("card_dt=?");
       values.push(parsed.data.card_dt === null ? null : parseISODateTime(parsed.data.card_dt));
@@ -345,19 +459,22 @@ export async function updateEventCard(req: Request, res: Response) {
     for (let i = 1; i <= 18; i += 1) {
       const key = `hole${i}` as keyof typeof parsed.data;
       if (parsed.data[key] !== undefined) {
+        effectiveHoles[i] = (parsed.data as any)[key] ?? null;
         fields.push(`${key}=?`);
         values.push((parsed.data as any)[key]);
       }
     }
+
+    const grossFromHoles = sumHoleValues(effectiveHoles);
+    const effectiveGross = parsed.data.gross !== undefined ? parsed.data.gross ?? grossFromHoles : grossFromHoles ?? existing.gross ?? null;
+    const derived = await buildDerivedCardValues(courseId, eventId, effectiveMemberId, effectiveNineId, effectiveHoles, effectiveGross);
+
+    if (parsed.data.gross !== undefined || grossFromHoles !== existing.gross) {
+      fields.push("gross=?");
+      values.push(derived.gross);
+    }
     if (!fields.length) return res.status(400).json({ error: "No fields to update" });
 
-    const effectiveMemberId =
-      parsed.data.member_id !== undefined ? parsed.data.member_id ?? null : existing.member_id ?? null;
-    const effectiveNineId =
-      parsed.data.nine_id !== undefined ? parsed.data.nine_id ?? null : existing.nine_id ?? null;
-    const effectiveGross =
-      parsed.data.gross !== undefined ? parsed.data.gross ?? null : existing.gross ?? null;
-    const derived = await buildDerivedCardValues(courseId, eventId, effectiveMemberId, effectiveNineId, effectiveGross);
     fields.push("handicap=?", "net=?", "adjustedscore=?", "hdiff=?", "numholes=?");
     values.push(derived.handicap, derived.net, derived.adjustedScore, derived.hdiff, derived.numholes);
 
@@ -429,19 +546,16 @@ export async function createEventCard(req: Request, res: Response) {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
-    const holes: number[] = [];
-    for (let i = 1; i <= 18; i += 1) {
-      const key = `hole${i}` as keyof typeof parsed.data;
-      const val = parsed.data[key];
-      if (typeof val === "number") holes.push(val);
-    }
-    const gross = parsed.data.gross ?? (holes.length ? holes.reduce((a, b) => a + b, 0) : null);
+    const holes = mergeHoleValues(parsed.data);
+    const grossFromHoles = sumHoleValues(holes);
+    const gross = parsed.data.gross ?? grossFromHoles;
     const cardDt = parsed.data.card_dt == null ? null : parseISODateTime(parsed.data.card_dt);
     const derived = await buildDerivedCardValues(
       courseId,
       eventId,
       parsed.data.member_id,
       parsed.data.nine_id ?? null,
+      holes,
       gross
     );
 
@@ -458,30 +572,30 @@ export async function createEventCard(req: Request, res: Response) {
         courseId,
         parsed.data.member_id,
         eventId,
-        gross,
+        derived.gross,
         derived.net,
         derived.adjustedScore,
         derived.handicap,
         derived.hdiff,
         cardDt,
-        parsed.data.hole1 ?? null,
-        parsed.data.hole2 ?? null,
-        parsed.data.hole3 ?? null,
-        parsed.data.hole4 ?? null,
-        parsed.data.hole5 ?? null,
-        parsed.data.hole6 ?? null,
-        parsed.data.hole7 ?? null,
-        parsed.data.hole8 ?? null,
-        parsed.data.hole9 ?? null,
-        parsed.data.hole10 ?? null,
-        parsed.data.hole11 ?? null,
-        parsed.data.hole12 ?? null,
-        parsed.data.hole13 ?? null,
-        parsed.data.hole14 ?? null,
-        parsed.data.hole15 ?? null,
-        parsed.data.hole16 ?? null,
-        parsed.data.hole17 ?? null,
-        parsed.data.hole18 ?? null,
+        holes[1],
+        holes[2],
+        holes[3],
+        holes[4],
+        holes[5],
+        holes[6],
+        holes[7],
+        holes[8],
+        holes[9],
+        holes[10],
+        holes[11],
+        holes[12],
+        holes[13],
+        holes[14],
+        holes[15],
+        holes[16],
+        holes[17],
+        holes[18],
         derived.nineId,
         derived.numholes,
       ]
