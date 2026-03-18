@@ -782,10 +782,10 @@ export default function EnterScoresPage() {
             <div className="table">
               <div className="tableHead">
                 <span>Name</span>
-                <span className="centerCell">Gross</span>
-                <span className="centerCell">Net</span>
-                <span className="centerCell">Hdcp</span>
-                <span className="centerCell">Date</span>
+                <span>Gross</span>
+                <span>Net</span>
+                <span>Hdcp</span>
+                <span>Date</span>
                 <span></span>
               </div>
               {displayCards.map((c) => (
@@ -795,7 +795,7 @@ export default function EnterScoresPage() {
                   </span>
                   <span>{c.gross ?? "—"}</span>
                   <span>{c.net ?? "—"}</span>
-                  <span className="rightCell">{formatHandicap(c.handicap)}</span>
+                  <span>{formatHandicap(c.handicap)}</span>
                   <span>{c.card_dt ? new Date(c.card_dt).toLocaleDateString() : "—"}</span>
                   <button className="btn small" onClick={() => setSelectedCardId(c.card_id)}>
                     Edit
@@ -853,11 +853,32 @@ export default function EnterScoresPage() {
         .searchInput { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; min-width: 180px; }
         .filterSelect { padding: 4px 8px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 11px; }
         .table { display: grid; gap: 8px; margin-top: 12px; }
-        .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: 2fr 0.8fr 0.8fr 0.9fr 1fr auto; align-items: center; }
+        .tableHead, .tableRow { display: grid; gap: 12px; grid-template-columns: minmax(160px, 1fr) 58px 58px 64px 86px auto; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
-        .centerCell { text-align: center; }
-        .rightCell { text-align: right; }
+        .tableHead > span:nth-child(2),
+        .tableHead > span:nth-child(3),
+        .tableHead > span:nth-child(4),
+        .tableHead > span:nth-child(5),
+        .tableRow > span:nth-child(2),
+        .tableRow > span:nth-child(3),
+        .tableRow > span:nth-child(5) {
+          text-align: center;
+        }
+        .tableRow > span:nth-child(4) {
+          text-align: right;
+        }
+        .tableHead > span:nth-child(2),
+        .tableHead > span:nth-child(3),
+        .tableHead > span:nth-child(4),
+        .tableHead > span:nth-child(5),
+        .tableRow > span:nth-child(2),
+        .tableRow > span:nth-child(3),
+        .tableRow > span:nth-child(4),
+        .tableRow > span:nth-child(5) {
+          font-variant-numeric: tabular-nums;
+        }
+        .numericCell, .dateCell { font-variant-numeric: tabular-nums; }
         .holesLines { display: grid; gap: 4px; }
         .holesHead {
           font-size: 10px;
