@@ -66,6 +66,10 @@ function hasWinningAmount(amount: number | string | null | undefined) {
   return Number.isFinite(n) && n > 0;
 }
 
+function formatMoneyInput(amount: number | null | undefined) {
+  return typeof amount === "number" && Number.isFinite(amount) ? amount.toFixed(2) : "";
+}
+
 export default function SubEventStrokePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -257,13 +261,13 @@ export default function SubEventStrokePage() {
 
       const grossEdits: Record<number, string> = {};
       for (const row of grossRows) {
-        grossEdits[row.gross_id] = row.amount != null ? String(row.amount) : "";
+        grossEdits[row.gross_id] = formatMoneyInput(row.amount);
       }
       setGrossAmountEdits(grossEdits);
 
       const netEdits: Record<number, string> = {};
       for (const row of netRows) {
-        netEdits[row.net_id] = row.amount != null ? String(row.amount) : "";
+        netEdits[row.net_id] = formatMoneyInput(row.amount);
       }
       setNetAmountEdits(netEdits);
     } catch (e: any) {
@@ -467,8 +471,8 @@ export default function SubEventStrokePage() {
   const saveGrossAmount = async (grossId: number) => {
     if (!id) return;
     const raw = (grossAmountEdits[grossId] ?? "").trim();
-    const amount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(amount)) {
+    const parsedAmount = raw === "" ? null : Number(raw);
+    if (raw !== "" && !Number.isFinite(parsedAmount)) {
       setError("Invalid gross amount");
       return;
     }
@@ -477,7 +481,7 @@ export default function SubEventStrokePage() {
     try {
       const res = await apiFetch(`/subevents/${id}/stroke/gross/${grossId}`, {
         method: "PATCH",
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)) }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadStroke();
@@ -491,8 +495,8 @@ export default function SubEventStrokePage() {
   const saveNetAmount = async (netId: number) => {
     if (!id) return;
     const raw = (netAmountEdits[netId] ?? "").trim();
-    const amount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(amount)) {
+    const parsedAmount = raw === "" ? null : Number(raw);
+    if (raw !== "" && !Number.isFinite(parsedAmount)) {
       setError("Invalid net amount");
       return;
     }
@@ -501,7 +505,7 @@ export default function SubEventStrokePage() {
     try {
       const res = await apiFetch(`/subevents/${id}/stroke/net/${netId}`, {
         method: "PATCH",
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)) }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadStroke();

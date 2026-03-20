@@ -1900,6 +1900,7 @@ app.post("/subevents/:id/skins/post", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spSkinCodeX(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     res.json({ ok: true });
   } catch (err) {
     console.error("subevent skins post error", err);
@@ -1927,6 +1928,7 @@ app.post("/subevents/:id/skins/unpost", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spUnPost(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     res.json({ ok: true });
   } catch (err) {
     console.error("subevent skins unpost error", err);
@@ -1972,6 +1974,7 @@ app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
       parsed.data.amount,
       skinId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     res.json({ ok: true });
   } catch (err) {
     console.error("subevent skins amount update error", err);
@@ -2042,6 +2045,320 @@ async function resolveBestBallNetTableName() {
     `
   );
   return rows?.[0]?.table_name ?? "subEventBBPayNet";
+}
+
+
+async function syncEventMoneyListForSubevent(subeventId: number) {
+  const bestBallNetTable = await resolveBestBallNetTableName();
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    await conn.query("DELETE FROM eventMoneyList WHERE subevent_id = ?", [subeventId]);
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        g.member_id,
+        ROUND(g.amount, 2) AS amount,
+        g.event_id,
+        g.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CASE
+          WHEN rf.flightname IS NOT NULL AND TRIM(rf.flightname) <> '' THEN CONCAT(TRIM(rf.flightname), ' Gross')
+          ELSE 'Gross'
+        END AS description,
+        g.place,
+        g.flight_id,
+        'GROSS' AS payout_type,
+        'subEventPayGross' AS source_table,
+        g.gross_id AS source_id
+      FROM subEventPayGross g
+      INNER JOIN eventMain e ON e.event_id = g.event_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
+      WHERE g.subevent_id = ?
+        AND g.member_id IS NOT NULL
+        AND COALESCE(g.amount, 0) <> 0
+        AND COALESCE(g.place, 0) > 0
+      `,
+      [subeventId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        n.member_id,
+        ROUND(n.amount, 2) AS amount,
+        n.event_id,
+        n.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CASE
+          WHEN rf.flightname IS NOT NULL AND TRIM(rf.flightname) <> '' THEN CONCAT(TRIM(rf.flightname), ' Net')
+          ELSE 'Net'
+        END AS description,
+        n.place,
+        n.flight_id,
+        'NET' AS payout_type,
+        'subEventPayNet' AS source_table,
+        n.net_id AS source_id
+      FROM subEventPayNet n
+      INNER JOIN eventMain e ON e.event_id = n.event_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
+      WHERE n.subevent_id = ?
+        AND n.member_id IS NOT NULL
+        AND COALESCE(n.amount, 0) <> 0
+        AND COALESCE(n.place, 0) > 0
+      `,
+      [subeventId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        es.member_id,
+        ROUND(es.amount, 2) AS amount,
+        es.event_id,
+        es.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CONCAT('Hole ', es.hole) AS description,
+        NULL AS place,
+        es.flight_id,
+        'SKINS' AS payout_type,
+        'eventSkin' AS source_table,
+        es.eventskin_id AS source_id
+      FROM eventSkin es
+      INNER JOIN eventMain e ON e.event_id = es.event_id
+      WHERE es.subevent_id = ?
+        AND es.member_id IS NOT NULL
+        AND COALESCE(es.amount, 0) <> 0
+      `,
+      [subeventId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        winners.member_id,
+        ROUND(winners.amount, 2) AS amount,
+        winners.event_id,
+        winners.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CASE
+          WHEN rf.flightname IS NOT NULL AND TRIM(rf.flightname) <> '' THEN CONCAT(TRIM(rf.flightname), ' Best Ball Gross')
+          ELSE 'Best Ball Gross'
+        END AS description,
+        winners.place,
+        winners.flight_id,
+        'BB_GROSS' AS payout_type,
+        'subEventBBPayGross' AS source_table,
+        winners.source_id
+      FROM (
+        SELECT
+          gross_id AS source_id,
+          member1_id AS member_id,
+          amount,
+          event_id,
+          subevent_id,
+          place,
+          flight_id
+        FROM subEventBBPayGross
+        WHERE subevent_id = ?
+          AND member1_id IS NOT NULL
+          AND COALESCE(amount, 0) <> 0
+          AND COALESCE(place, 0) > 0
+        UNION ALL
+        SELECT
+          gross_id AS source_id,
+          member2_id AS member_id,
+          amount,
+          event_id,
+          subevent_id,
+          place,
+          flight_id
+        FROM subEventBBPayGross
+        WHERE subevent_id = ?
+          AND member2_id IS NOT NULL
+          AND COALESCE(amount, 0) <> 0
+          AND COALESCE(place, 0) > 0
+      ) winners
+      INNER JOIN eventMain e ON e.event_id = winners.event_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = winners.flight_id
+      `,
+      [subeventId, subeventId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        winners.member_id,
+        ROUND(winners.amount, 2) AS amount,
+        winners.event_id,
+        winners.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CASE
+          WHEN rf.flightname IS NOT NULL AND TRIM(rf.flightname) <> '' THEN CONCAT(TRIM(rf.flightname), ' Best Ball Net')
+          ELSE 'Best Ball Net'
+        END AS description,
+        winners.place,
+        winners.flight_id,
+        'BB_NET' AS payout_type,
+        'subEventBBPayNet' AS source_table,
+        winners.source_id
+      FROM (
+        SELECT
+          net_id AS source_id,
+          member1_id AS member_id,
+          amount,
+          event_id,
+          subevent_id,
+          place,
+          flight_id
+        FROM ${bestBallNetTable}
+        WHERE subevent_id = ?
+          AND member1_id IS NOT NULL
+          AND COALESCE(amount, 0) <> 0
+          AND COALESCE(place, 0) > 0
+        UNION ALL
+        SELECT
+          net_id AS source_id,
+          member2_id AS member_id,
+          amount,
+          event_id,
+          subevent_id,
+          place,
+          flight_id
+        FROM ${bestBallNetTable}
+        WHERE subevent_id = ?
+          AND member2_id IS NOT NULL
+          AND COALESCE(amount, 0) <> 0
+          AND COALESCE(place, 0) > 0
+      ) winners
+      INNER JOIN eventMain e ON e.event_id = winners.event_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = winners.flight_id
+      `,
+      [subeventId, subeventId]
+    );
+
+    await conn.query(
+      `
+      INSERT INTO eventMoneyList
+        (
+          member_id,
+          amount,
+          event_id,
+          subevent_id,
+          payout_date,
+          description,
+          place,
+          flight_id,
+          payout_type,
+          source_table,
+          source_id
+        )
+      SELECT
+        c.member_id,
+        ROUND(c.amount, 2) AS amount,
+        s.event_id,
+        c.subevent_id,
+        DATE(e.end_dt) AS payout_date,
+        CASE
+          WHEN rf.flightname IS NOT NULL AND TRIM(rf.flightname) <> '' THEN CONCAT(TRIM(rf.flightname), ' Chicago')
+          ELSE 'Chicago'
+        END AS description,
+        c.place,
+        c.flight_id,
+        'CHICAGO' AS payout_type,
+        'subEventPayChicago' AS source_table,
+        c.chicago_id AS source_id
+      FROM subEventPayChicago c
+      INNER JOIN subEventMain s ON s.subevent_id = c.subevent_id
+      INNER JOIN eventMain e ON e.event_id = s.event_id
+      LEFT JOIN rosterFlight rf ON rf.flight_id = c.flight_id
+      WHERE c.subevent_id = ?
+        AND c.member_id IS NOT NULL
+        AND COALESCE(c.amount, 0) <> 0
+        AND COALESCE(c.place, 0) > 0
+      `,
+      [subeventId]
+    );
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
@@ -2335,6 +2652,7 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
     await recalculateBestBallGross(sub.event_id);
     await pool.query("CALL spBBFlightPick(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
 
     const [diagRows] = await pool.query<any[]>(
       `
@@ -2376,6 +2694,7 @@ app.post("/subevents/:id/bestball/unpost", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spUnPost(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent best ball unpost error", err);
@@ -2419,6 +2738,7 @@ app.patch("/subevents/:id/bestball/gross/:grossId", authMiddleware, async (req, 
       parsed.data.amount,
       grossId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent best ball gross amount update error", err);
@@ -2464,6 +2784,7 @@ app.patch("/subevents/:id/bestball/net/:netId", authMiddleware, async (req, res)
       parsed.data.amount,
       netId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent best ball net amount update error", err);
@@ -2555,6 +2876,7 @@ app.post("/subevents/:id/chicago/post", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spChicago(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent chicago post error", err);
@@ -2582,6 +2904,7 @@ app.post("/subevents/:id/chicago/unpost", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spUnPost(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent chicago unpost error", err);
@@ -2625,6 +2948,7 @@ app.patch("/subevents/:id/chicago/:chicagoId", authMiddleware, async (req, res) 
       parsed.data.amount,
       chicagoId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent chicago amount update error", err);
@@ -2706,6 +3030,11 @@ function strokeSortByScoreNameCard(a: StrokePayRow, b: StrokePayRow) {
   return a.row_id - b.row_id;
 }
 
+function roundCurrencyAmount(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function assignStrokeAwards(rows: StrokePayRow[], activeKeys: Set<string>, payoutByPlace: Map<number, number>) {
   const ranked = [...rows]
     .map((row, idx) => ({ row, key: strokeWinnerKey(row, `row:${idx}`) }))
@@ -2729,7 +3058,7 @@ function assignStrokeAwards(rows: StrokePayRow[], activeKeys: Set<string>, payou
       const v = payoutByPlace.get(place);
       payoutSum += typeof v === "number" && Number.isFinite(v) ? v : 0;
     }
-    const eachAmount = payoutSum > 0 ? payoutSum / groupSize : null;
+    const eachAmount = payoutSum > 0 ? roundCurrencyAmount(payoutSum / groupSize) : null;
 
     for (let k = i; k <= j; k += 1) {
       awards.set(ranked[k].key, { place: placeStart, amount: eachAmount });
@@ -3301,6 +3630,7 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
       diagnostics = diagRowsAfter?.[0] ?? diagnostics;
     }
 
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true, mode, diagnostics, fallbackApplied });
   } catch (err) {
     console.error("subevent stroke post error", err);
@@ -3328,6 +3658,7 @@ app.post("/subevents/:id/stroke/unpost", authMiddleware, async (req, res) => {
     }
 
     await pool.query("CALL spUnPost(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent stroke unpost error", err);
@@ -3370,9 +3701,10 @@ app.patch("/subevents/:id/stroke/gross/:grossId", authMiddleware, async (req, re
     }
 
     await pool.execute("UPDATE subEventPayGross SET amount = ? WHERE gross_id = ?", [
-      parsed.data.amount,
+      roundCurrencyAmount(parsed.data.amount),
       grossId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent stroke gross update error", err);
@@ -3415,9 +3747,10 @@ app.patch("/subevents/:id/stroke/net/:netId", authMiddleware, async (req, res) =
     }
 
     await pool.execute("UPDATE subEventPayNet SET amount = ? WHERE net_id = ?", [
-      parsed.data.amount,
+      roundCurrencyAmount(parsed.data.amount),
       netId,
     ]);
+    await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
     console.error("subevent stroke net update error", err);

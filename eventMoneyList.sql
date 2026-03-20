@@ -13,6 +13,16 @@ CREATE TABLE eventMoneyList (
 
   description VARCHAR(255) NULL,
   place INT NULL,
+  flight_id BIGINT NULL,
+  payout_type ENUM(
+    'GROSS',
+    'NET',
+    'SKINS',
+    'BB_GROSS',
+    'BB_NET',
+    'CHICAGO',
+    'OTHER'
+  ) NULL,
 
   -- polymorphic source pointer
   source_table ENUM(
@@ -21,6 +31,7 @@ CREATE TABLE eventMoneyList (
     'subEventPayGross',
     'subEventPayNet',
     'subEventPayChicago',
+    'eventSkin',
     'eventOtherPay'
   ) NOT NULL,
   source_id BIGINT NOT NULL,
