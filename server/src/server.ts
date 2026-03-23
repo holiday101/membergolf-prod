@@ -451,6 +451,58 @@ app.get("/course", authMiddleware, async (req, res) => {
   }
 });
 
+app.get("/public/:courseId/members/:memberId/winnings", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const memberId = Number(req.params.memberId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(memberId)) {
+      return res.status(400).json({ error: "Invalid params" });
+    }
+    const yearParam = req.query.year;
+    const year =
+      yearParam === undefined || yearParam === null || yearParam === "" || yearParam === "all"
+        ? null
+        : Number(yearParam);
+    if (year !== null && !Number.isFinite(year)) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        ml.moneylist_id,
+        ml.amount,
+        ml.payout_date,
+        ml.payout_type,
+        ml.place,
+        ml.description,
+        COALESCE(e.eventname, e2.eventname) AS eventname
+      FROM eventMoneyList ml
+      JOIN memberMain m ON m.member_id = ml.member_id
+      LEFT JOIN eventMain e ON e.event_id = ml.event_id
+      LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
+      LEFT JOIN eventMain e2 ON e2.event_id = se.event_id
+      WHERE ml.member_id = ?
+        AND m.course_id = ?
+        AND ml.amount <> 0
+        AND (? IS NULL OR YEAR(ml.payout_date) = ?)
+      ORDER BY ml.payout_date ASC, ml.moneylist_id ASC
+      `,
+      [memberId, courseId, year, year]
+    );
+
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        amount: row.amount !== null ? Number(row.amount) : 0,
+      }))
+    );
+  } catch (err) {
+    console.error("member winnings error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/public/:courseId/members/:memberId", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);

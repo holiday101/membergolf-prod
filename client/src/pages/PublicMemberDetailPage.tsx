@@ -32,6 +32,16 @@ type Round = {
   hole18?: number | null;
 };
 
+type Winning = {
+  moneylist_id: number;
+  amount: number;
+  payout_date: string | null;
+  payout_type: string | null;
+  place: number | null;
+  description: string | null;
+  eventname: string | null;
+};
+
 type MemberDetail = {
   member: {
     member_id: number;
@@ -174,6 +184,8 @@ export default function PublicMemberDetailPage() {
   const [moneyTotal, setMoneyTotal] = useState<number | null>(null);
   const [moneyRank, setMoneyRank] = useState<number | null>(null);
   const [moneyLoading, setMoneyLoading] = useState(false);
+  const [winnings, setWinnings] = useState<Winning[]>([]);
+  const [winningsLoading, setWinningsLoading] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -232,6 +244,25 @@ export default function PublicMemberDetailPage() {
     loadMoney();
   }, [courseId, memberId]);
 
+  useEffect(() => {
+    const loadWinnings = async () => {
+      if (!courseId || !memberId) return;
+      setWinningsLoading(true);
+      try {
+        const year = new Date().getFullYear();
+        const rows = await publicFetch<Winning[]>(
+          `/public/${courseId}/members/${memberId}/winnings?year=${year}`
+        );
+        setWinnings(rows);
+      } catch {
+        setWinnings([]);
+      } finally {
+        setWinningsLoading(false);
+      }
+    };
+    loadWinnings();
+  }, [courseId, memberId]);
+
   const fullName = useMemo(() => {
     const first = data?.member.firstname ?? "";
     const last = data?.member.lastname ?? "";
@@ -243,6 +274,10 @@ export default function PublicMemberDetailPage() {
   }, [data]);
 
   const currentYear = new Date().getFullYear();
+  const winningsTotal = useMemo(
+    () => winnings.reduce((sum, w) => sum + w.amount, 0),
+    [winnings]
+  );
   const moneyFormatter = useMemo(
     () => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
     []
@@ -301,6 +336,41 @@ export default function PublicMemberDetailPage() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="card">
+            <h3>Season Winnings ({currentYear})</h3>
+            {winningsLoading ? (
+              <div className="empty">Loading…</div>
+            ) : winnings.length === 0 ? (
+              <div className="empty">No winnings this season</div>
+            ) : (
+              <div className="winningsTable">
+                <div className="winningsRow winningsHead">
+                  <div>Date</div>
+                  <div>Event</div>
+                  <div>Type</div>
+                  <div>Place</div>
+                  <div className="winningsAmt">Amount</div>
+                </div>
+                {winnings.map((w) => (
+                  <div key={w.moneylist_id} className="winningsRow">
+                    <div>{formatDate(w.payout_date)}</div>
+                    <div>{w.eventname ?? w.description ?? "—"}</div>
+                    <div>{w.payout_type ?? "—"}</div>
+                    <div>{w.place != null ? `#${w.place}` : "—"}</div>
+                    <div className="winningsAmt">{moneyFormatter.format(w.amount)}</div>
+                  </div>
+                ))}
+                <div className="winningsRow winningsTotal">
+                  <div />
+                  <div />
+                  <div />
+                  <div>Total</div>
+                  <div className="winningsAmt">{moneyFormatter.format(winningsTotal)}</div>
+                </div>
+              </div>
+            )}
           </section>
 
           {sortedGroups.length === 0 ? (
@@ -574,6 +644,40 @@ export default function PublicMemberDetailPage() {
         .holeValue { position: relative; z-index: 1; }
         .holeCell:nth-child(even) { background: inherit; }
         .empty { color: #9ca3af; font-size: 12px; padding: 4px 0; }
+
+        .winningsTable { display: grid; gap: 4px; }
+        .winningsRow {
+          display: grid;
+          grid-template-columns: 90px 1fr 80px 52px 80px;
+          gap: 8px;
+          align-items: center;
+          font-size: 11px;
+          color: #374151;
+          background: #f9fafb;
+          border-radius: 8px;
+          padding: 6px 8px;
+        }
+        .winningsRow:nth-child(even) { background: #f0f7ff; }
+        .winningsHead {
+          background: transparent !important;
+          color: #9ca3af;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          font-size: 10px;
+          font-weight: 600;
+          padding: 0 8px 4px;
+          border-radius: 0;
+        }
+        .winningsTotal {
+          background: transparent !important;
+          font-weight: 700;
+          color: #111827;
+          border-top: 1px solid #e5e7eb;
+          padding-top: 8px;
+          border-radius: 0;
+        }
+        .winningsAmt { text-align: right; font-weight: 700; }
+        .winningsHead .winningsAmt { font-weight: 600; }
         .calcMeta {
           display: grid;
           gap: 4px;
