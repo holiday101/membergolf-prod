@@ -155,9 +155,11 @@ export default function SubEventDetailPage() {
     run();
   }, [id]);
 
-  const typeName = (data?.eventtypename ?? "").toLowerCase();
+  const savedTypeName = (data?.eventtypename ?? "").toLowerCase();
+  const selectedTypeName = (types.find((t) => String(t.eventtype_id) === form.eventtype_id)?.eventtypename ?? "").toLowerCase();
+  const typeName = selectedTypeName || savedTypeName;
   const isPowerSkinType = typeName.includes("power skin");
-  const isSkinsType = typeName.includes("skin") && !isPowerSkinType;
+  const isSkinsType = savedTypeName.includes("skin") && !savedTypeName.includes("power skin");
 
   const loadSkins = async () => {
     if (!id) return;
