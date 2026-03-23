@@ -1802,6 +1802,7 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.roster_id,
         s.amount,
         s.addedmoney,
+        s.drawn_hole,
         c.autoflight_yn
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
@@ -2030,6 +2031,65 @@ app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("subevent skins amount update error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/powerskin/post", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id, drawn_hole FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    if (!sub.drawn_hole) {
+      return res.status(400).json({ error: "Drawn hole must be set before posting Power Skin" });
+    }
+
+    await pool.query("CALL spPowerSkin(?)", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent powerskin post error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post("/subevents/:id/powerskin/unpost", authMiddleware, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const subeventId = Number(req.params.id);
+    if (!Number.isFinite(subeventId)) return res.status(400).json({ error: "Invalid subevent" });
+    if (!payload?.courseId && !isGlobal(payload)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const [subRows] = await pool.query<any[]>(
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      [subeventId]
+    );
+    const sub = subRows?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    await pool.execute("DELETE FROM eventSkin WHERE subevent_id = ?", [subeventId]);
+    await syncEventMoneyListForSubevent(subeventId);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("subevent powerskin unpost error", err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -3876,6 +3936,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
       roster_id: z.number().int().optional().nullable(),
       amount: z.number().optional().nullable(),
       addedmoney: z.number().optional().nullable(),
+      drawn_hole: z.number().int().min(1).max(9).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -3892,7 +3953,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
 
     await pool.execute(
       `UPDATE subEventMain
-       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?
+       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?, drawn_hole = ?
        WHERE subevent_id = ?`,
       [
         parsed.data.eventtype_id ?? null,
@@ -3900,6 +3961,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
         parsed.data.roster_id ?? null,
         parsed.data.amount ?? null,
         parsed.data.addedmoney ?? null,
+        parsed.data.drawn_hole ?? null,
         subeventId,
       ]
     );
