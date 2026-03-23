@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-    "build": "tsc --noEmit false --skipLibCheck --strict false",
+    "build": "tsc --noCheck",
     "start": "node dist/server.js"
   },
   "keywords": [],
