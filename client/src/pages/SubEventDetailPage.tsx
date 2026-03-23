@@ -13,6 +13,7 @@ type SubEventDetail = {
   amount: number | null;
   addedmoney: number | null;
   drawn_hole: number | null;
+  startinghole: number;
 };
 
 type SkinRow = {
@@ -407,7 +408,7 @@ export default function SubEventDetailPage() {
                 >
                   <option value="">Select hole</option>
                   {[1,2,3,4,5,6,7,8,9].map((h) => (
-                    <option key={h} value={String(h)}>Hole {h}</option>
+                    <option key={h} value={String(h)}>Hole {h + (data?.startinghole ?? 1) - 1}</option>
                   ))}
                 </select>
               </div>
@@ -429,7 +430,7 @@ export default function SubEventDetailPage() {
               <div className="card wideCard">
                 <div className="titleRow">
                   <div className="title">
-                    Power Skin{data?.drawn_hole ? ` — Hole ${data.drawn_hole}` : ""}
+                    Power Skin{data?.drawn_hole ? ` — Hole ${data.drawn_hole + (data?.startinghole ?? 1) - 1}` : ""}
                   </div>
                   <div className="actionsRight">
                     <button className="btn" onClick={unpostPowerSkin} disabled={skinsBusy}>

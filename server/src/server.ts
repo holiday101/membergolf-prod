@@ -1803,11 +1803,13 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.amount,
         s.addedmoney,
         s.drawn_hole,
-        c.autoflight_yn
+        c.autoflight_yn,
+        COALESCE(n.startinghole, 1) AS startinghole
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
       LEFT JOIN courseMain c ON c.course_id = s.course_id
+      LEFT JOIN courseNine n ON n.nine_id = e.nine_id
       WHERE s.subevent_id = ?
       LIMIT 1
       `,
@@ -2277,7 +2279,7 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
         CONCAT('Hole ', es.hole) AS description,
         NULL AS place,
         es.flight_id,
-        'SKINS' AS payout_type,
+        'SKIN' AS payout_type,
         'eventSkin' AS source_table,
         es.eventskin_id AS source_id
       FROM eventSkin es
