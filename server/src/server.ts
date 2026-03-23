@@ -47,7 +47,7 @@ app.use(corsMiddleware);
 app.use(express.json());
 app.use("/api/events", eventsRouter);
 
-app.get("/public/:courseId/events", async (req, res) => {
+app.get("/api/public/:courseId/events", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
@@ -86,7 +86,7 @@ app.get("/public/:courseId/events", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/events/:eventId", async (req, res) => {
+app.get("/api/public/:courseId/events/:eventId", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const eventId = Number(req.params.eventId);
@@ -121,7 +121,7 @@ app.get("/public/:courseId/events/:eventId", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/events/:eventId/files", async (req, res) => {
+app.get("/api/public/:courseId/events/:eventId/files", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const eventId = Number(req.params.eventId);
@@ -159,7 +159,7 @@ app.get("/public/:courseId/events/:eventId/files", async (req, res) => {
 });
 
 
-app.get("/public/:courseId/events/:eventId/winnings", async (req, res) => {
+app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const eventId = Number(req.params.eventId);
@@ -228,7 +228,7 @@ app.get("/public/:courseId/events/:eventId/winnings", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/events/:eventId/scores", async (req, res) => {
+app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const eventId = Number(req.params.eventId);
@@ -284,7 +284,7 @@ app.get("/public/:courseId/events/:eventId/scores", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/events/:eventId/scores/exists", async (req, res) => {
+app.get("/api/public/:courseId/events/:eventId/scores/exists", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const eventId = Number(req.params.eventId);
@@ -305,7 +305,7 @@ app.get("/public/:courseId/events/:eventId/scores/exists", async (req, res) => {
 });
 
 
-app.get("/public/:courseId/members", async (req, res) => {
+app.get("/api/public/:courseId/members", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
@@ -320,7 +320,7 @@ app.get("/public/:courseId/members", async (req, res) => {
 });
 
 
-app.get("/public/:courseId/moneylist", async (req, res) => {
+app.get("/api/public/:courseId/moneylist", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
@@ -370,7 +370,7 @@ app.get("/public/:courseId/moneylist", async (req, res) => {
 });
 
 
-app.get("/public/:courseId/moneylist/years", async (req, res) => {
+app.get("/api/public/:courseId/moneylist/years", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
@@ -399,7 +399,7 @@ app.get("/public/:courseId/moneylist/years", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/course", async (req, res) => {
+app.get("/api/public/:courseId/course", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
@@ -451,7 +451,7 @@ app.get("/course", authMiddleware, async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/members/:memberId/winnings", async (req, res) => {
+app.get("/api/public/:courseId/members/:memberId/winnings", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const memberId = Number(req.params.memberId);
@@ -503,7 +503,7 @@ app.get("/public/:courseId/members/:memberId/winnings", async (req, res) => {
   }
 });
 
-app.get("/public/:courseId/members/:memberId", async (req, res) => {
+app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     const memberId = Number(req.params.memberId);
@@ -682,7 +682,7 @@ app.get("/public/:courseId/members/:memberId", async (req, res) => {
   }
 });
 
-app.post("/public/lead", async (req, res) => {
+app.post("/api/public/lead", async (req, res) => {
   try {
     const schema = z.object({
       name: z.string().min(1).max(120),
