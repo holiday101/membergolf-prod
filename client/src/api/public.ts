@@ -1,3 +1,4 @@
+/** Build a full URL for public API calls, ensuring the /api prefix. */
 function buildPublicUrl(path: string) {
   const rawBase = import.meta.env.VITE_API_BASE ?? "/api";
   const base = rawBase.replace(/\/+$/, "");
