@@ -4081,7 +4081,7 @@ app.post("/api/events/:id/winnings", authMiddleware, async (req, res) => {
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
   const [eventRows] = await pool.query<any[]>(
-    "SELECT event_id FROM eventMain WHERE event_id = ? AND course_id = ? LIMIT 1",
+    "SELECT event_id, end_dt FROM eventMain WHERE event_id = ? AND course_id = ? LIMIT 1",
     [id, payload.courseId]
   );
   if (!eventRows.length) return res.status(404).json({ error: "Not found" });
@@ -4091,7 +4091,15 @@ app.post("/api/events/:id/winnings", authMiddleware, async (req, res) => {
       "INSERT INTO eventOtherPay (event_id, member_id, amount, description) VALUES (?, ?, ?, ?)",
       [id, parsed.data.member_id, parsed.data.amount, parsed.data.description ?? null]
     );
-    res.status(201).json({ id: result.insertId });
+    const otherPayId = result.insertId;
+    const payoutDate = eventRows[0].end_dt ? new Date(eventRows[0].end_dt).toISOString().slice(0, 10) : null;
+    await pool.execute(
+      `INSERT INTO eventMoneyList
+        (member_id, amount, event_id, subevent_id, payout_date, description, place, flight_id, payout_type, source_table, source_id)
+       VALUES (?, ?, ?, NULL, ?, ?, NULL, NULL, 'OTHER', 'eventOtherPay', ?)`,
+      [parsed.data.member_id, parsed.data.amount, id, payoutDate, parsed.data.description ?? null, otherPayId]
+    );
+    res.status(201).json({ id: otherPayId });
   } catch {
     res.status(500).json({ error: "Server error" });
   }
@@ -4129,6 +4137,12 @@ app.put("/api/events/:id/winnings/:payId", authMiddleware, async (req, res) => {
       `,
       [parsed.data.member_id, parsed.data.amount, parsed.data.description ?? null, payId, id]
     );
+    await pool.execute(
+      `UPDATE eventMoneyList
+       SET member_id = ?, amount = ?, description = ?
+       WHERE source_table = 'eventOtherPay' AND source_id = ?`,
+      [parsed.data.member_id, parsed.data.amount, parsed.data.description ?? null, payId]
+    );
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: "Server error" });
@@ -4154,6 +4168,10 @@ app.delete("/api/events/:id/winnings/:payId", authMiddleware, async (req, res) =
     await pool.execute(
       "DELETE FROM eventOtherPay WHERE eventotherpay_id = ? AND event_id = ?",
       [payId, id]
+    );
+    await pool.execute(
+      "DELETE FROM eventMoneyList WHERE source_table = 'eventOtherPay' AND source_id = ?",
+      [payId]
     );
     res.json({ ok: true });
   } catch {
