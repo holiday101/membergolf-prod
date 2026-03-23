@@ -377,6 +377,7 @@ CREATE TABLE IF NOT EXISTS subEventMain (
   roster_id INT NULL,
   amount DOUBLE NULL,
   addedmoney DOUBLE NULL,
+  drawn_hole INT NULL,
   PRIMARY KEY (subevent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -615,3 +616,9 @@ CREATE INDEX IF NOT EXISTS idx_tmpMoneyList_event_id ON tmpMoneyList(event_id);
 CREATE INDEX IF NOT EXISTS idx_tmpMoneyList_member_id ON tmpMoneyList(member_id);
 CREATE INDEX IF NOT EXISTS idx_tmpMoneyList_card_id ON tmpMoneyList(card_id);
 CREATE INDEX IF NOT EXISTS idx_tmpMoneyList_flight_id ON tmpMoneyList(flight_id);
+
+-- Migration: add drawn_hole to subEventMain for Power Skin subevent type
+ALTER TABLE subEventMain ADD COLUMN IF NOT EXISTS drawn_hole INT NULL;
+
+-- Seed: Power Skin subevent type (insert only if not already present)
+INSERT IGNORE INTO subEventType (eventtypename) VALUES ('Power Skin');

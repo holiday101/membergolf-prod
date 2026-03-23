@@ -12,6 +12,7 @@ type SubEventDetail = {
   roster_id: number | null;
   amount: number | null;
   addedmoney: number | null;
+  drawn_hole: number | null;
 };
 
 type SkinRow = {
@@ -117,6 +118,7 @@ export default function SubEventDetailPage() {
     roster_id: "",
     amount: "",
     addedmoney: "",
+    drawn_hole: "",
   });
 
   useEffect(() => {
@@ -142,6 +144,7 @@ export default function SubEventDetailPage() {
           roster_id: detail.roster_id ? String(detail.roster_id) : "",
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
+          drawn_hole: detail.drawn_hole != null ? String(detail.drawn_hole) : "",
         });
       } catch (e: any) {
         setError(e.message ?? "Failed to load subevent");
@@ -152,7 +155,9 @@ export default function SubEventDetailPage() {
     run();
   }, [id]);
 
-  const isSkinsType = (data?.eventtypename ?? "").toLowerCase().includes("skin");
+  const typeName = (data?.eventtypename ?? "").toLowerCase();
+  const isPowerSkinType = typeName.includes("power skin");
+  const isSkinsType = typeName.includes("skin") && !isPowerSkinType;
 
   const loadSkins = async () => {
     if (!id) return;
@@ -182,8 +187,8 @@ export default function SubEventDetailPage() {
   };
 
   useEffect(() => {
-    if (isSkinsType) loadSkins();
-  }, [id, isSkinsType]);
+    if (isSkinsType || isPowerSkinType) loadSkins();
+  }, [id, isSkinsType, isPowerSkinType]);
 
   const save = async () => {
     if (!id) return;
@@ -198,6 +203,7 @@ export default function SubEventDetailPage() {
           roster_id: form.roster_id ? Number(form.roster_id) : null,
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
+          drawn_hole: form.drawn_hole ? Number(form.drawn_hole) : null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -249,6 +255,36 @@ export default function SubEventDetailPage() {
       await loadSkins();
     } catch (e: any) {
       setError(e.message ?? "Failed to un-post skins");
+    } finally {
+      setSkinsBusy(false);
+    }
+  };
+
+  const postPowerSkin = async () => {
+    if (!id) return;
+    setSkinsBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/subevents/${id}/powerskin/post`, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      await loadSkins();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to post power skin");
+    } finally {
+      setSkinsBusy(false);
+    }
+  };
+
+  const unpostPowerSkin = async () => {
+    if (!id) return;
+    setSkinsBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(`/subevents/${id}/powerskin/unpost`, { method: "POST" });
+      if (!res.ok) throw new Error(await res.text());
+      await loadSkins();
+    } catch (e: any) {
+      setError(e.message ?? "Failed to un-post power skin");
     } finally {
       setSkinsBusy(false);
     }
@@ -360,6 +396,20 @@ export default function SubEventDetailPage() {
                 onChange={(e) => setForm((p) => ({ ...p, addedmoney: e.target.value }))}
               />
             </div>
+            {isPowerSkinType ? (
+              <div className="row">
+                <div className="label">Drawn Hole</div>
+                <select
+                  value={form.drawn_hole}
+                  onChange={(e) => setForm((p) => ({ ...p, drawn_hole: e.target.value }))}
+                >
+                  <option value="">Select hole</option>
+                  {[1,2,3,4,5,6,7,8,9].map((h) => (
+                    <option key={h} value={String(h)}>Hole {h}</option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <div className="actionsRow">
               <div className="actionsLeft" />
               <div className="actionsRight">
@@ -372,6 +422,121 @@ export default function SubEventDetailPage() {
               </div>
             </div>
           </div>
+          {isPowerSkinType ? (
+            <div className="skinsCardsWrap">
+              <div className="card wideCard">
+                <div className="titleRow">
+                  <div className="title">
+                    Power Skin{data?.drawn_hole ? ` — Hole ${data.drawn_hole}` : ""}
+                  </div>
+                  <div className="actionsRight">
+                    <button className="btn" onClick={unpostPowerSkin} disabled={skinsBusy}>
+                      {skinsBusy ? "Working…" : "Un-Post"}
+                    </button>
+                    <button className="btn primary" onClick={postPowerSkin} disabled={skinsBusy}>
+                      {skinsBusy ? "Working…" : "Post Power Skin"}
+                    </button>
+                  </div>
+                </div>
+                {skinsLoading ? <div className="muted">Loading…</div> : null}
+                {!skinsLoading ? (
+                  <div className="skinsTable">
+                    <div className="skinsHead">
+                      <span>Flight</span>
+                      <span>Member</span>
+                      <span>Hole</span>
+                      <span>Score</span>
+                      <span>Amount</span>
+                      <span></span>
+                    </div>
+                    {skins.map((s) => (
+                      <div key={s.eventskin_id} className="skinsRow">
+                        <span>{s.flightname ?? s.flight_id ?? "—"}</span>
+                        <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
+                        <span>{s.holenum ?? s.hole ?? "—"}</span>
+                        <span>{s.score ?? "—"}</span>
+                        <input
+                          value={amountEdits[s.eventskin_id] ?? ""}
+                          onChange={(e) =>
+                            setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
+                          }
+                        />
+                        <button
+                          className="btn"
+                          onClick={() => updateSkinAmount(s.eventskin_id)}
+                          disabled={skinsBusy}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ))}
+                    {!skins.length ? <div className="muted">No results posted yet.</div> : null}
+                  </div>
+                ) : null}
+              </div>
+              {!skinsLoading && skins.length > 0 ? (
+                <div className="card wideCard">
+                  <div className="title">Card Details</div>
+                  <div className="skinsDetails">
+                    <div className="detailsList">
+                      {skinCardFlights.map((flight) => {
+                        const headerLabels = getHoleLabels(flight.rows[0]?.numholes ?? 9, flight.rows[0]?.startinghole ?? 1);
+                        return (
+                          <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection">
+                            <div className="flightHeader">{flight.flightname ?? flight.flight_id ?? "Unassigned"}</div>
+                            <div className="detailHeadRow">
+                              <span>Name</span>
+                              <span>Card Date</span>
+                              <span>Hdcp</span>
+                              <div className="holesHeadGrid">
+                                {headerLabels.map((h) => (
+                                  <span key={`head-${flight.flight_id ?? "na"}-${h}`}>{h}</span>
+                                ))}
+                              </div>
+                              <span>Gross</span>
+                              <span>Net</span>
+                            </div>
+                            {flight.rows.map((row) => {
+                              const labels = getHoleLabels(row.numholes, row.startinghole);
+                              return (
+                                <div key={row.card_id} className="detailRow">
+                                  <div className="detailMeta">
+                                    <span className="memberTag">{(row.lastname || "").trim()}, {(row.firstname || "").trim()}</span>
+                                  </div>
+                                  <div className="dateCell">{row.card_dt ? new Date(row.card_dt).toLocaleDateString() : "—"}</div>
+                                  <div className="statCell">{row.handicap ?? "—"}</div>
+                                  <div className="scoreGrid">
+                                    {labels.map((h) => {
+                                      const score = getCardScore(row, h);
+                                      const par = getCardPar(row, h);
+                                      const meta = getScoreMeta(score, par);
+                                      const isDrawn = data?.drawn_hole != null && h === data.drawn_hole;
+                                      return (
+                                        <div
+                                          key={`${row.card_id}-${h}`}
+                                          className={meta.className + (isDrawn ? " drawnHole" : "")}
+                                          style={meta.style}
+                                        >
+                                          {typeof score === "number" ? score : "—"}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="statCell">{row.gross ?? "—"}</div>
+                                  <div className="statCell">{row.net ?? "—"}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                      {!skinCards.length ? <div className="muted">No card details available.</div> : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {isSkinsType ? (
             <div className="skinsCardsWrap">
               <div className="card wideCard">
@@ -551,6 +716,7 @@ export default function SubEventDetailPage() {
         .scoreCell.neutral { background: #f8fafc; }
         .scoreCell.birdie { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
         .scoreCell.eagle { background: #fecaca; color: #7f1d1d; border-color: #fca5a5; font-weight: 700; }
+        .scoreCell.drawnHole { outline: 2px solid #f59e0b; outline-offset: -1px; }
         .statCell { text-align: center; font-size: 11px; color: #374151; font-weight: 600; }
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
