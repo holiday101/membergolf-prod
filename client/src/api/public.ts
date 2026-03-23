@@ -1,8 +1,10 @@
 function buildPublicUrl(path: string) {
   const rawBase = import.meta.env.VITE_API_BASE ?? "/api";
   const base = rawBase.replace(/\/+$/, "");
+  // Server routes live under /api/public/...; ensure the /api prefix is present.
+  const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const normalizedPath =
-    base.endsWith("/api") && path.startsWith("/api") ? path.slice(4) || "/" : path;
+    base.endsWith("/api") && apiPath.startsWith("/api") ? apiPath.slice(4) || "/" : apiPath;
   return `${base}${normalizedPath}`;
 }
 
