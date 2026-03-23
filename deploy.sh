@@ -31,6 +31,7 @@ echo "── Starting new container..."
 docker run -d \
   --name golfapp \
   --restart unless-stopped \
+  --add-host=host.docker.internal:host-gateway \
   -p 4000:4000 \
   --env-file .env \
   golfapp
