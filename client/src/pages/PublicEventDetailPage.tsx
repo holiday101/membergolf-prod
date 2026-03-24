@@ -271,16 +271,19 @@ export default function PublicEventDetailPage() {
                           {rows.map((row) => (
                             <div key={row.moneylist_id} className="winningsRow">
                               <div className="wname">
-                                {row.place ? <span className="wplace">#{row.place} </span> : null}
+                                {(() => {
+                                  const desc = (row.description || "").trim();
+                                  const holeMatch = desc.match(/^Hole\s+(\d+)/i);
+                                  const hole = row.place ?? (holeMatch ? Number(mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent).replace(/^Hole\s+/i, "")) : null);
+                                  if (hole) return <span className="wplace">#{hole} </span>;
+                                  return null;
+                                })()}
                                 {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
                                 {(() => {
                                   const desc = (row.description || "").trim();
-                                  const isHoleDesc = /^Hole\s/i.test(desc);
                                   const isScoreDesc = /^Score:\s*/i.test(desc);
-                                  if (isHoleDesc && row.score != null) return <span className="wscore"> ({mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent)}, {row.score})</span>;
-                                  if (isHoleDesc) return <span className="wscore"> ({mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent)})</span>;
-                                  if (isScoreDesc) return <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span>;
                                   if (row.score != null) return <span className="wscore"> ({row.score})</span>;
+                                  if (isScoreDesc) return <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span>;
                                   return null;
                                 })()}
                               </div>
