@@ -273,7 +273,16 @@ export default function PublicEventDetailPage() {
                               <div className="wname">
                                 {row.place ? <span className="wplace">#{row.place} </span> : null}
                                 {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                                {row.description ? <span className="wscore"> ({row.description.replace(/^Score:\s*/i, "")})</span> : null}
+                                {(() => {
+                                  const desc = (row.description || "").trim();
+                                  const isHoleDesc = /^Hole\s/i.test(desc);
+                                  const isScoreDesc = /^Score:\s*/i.test(desc);
+                                  if (isHoleDesc && row.score != null) return <span className="wscore"> ({mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent)}, {row.score})</span>;
+                                  if (isHoleDesc) return <span className="wscore"> ({mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent)})</span>;
+                                  if (isScoreDesc) return <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span>;
+                                  if (row.score != null) return <span className="wscore"> ({row.score})</span>;
+                                  return null;
+                                })()}
                               </div>
                               <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
                             </div>

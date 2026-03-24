@@ -183,6 +183,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         CASE
           WHEN w.payout_type = 'GROSS' THEN spg.score
           WHEN w.payout_type = 'NET'   THEN spn.score
+          WHEN w.payout_type IN ('SKINS','SKIN') THEN es.score
           ELSE NULL
         END AS score
       FROM (
@@ -227,6 +228,11 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         AND spn.member_id = w.member_id
         AND COALESCE(spn.flight_id, 0) = COALESCE(w.flight_id, 0)
         AND ROUND(spn.amount, 2) = ROUND(w.amount, 2)
+      LEFT JOIN eventSkin es ON w.payout_type IN ('SKINS','SKIN')
+        AND es.subevent_id = w.subevent_id
+        AND es.member_id = w.member_id
+        AND COALESCE(es.flight_id, 0) = COALESCE(w.flight_id, 0)
+        AND ROUND(es.amount, 2) = ROUND(w.amount, 2)
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
