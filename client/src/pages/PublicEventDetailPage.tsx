@@ -24,6 +24,7 @@ type WinningsRow = {
   place: number | null;
   description: string | null;
   payout_type: string | null;
+  score: number | null;
 };
 
 type EventFile = {
@@ -218,6 +219,7 @@ export default function PublicEventDetailPage() {
                                   <span className="wdesc">{mapBackNineSkinDescription(row.description, row.payout_type, isBackNineEvent)} • </span>
                                 ) : null}
                                 {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                                {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
                               </div>
                               <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
                             </div>
@@ -234,6 +236,7 @@ export default function PublicEventDetailPage() {
                               <div className="wname">
                                 {row.place ? <span className="wplace">#{row.place} </span> : null}
                                 {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                                {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
                               </div>
                               <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
                             </div>
@@ -270,6 +273,7 @@ export default function PublicEventDetailPage() {
                               <div className="wname">
                                 {row.place ? <span className="wplace">#{row.place} </span> : null}
                                 {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                                {row.description ? <span className="wscore"> ({row.description.replace(/^Score:\s*/i, "")})</span> : null}
                               </div>
                               <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
                             </div>
@@ -419,6 +423,7 @@ export default function PublicEventDetailPage() {
         .wamount { font-weight: 700; color: #0f172a; text-align: right; }
         .wplace { font-weight: 700; color: #1f2937; }
         .wdesc { color: #64748b; font-weight: 500; }
+        .wscore { color: #6b7280; font-weight: 500; }
         .empty { color: #9ca3af; font-size: 12px; padding: 8px 10px; }
         .emptyRow { color: #9ca3af; font-size: 11px; padding: 7px 10px; border-bottom: 1px solid #edf2f7; }
         .files { margin-top: 14px; display: grid; gap: 8px; }

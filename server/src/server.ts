@@ -179,7 +179,12 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         f.flightname AS flight_name,
         w.place,
         w.description,
-        w.payout_type
+        w.payout_type,
+        CASE
+          WHEN w.payout_type = 'GROSS' THEN spg.score
+          WHEN w.payout_type = 'NET'   THEN spn.score
+          ELSE NULL
+        END AS score
       FROM (
         SELECT
           ml.moneylist_id,
@@ -188,7 +193,8 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           ml.flight_id,
           ml.place,
           ml.description,
-          ml.payout_type
+          ml.payout_type,
+          ml.subevent_id
         FROM eventMoneyList ml
         LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
         WHERE (ml.event_id = ? OR se.event_id = ?)
@@ -203,13 +209,24 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           NULL AS flight_id,
           NULL AS place,
           op.description,
-          'OTHER' AS payout_type
+          'OTHER' AS payout_type,
+          NULL AS subevent_id
         FROM eventOtherPay op
         WHERE op.event_id = ?
           AND op.amount <> 0
       ) w
       JOIN memberMain m ON m.member_id = w.member_id
       LEFT JOIN rosterFlight f ON f.flight_id = w.flight_id
+      LEFT JOIN subEventPayGross spg ON w.payout_type = 'GROSS'
+        AND spg.subevent_id = w.subevent_id
+        AND spg.member_id = w.member_id
+        AND COALESCE(spg.flight_id, 0) = COALESCE(w.flight_id, 0)
+        AND ROUND(spg.amount, 2) = ROUND(w.amount, 2)
+      LEFT JOIN subEventPayNet spn ON w.payout_type = 'NET'
+        AND spn.subevent_id = w.subevent_id
+        AND spn.member_id = w.member_id
+        AND COALESCE(spn.flight_id, 0) = COALESCE(w.flight_id, 0)
+        AND ROUND(spn.amount, 2) = ROUND(w.amount, 2)
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
