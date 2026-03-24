@@ -233,6 +233,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         AND es.member_id = w.member_id
         AND COALESCE(es.flight_id, 0) = COALESCE(w.flight_id, 0)
         AND ROUND(es.amount, 2) = ROUND(w.amount, 2)
+        AND es.hole = CAST(REGEXP_SUBSTR(w.description, '[0-9]+') AS UNSIGNED)
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
