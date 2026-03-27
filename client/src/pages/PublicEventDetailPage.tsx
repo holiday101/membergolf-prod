@@ -141,6 +141,7 @@ export default function PublicEventDetailPage() {
   const [allScores, setAllScores] = useState<ScoreCard[] | null>(null);
   const [scoresLoading, setScoresLoading] = useState(false);
   const [expandedMember, setExpandedMember] = useState<number | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -171,11 +172,17 @@ export default function PublicEventDetailPage() {
     || (event?.ninename || "").toLowerCase().includes("back");
 
   // Fetch all scores on first click, then cache
-  const handlePlayerClick = useCallback(async (memberId: number) => {
+  const handlePlayerClick = useCallback(async (memberId: number, e: React.MouseEvent) => {
     if (expandedMember === memberId) {
       setExpandedMember(null);
+      setPopoverAnchor(null);
       return;
     }
+    // Position popover below the clicked name
+    const el = e.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    setPopoverAnchor({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: Math.max(rect.width, 420) });
+
     if (!allScores && !scoresLoading) {
       setScoresLoading(true);
       try {
@@ -276,58 +283,23 @@ export default function PublicEventDetailPage() {
     return { flights: result, otherGroups };
   }, [winnings]);
 
-  const renderScoreCard = (memberId: number) => {
-    if (expandedMember !== memberId) return null;
-    if (scoresLoading) return <div className="scoreCardRow"><div className="muted">Loading scorecard…</div></div>;
-    if (!allScores) return null;
-    const card = allScores.find((s) => s.member_id === memberId);
-    if (!card) return <div className="scoreCardRow"><div className="muted">No scorecard available</div></div>;
+  // Build modal content
+  const modalCard = useMemo(() => {
+    if (expandedMember === null || !allScores) return null;
+    return allScores.find((s) => s.member_id === expandedMember) ?? null;
+  }, [expandedMember, allScores]);
 
-    const numholes = card.numholes ?? 9;
-    const startinghole = card.startinghole ?? 1;
-    const holeCount = numholes === 18 ? 18 : 9;
-    const holes: number[] = [];
-    for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
-
-    const scores: (number | null)[] = [];
-    const pars: (number | null)[] = [];
-    for (let i = 0; i < holeCount; i++) {
-      // Scores are stored in hole1-hole9 (or hole1-hole18) regardless of starting hole
-      scores.push(card[`hole${i + 1}`] ?? null);
-      pars.push(card[`par${startinghole + i}`] ?? null);
-    }
-
-    return (
-      <div className="scoreCardRow">
-        <div className="scoreCardInner">
-          <div className="scoreHoleNums" style={{ gridTemplateColumns: `repeat(${holeCount}, minmax(14px, 1fr))` }}>
-            {holes.map((h) => <div key={h} className="holeNum">{h}</div>)}
-          </div>
-          <div className="scoreHoleCells" style={{ gridTemplateColumns: `repeat(${holeCount}, minmax(14px, 1fr))` }}>
-            {scores.map((score, idx) => {
-              const meta = getScoreMeta(score, pars[idx]);
-              return (
-                <div key={idx} className={meta.className} style={meta.style}>
-                  {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
-                  <span className="holeValue">{score ?? "—"}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="scoreTotals">
-            <span><strong>{card.gross ?? "—"}</strong> Gross</span>
-            <span><strong>{card.net ?? "—"}</strong> Net</span>
-            <span><strong>{card.adjustedscore ?? "—"}</strong> Adj</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const modalName = useMemo(() => {
+    if (expandedMember === null) return "";
+    const row = winnings.find((w) => w.member_id === expandedMember);
+    if (!row) return "";
+    return `${(row.firstname || "").trim()} ${(row.lastname || "").trim()}`;
+  }, [expandedMember, winnings]);
 
   const renderClickableName = (row: WinningsRow, content: React.ReactNode) => (
     <div
-      className={`wname clickable${expandedMember === row.member_id ? " expanded" : ""}`}
-      onClick={() => handlePlayerClick(row.member_id)}
+      className="wname clickable"
+      onClick={(e) => handlePlayerClick(row.member_id, e)}
     >
       {content}
     </div>
@@ -339,32 +311,26 @@ export default function PublicEventDetailPage() {
     const hole = row.place ?? (holeMatch ? Number(mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent).replace(/^Hole\s+/i, "")) : null);
     const isScoreDesc = /^Score:\s*/i.test(desc);
     return (
-      <div key={row.moneylist_id} className="winningsRowWrap">
-        <div className="winningsRow">
-          {renderClickableName(row, <>
-            {hole ? <span className="wplace">#{hole} </span> : null}
-            {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-            {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
-            {!row.score && isScoreDesc ? <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span> : null}
-          </>)}
-          <div className="wamount">{formatCurrency(row.amount)}</div>
-        </div>
-        {renderScoreCard(row.member_id)}
+      <div key={row.moneylist_id} className="winningsRow">
+        {renderClickableName(row, <>
+          {hole ? <span className="wplace">#{hole} </span> : null}
+          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+          {!row.score && isScoreDesc ? <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span> : null}
+        </>)}
+        <div className="wamount">{formatCurrency(row.amount)}</div>
       </div>
     );
   };
 
   const renderStrokeRow = (row: WinningsRow) => (
-    <div key={row.moneylist_id} className="winningsRowWrap">
-      <div className="winningsRow">
-        {renderClickableName(row, <>
-          {row.place ? <span className="wplace">#{row.place} </span> : null}
-          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
-        </>)}
-        <div className="wamount">{formatCurrency(row.amount)}</div>
-      </div>
-      {renderScoreCard(row.member_id)}
+    <div key={row.moneylist_id} className="winningsRow">
+      {renderClickableName(row, <>
+        {row.place ? <span className="wplace">#{row.place} </span> : null}
+        {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+        {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+      </>)}
+      <div className="wamount">{formatCurrency(row.amount)}</div>
     </div>
   );
 
@@ -466,13 +432,11 @@ export default function PublicEventDetailPage() {
                     <div className="typeTitle">{og.label}</div>
                     <div className="typeRows">
                       {og.rows.map((row) => (
-                        <div key={row.moneylist_id} className="winningsRowWrap">
-                          <div className="winningsRow">
-                            <div className="wname">
-                              {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                            </div>
-                            <div className="wamount">{formatCurrency(row.amount)}</div>
+                        <div key={row.moneylist_id} className="winningsRow">
+                          <div className="wname">
+                            {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
                           </div>
+                          <div className="wamount">{formatCurrency(row.amount)}</div>
                         </div>
                       ))}
                     </div>
@@ -506,6 +470,68 @@ export default function PublicEventDetailPage() {
               </div>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Scorecard Popover */}
+      {expandedMember !== null ? (
+        <div className="modalOverlay" onClick={() => { setExpandedMember(null); setPopoverAnchor(null); }}>
+          <div
+            className="popoverContent"
+            style={popoverAnchor ? { position: "absolute", top: popoverAnchor.top, left: popoverAnchor.left, minWidth: Math.min(popoverAnchor.width, 520) } : {}}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modalHeader">
+              <div className="modalTitle">{modalName}</div>
+              <button className="modalClose" onClick={() => { setExpandedMember(null); setPopoverAnchor(null); }}>✕</button>
+            </div>
+            {scoresLoading ? (
+              <div className="muted" style={{ padding: 16 }}>Loading scorecard…</div>
+            ) : !modalCard ? (
+              <div className="muted" style={{ padding: 16 }}>No scorecard available</div>
+            ) : (() => {
+              const numholes = modalCard.numholes ?? 9;
+              const startinghole = modalCard.startinghole ?? 1;
+              const holeCount = numholes === 18 ? 18 : 9;
+              const holes: number[] = [];
+              for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
+              const scores: (number | null)[] = [];
+              const pars: (number | null)[] = [];
+              for (let i = 0; i < holeCount; i++) {
+                scores.push(modalCard[`hole${i + 1}`] ?? null);
+                pars.push(modalCard[`par${startinghole + i}`] ?? null);
+              }
+              return (
+                <div className="modalBody">
+                  <div className="modalScoreGrid" style={{ gridTemplateColumns: `repeat(${holeCount}, 1fr) auto auto auto` }}>
+                    {/* Header row */}
+                    {holes.map((h) => <div key={`h${h}`} className="holeNum">{h}</div>)}
+                    <div className="holeNum">Gross</div>
+                    <div className="holeNum">Net</div>
+                    <div className="holeNum">Adj</div>
+                    {/* Par row */}
+                    {pars.map((p, i) => <div key={`p${i}`} className="parCell">{p ?? ""}</div>)}
+                    <div className="parCell"></div>
+                    <div className="parCell"></div>
+                    <div className="parCell"></div>
+                    {/* Score row */}
+                    {scores.map((score, idx) => {
+                      const meta = getScoreMeta(score, pars[idx]);
+                      return (
+                        <div key={idx} className={meta.className} style={meta.style}>
+                          {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
+                          <span className="holeValue">{score ?? "—"}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="totalCell">{modalCard.gross ?? "—"}</div>
+                    <div className="totalCell">{modalCard.net ?? "—"}</div>
+                    <div className="totalCell">{modalCard.adjustedscore ?? "—"}</div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
         </div>
       ) : null}
 
@@ -600,8 +626,6 @@ export default function PublicEventDetailPage() {
           border-bottom: 1px solid #edf2f7;
         }
         .typeRows { display: grid; }
-        .winningsRowWrap { border-bottom: 1px solid #edf2f7; }
-        .winningsRowWrap:last-child { border-bottom: 0; }
         .winningsRow {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -612,54 +636,87 @@ export default function PublicEventDetailPage() {
           font-size: 13px;
         }
         .wname { font-weight: 600; }
-        .wname.clickable { cursor: pointer; }
-        .wname.clickable:hover { color: #2563eb; }
-        .wname.expanded { color: #2563eb; }
+        .wname.clickable { cursor: pointer; text-decoration: underline; text-decoration-color: transparent; transition: all 0.15s; }
+        .wname.clickable:hover { color: #2563eb; text-decoration-color: #2563eb; }
         .wamount { font-weight: 700; color: #0f172a; text-align: right; }
         .wplace { font-weight: 700; color: #1f2937; }
         .wdesc { color: #64748b; font-weight: 500; }
         .wscore { color: #6b7280; font-weight: 500; }
         .emptyRow { color: #9ca3af; font-size: 12px; padding: 8px 12px; border-bottom: 1px solid #edf2f7; }
 
-        /* Inline scorecard */
-        .scoreCardRow {
-          padding: 6px 12px 8px;
+        /* Scorecard Popover */
+        .modalOverlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.15);
+          z-index: 1000;
+        }
+        .popoverContent {
+          background: #fff;
+          border-radius: 10px;
+          box-shadow: 0 8px 30px rgba(0,0,0,0.2), 0 2px 8px rgba(0,0,0,0.1);
+          max-width: 560px;
+          min-width: 360px;
+          overflow: hidden;
+          z-index: 1001;
+        }
+        .modalHeader {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 14px 18px;
+          border-bottom: 1px solid #e5e7eb;
           background: #f9fafb;
         }
-        .scoreCardInner {
+        .modalTitle {
+          font-size: 18px;
+          font-weight: 800;
+          color: #0f172a;
+        }
+        .modalClose {
+          background: none;
+          border: none;
+          font-size: 18px;
+          color: #9ca3af;
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          line-height: 1;
+        }
+        .modalClose:hover { background: #f3f4f6; color: #374151; }
+        .modalBody { padding: 18px; }
+        .modalScoreGrid {
           display: grid;
           gap: 4px;
-        }
-        .scoreHoleNums {
-          display: grid;
-          gap: 3px;
-          justify-items: center;
+          align-items: center;
         }
         .holeNum {
           text-align: center;
-          font-size: 9px;
+          font-size: 10px;
           color: #9ca3af;
           font-weight: 600;
         }
-        .scoreHoleCells {
-          display: grid;
-          gap: 3px;
+        .parCell {
+          text-align: center;
+          font-size: 9px;
+          color: #b0b8c4;
+          font-weight: 500;
         }
         .holeCell {
           background: #ffffff;
           border: 1px solid #e5e7eb;
-          padding: 3px 0;
+          padding: 5px 0;
           text-align: center;
-          font-size: 10px;
-          font-weight: 600;
+          font-size: 12px;
+          font-weight: 700;
           color: #374151;
           display: flex;
           align-items: center;
           justify-content: center;
           position: relative;
           overflow: hidden;
-          border-radius: 2px;
-          min-height: 22px;
+          border-radius: 3px;
+          min-height: 28px;
         }
         .holeCell.neutral { background: #ffffff; }
         .holeCell.birdie { background: #fee2e2; color: #991b1b; }
@@ -672,22 +729,16 @@ export default function PublicEventDetailPage() {
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 12px;
+          font-size: 14px;
           opacity: 0.25;
           z-index: 0;
         }
         .holeValue { position: relative; z-index: 1; }
-        .scoreTotals {
-          display: flex;
-          gap: 14px;
-          font-size: 11px;
-          color: #6b7280;
-          padding-top: 2px;
-        }
-        .scoreTotals strong {
+        .totalCell {
+          text-align: center;
+          font-size: 13px;
+          font-weight: 800;
           color: #0f172a;
-          font-weight: 700;
-          margin-right: 3px;
         }
 
         .files { margin-top: 14px; display: grid; gap: 8px; }
@@ -749,7 +800,7 @@ export default function PublicEventDetailPage() {
           .typeTitle { font-size: 10px; padding: 5px 8px; }
           .subTypeTitle { font-size: 9px; padding: 4px 8px 2px; }
           .title { font-size: 20px; }
-          .scoreCardRow { display: none !important; }
+          .modalOverlay { display: none !important; }
         }
       `}</style>
     </div>
