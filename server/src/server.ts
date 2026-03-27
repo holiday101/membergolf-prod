@@ -185,7 +185,13 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           WHEN w.payout_type = 'NET'   THEN spn.score
           WHEN w.payout_type IN ('SKINS','SKIN','POWER_SKIN') THEN es.score
           ELSE NULL
-        END AS score
+        END AS score,
+        CASE
+          WHEN w.payout_type = 'GROSS' THEN spg.card_id
+          WHEN w.payout_type = 'NET'   THEN spn.card_id
+          WHEN w.payout_type IN ('SKINS','SKIN','POWER_SKIN') THEN es.card_id
+          ELSE NULL
+        END AS card_id
       FROM (
         SELECT
           ml.moneylist_id,

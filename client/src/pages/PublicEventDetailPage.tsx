@@ -25,6 +25,7 @@ type WinningsRow = {
   description: string | null;
   payout_type: string | null;
   score: number | null;
+  card_id: number | null;
 };
 
 type EventFile = {
@@ -140,7 +141,8 @@ export default function PublicEventDetailPage() {
   // Scorecard expansion
   const [allScores, setAllScores] = useState<ScoreCard[] | null>(null);
   const [scoresLoading, setScoresLoading] = useState(false);
-  const [expandedMember, setExpandedMember] = useState<number | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<number | null>(null);
+  const [expandedName, setExpandedName] = useState<string>("");
   const [popoverAnchor, setPopoverAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
@@ -172,16 +174,18 @@ export default function PublicEventDetailPage() {
     || (event?.ninename || "").toLowerCase().includes("back");
 
   // Fetch all scores on first click, then cache
-  const handlePlayerClick = useCallback(async (memberId: number, e: React.MouseEvent) => {
-    if (expandedMember === memberId) {
-      setExpandedMember(null);
+  const handlePlayerClick = useCallback(async (row: WinningsRow, e: React.MouseEvent) => {
+    const cardId = row.card_id;
+    if (!cardId) return;
+    if (expandedCardId === cardId) {
+      setExpandedCardId(null);
       setPopoverAnchor(null);
       return;
     }
-    // Position popover below the clicked name
     const el = e.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
     setPopoverAnchor({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: Math.max(rect.width, 420) });
+    setExpandedName(`${(row.firstname || "").trim()} ${(row.lastname || "").trim()}`);
 
     if (!allScores && !scoresLoading) {
       setScoresLoading(true);
@@ -194,8 +198,8 @@ export default function PublicEventDetailPage() {
         setScoresLoading(false);
       }
     }
-    setExpandedMember(memberId);
-  }, [expandedMember, allScores, scoresLoading, courseId, eventId]);
+    setExpandedCardId(cardId);
+  }, [expandedCardId, allScores, scoresLoading, courseId, eventId]);
 
   // Group all winnings by flight, then by payout type within each flight
   const flightGroups = useMemo(() => {
@@ -283,23 +287,16 @@ export default function PublicEventDetailPage() {
     return { flights: result, otherGroups };
   }, [winnings]);
 
-  // Build modal content - find ALL cards for this member
-  const modalCards = useMemo(() => {
-    if (expandedMember === null || !allScores) return [];
-    return allScores.filter((s) => s.member_id === expandedMember);
-  }, [expandedMember, allScores]);
-
-  const modalName = useMemo(() => {
-    if (expandedMember === null) return "";
-    const row = winnings.find((w) => w.member_id === expandedMember);
-    if (!row) return "";
-    return `${(row.firstname || "").trim()} ${(row.lastname || "").trim()}`;
-  }, [expandedMember, winnings]);
+  // Find the specific card by card_id
+  const modalCard = useMemo(() => {
+    if (expandedCardId === null || !allScores) return null;
+    return allScores.find((s) => s.card_id === expandedCardId) ?? null;
+  }, [expandedCardId, allScores]);
 
   const renderClickableName = (row: WinningsRow, content: React.ReactNode) => (
     <div
-      className="wname clickable"
-      onClick={(e) => handlePlayerClick(row.member_id, e)}
+      className={`wname${row.card_id ? " clickable" : ""}`}
+      onClick={row.card_id ? (e) => handlePlayerClick(row, e) : undefined}
     >
       {content}
     </div>
@@ -474,65 +471,60 @@ export default function PublicEventDetailPage() {
       ) : null}
 
       {/* Scorecard Popover */}
-      {expandedMember !== null ? (
-        <div className="modalOverlay" onClick={() => { setExpandedMember(null); setPopoverAnchor(null); }}>
+      {expandedCardId !== null ? (
+        <div className="modalOverlay" onClick={() => { setExpandedCardId(null); setPopoverAnchor(null); }}>
           <div
             className="popoverContent"
             style={popoverAnchor ? { position: "absolute", top: popoverAnchor.top, left: popoverAnchor.left, minWidth: Math.min(popoverAnchor.width, 520) } : {}}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modalHeader">
-              <div className="modalTitle">{modalName}</div>
-              <button className="modalClose" onClick={() => { setExpandedMember(null); setPopoverAnchor(null); }}>✕</button>
+              <div className="modalTitle">{expandedName}</div>
+              <button className="modalClose" onClick={() => { setExpandedCardId(null); setPopoverAnchor(null); }}>✕</button>
             </div>
             {scoresLoading ? (
               <div className="muted" style={{ padding: 16 }}>Loading scorecard…</div>
-            ) : modalCards.length === 0 ? (
+            ) : !modalCard ? (
               <div className="muted" style={{ padding: 16 }}>No scorecard available</div>
-            ) : (
-              <div className="modalBody">
-                {modalCards.map((card, cardIdx) => {
-                  const numholes = card.numholes ?? 9;
-                  const startinghole = card.startinghole ?? 1;
-                  const holeCount = numholes === 18 ? 18 : 9;
-                  const holes: number[] = [];
-                  for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
-                  const scores: (number | null)[] = [];
-                  const pars: (number | null)[] = [];
-                  for (let i = 0; i < holeCount; i++) {
-                    scores.push(card[`hole${i + 1}`] ?? null);
-                    pars.push(card[`par${startinghole + i}`] ?? null);
-                  }
-                  return (
-                    <div key={card.card_id} className={`modalCardBlock${cardIdx > 0 ? " modalCardDivider" : ""}`}>
-                      {modalCards.length > 1 ? <div className="modalRoundLabel">Round {cardIdx + 1}</div> : null}
-                      <div className="modalScoreGrid" style={{ gridTemplateColumns: `repeat(${holeCount}, 1fr) auto auto auto` }}>
-                        {holes.map((h) => <div key={`h${h}`} className="holeNum">{h}</div>)}
-                        <div className="holeNum">Gross</div>
-                        <div className="holeNum">Net</div>
-                        <div className="holeNum">Adj</div>
-                        {pars.map((p, i) => <div key={`p${i}`} className="parCell">{p ?? ""}</div>)}
-                        <div className="parCell"></div>
-                        <div className="parCell"></div>
-                        <div className="parCell"></div>
-                        {scores.map((score, idx) => {
-                          const meta = getScoreMeta(score, pars[idx]);
-                          return (
-                            <div key={idx} className={meta.className} style={meta.style}>
-                              {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
-                              <span className="holeValue">{score ?? "—"}</span>
-                            </div>
-                          );
-                        })}
-                        <div className="totalCell">{card.gross ?? "—"}</div>
-                        <div className="totalCell">{card.net ?? "—"}</div>
-                        <div className="totalCell">{card.adjustedscore ?? "—"}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            ) : (() => {
+              const numholes = modalCard.numholes ?? 9;
+              const startinghole = modalCard.startinghole ?? 1;
+              const holeCount = numholes === 18 ? 18 : 9;
+              const holes: number[] = [];
+              for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
+              const scores: (number | null)[] = [];
+              const pars: (number | null)[] = [];
+              for (let i = 0; i < holeCount; i++) {
+                scores.push(modalCard[`hole${i + 1}`] ?? null);
+                pars.push(modalCard[`par${startinghole + i}`] ?? null);
+              }
+              return (
+                <div className="modalBody">
+                  <div className="modalScoreGrid" style={{ gridTemplateColumns: `repeat(${holeCount}, 1fr) auto auto auto` }}>
+                    {holes.map((h) => <div key={`h${h}`} className="holeNum">{h}</div>)}
+                    <div className="holeNum">Gross</div>
+                    <div className="holeNum">Net</div>
+                    <div className="holeNum">Adj</div>
+                    {pars.map((p, i) => <div key={`p${i}`} className="parCell">{p ?? ""}</div>)}
+                    <div className="parCell"></div>
+                    <div className="parCell"></div>
+                    <div className="parCell"></div>
+                    {scores.map((score, idx) => {
+                      const meta = getScoreMeta(score, pars[idx]);
+                      return (
+                        <div key={idx} className={meta.className} style={meta.style}>
+                          {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
+                          <span className="holeValue">{score ?? "—"}</span>
+                        </div>
+                      );
+                    })}
+                    <div className="totalCell">{modalCard.gross ?? "—"}</div>
+                    <div className="totalCell">{modalCard.net ?? "—"}</div>
+                    <div className="totalCell">{modalCard.adjustedscore ?? "—"}</div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       ) : null}
