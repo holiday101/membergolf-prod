@@ -3831,6 +3831,7 @@ app.patch("/subevents/:id/stroke/gross/:grossId", authMiddleware, async (req, re
 
     const schema = z.object({
       amount: z.number().nullable(),
+      place: z.number().int().nullable().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -3851,10 +3852,14 @@ app.patch("/subevents/:id/stroke/gross/:grossId", authMiddleware, async (req, re
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    await pool.execute("UPDATE subEventPayGross SET amount = ? WHERE gross_id = ?", [
-      roundCurrencyAmount(parsed.data.amount),
-      grossId,
-    ]);
+    const sets: string[] = ["amount = ?"];
+    const params: any[] = [roundCurrencyAmount(parsed.data.amount)];
+    if (parsed.data.place !== undefined) {
+      sets.push("place = ?");
+      params.push(parsed.data.place);
+    }
+    params.push(grossId);
+    await pool.execute(`UPDATE subEventPayGross SET ${sets.join(", ")} WHERE gross_id = ?`, params);
     await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
@@ -3877,6 +3882,7 @@ app.patch("/subevents/:id/stroke/net/:netId", authMiddleware, async (req, res) =
 
     const schema = z.object({
       amount: z.number().nullable(),
+      place: z.number().int().nullable().optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -3897,10 +3903,14 @@ app.patch("/subevents/:id/stroke/net/:netId", authMiddleware, async (req, res) =
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    await pool.execute("UPDATE subEventPayNet SET amount = ? WHERE net_id = ?", [
-      roundCurrencyAmount(parsed.data.amount),
-      netId,
-    ]);
+    const sets: string[] = ["amount = ?"];
+    const params: any[] = [roundCurrencyAmount(parsed.data.amount)];
+    if (parsed.data.place !== undefined) {
+      sets.push("place = ?");
+      params.push(parsed.data.place);
+    }
+    params.push(netId);
+    await pool.execute(`UPDATE subEventPayNet SET ${sets.join(", ")} WHERE net_id = ?`, params);
     await syncEventMoneyListForSubevent(subeventId);
     return res.json({ ok: true });
   } catch (err) {
