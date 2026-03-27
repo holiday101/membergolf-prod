@@ -90,6 +90,8 @@ export default function SubEventStrokePage() {
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
   const [grossAmountEdits, setGrossAmountEdits] = useState<Record<number, string>>({});
   const [netAmountEdits, setNetAmountEdits] = useState<Record<number, string>>({});
+  const [grossPlaceEdits, setGrossPlaceEdits] = useState<Record<number, string>>({});
+  const [netPlaceEdits, setNetPlaceEdits] = useState<Record<number, string>>({});
   const [form, setForm] = useState({
     eventtype_id: "",
     eventnumhole_id: "",
@@ -260,16 +262,22 @@ export default function SubEventStrokePage() {
       setPayouts((json.payouts ?? []) as PayoutRow[]);
 
       const grossEdits: Record<number, string> = {};
+      const grossPlaces: Record<number, string> = {};
       for (const row of grossRows) {
         grossEdits[row.gross_id] = formatMoneyInput(row.amount);
+        grossPlaces[row.gross_id] = typeof row.place === "number" && row.place > 0 ? String(row.place) : "";
       }
       setGrossAmountEdits(grossEdits);
+      setGrossPlaceEdits(grossPlaces);
 
       const netEdits: Record<number, string> = {};
+      const netPlaces: Record<number, string> = {};
       for (const row of netRows) {
         netEdits[row.net_id] = formatMoneyInput(row.amount);
+        netPlaces[row.net_id] = typeof row.place === "number" && row.place > 0 ? String(row.place) : "";
       }
       setNetAmountEdits(netEdits);
+      setNetPlaceEdits(netPlaces);
     } catch (e: any) {
       setError(e.message ?? "Failed to load stroke payouts");
       setGross([]);
@@ -277,6 +285,8 @@ export default function SubEventStrokePage() {
       setPayouts([]);
       setGrossAmountEdits({});
       setNetAmountEdits({});
+      setGrossPlaceEdits({});
+      setNetPlaceEdits({});
     } finally {
       setStrokeLoading(false);
     }
@@ -468,12 +478,18 @@ export default function SubEventStrokePage() {
     }
   };
 
-  const saveGrossAmount = async (grossId: number) => {
+  const saveGross = async (grossId: number) => {
     if (!id) return;
-    const raw = (grossAmountEdits[grossId] ?? "").trim();
-    const parsedAmount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(parsedAmount)) {
+    const rawAmount = (grossAmountEdits[grossId] ?? "").trim();
+    const parsedAmount = rawAmount === "" ? null : Number(rawAmount);
+    if (rawAmount !== "" && !Number.isFinite(parsedAmount)) {
       setError("Invalid gross amount");
+      return;
+    }
+    const rawPlace = (grossPlaceEdits[grossId] ?? "").trim();
+    const parsedPlace = rawPlace === "" ? null : Number(rawPlace);
+    if (rawPlace !== "" && (!Number.isFinite(parsedPlace) || !Number.isInteger(parsedPlace) || parsedPlace! < 1)) {
+      setError("Invalid gross place (must be a positive integer)");
       return;
     }
     setStrokeBusy(true);
@@ -481,23 +497,32 @@ export default function SubEventStrokePage() {
     try {
       const res = await apiFetch(`/subevents/${id}/stroke/gross/${grossId}`, {
         method: "PATCH",
-        body: JSON.stringify({ amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)) }),
+        body: JSON.stringify({
+          amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)),
+          place: parsedPlace,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadStroke();
     } catch (e: any) {
-      setError(e.message ?? "Failed to save gross amount");
+      setError(e.message ?? "Failed to save gross");
     } finally {
       setStrokeBusy(false);
     }
   };
 
-  const saveNetAmount = async (netId: number) => {
+  const saveNet = async (netId: number) => {
     if (!id) return;
-    const raw = (netAmountEdits[netId] ?? "").trim();
-    const parsedAmount = raw === "" ? null : Number(raw);
-    if (raw !== "" && !Number.isFinite(parsedAmount)) {
+    const rawAmount = (netAmountEdits[netId] ?? "").trim();
+    const parsedAmount = rawAmount === "" ? null : Number(rawAmount);
+    if (rawAmount !== "" && !Number.isFinite(parsedAmount)) {
       setError("Invalid net amount");
+      return;
+    }
+    const rawPlace = (netPlaceEdits[netId] ?? "").trim();
+    const parsedPlace = rawPlace === "" ? null : Number(rawPlace);
+    if (rawPlace !== "" && (!Number.isFinite(parsedPlace) || !Number.isInteger(parsedPlace) || parsedPlace! < 1)) {
+      setError("Invalid net place (must be a positive integer)");
       return;
     }
     setStrokeBusy(true);
@@ -505,12 +530,15 @@ export default function SubEventStrokePage() {
     try {
       const res = await apiFetch(`/subevents/${id}/stroke/net/${netId}`, {
         method: "PATCH",
-        body: JSON.stringify({ amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)) }),
+        body: JSON.stringify({
+          amount: parsedAmount == null ? null : Number(parsedAmount.toFixed(2)),
+          place: parsedPlace,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadStroke();
     } catch (e: any) {
-      setError(e.message ?? "Failed to save net amount");
+      setError(e.message ?? "Failed to save net");
     } finally {
       setStrokeBusy(false);
     }
@@ -649,7 +677,18 @@ export default function SubEventStrokePage() {
                                 <>
                                   <div className="cellMember">{(pair.gross.lastname || "").trim()}, {(pair.gross.firstname || "").trim()}</div>
                                   <div className="cellValue">{pair.gross.score ?? "—"}</div>
-                                  <div className="cellValue">{pair.gross.place ?? "—"}</div>
+                                  <div className="cellAmount">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      style={{ width: "3.5rem" }}
+                                      value={grossPlaceEdits[pair.gross.gross_id] ?? ""}
+                                      onChange={(e) =>
+                                        setGrossPlaceEdits((prev) => ({ ...prev, [pair.gross!.gross_id]: e.target.value }))
+                                      }
+                                    />
+                                  </div>
                                   <div className="cellAmount">
                                     <input
                                       value={grossAmountEdits[pair.gross.gross_id] ?? ""}
@@ -657,10 +696,10 @@ export default function SubEventStrokePage() {
                                         setGrossAmountEdits((prev) => ({ ...prev, [pair.gross!.gross_id]: e.target.value }))
                                       }
                                     />
-                                    <button className="btn btn-sm" onClick={() => saveGrossAmount(pair.gross!.gross_id)} disabled={strokeBusy}>
+                                    <button className="btn btn-sm" onClick={() => saveGross(pair.gross!.gross_id)} disabled={strokeBusy}>
                                       Save
                                     </button>
-                                    
+
                                   </div>
                                 </>
                               ) : (
@@ -677,7 +716,18 @@ export default function SubEventStrokePage() {
                                 <>
                                   <div className="cellMember">{(pair.net.lastname || "").trim()}, {(pair.net.firstname || "").trim()}</div>
                                   <div className="cellValue">{pair.net.score ?? "—"}</div>
-                                  <div className="cellValue">{pair.net.place ?? "—"}</div>
+                                  <div className="cellAmount">
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      style={{ width: "3.5rem" }}
+                                      value={netPlaceEdits[pair.net.net_id] ?? ""}
+                                      onChange={(e) =>
+                                        setNetPlaceEdits((prev) => ({ ...prev, [pair.net!.net_id]: e.target.value }))
+                                      }
+                                    />
+                                  </div>
                                   <div className="cellAmount">
                                     <input
                                       value={netAmountEdits[pair.net.net_id] ?? ""}
@@ -685,10 +735,10 @@ export default function SubEventStrokePage() {
                                         setNetAmountEdits((prev) => ({ ...prev, [pair.net!.net_id]: e.target.value }))
                                       }
                                     />
-                                    <button className="btn btn-sm" onClick={() => saveNetAmount(pair.net!.net_id)} disabled={strokeBusy}>
+                                    <button className="btn btn-sm" onClick={() => saveNet(pair.net!.net_id)} disabled={strokeBusy}>
                                       Save
                                     </button>
-                                    
+
                                   </div>
                                 </>
                               ) : (
