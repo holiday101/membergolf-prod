@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 
@@ -34,6 +34,19 @@ type EventFile = {
   size_bytes: number | null;
   uploaded_at: string;
   url: string;
+};
+
+type ScoreCard = {
+  card_id: number;
+  member_id: number;
+  firstname: string | null;
+  lastname: string | null;
+  gross: number | null;
+  net: number | null;
+  adjustedscore: number | null;
+  numholes: number | null;
+  startinghole: number | null;
+  [key: string]: any; // hole1-hole18, par1-par18
 };
 
 type FlightGroup = {
@@ -99,6 +112,22 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount ?? 0);
 }
 
+function getScoreMeta(score: number | null | undefined, par: number | null | undefined) {
+  if (typeof score !== "number" || typeof par !== "number" || Number.isNaN(score) || Number.isNaN(par)) {
+    return { className: "holeCell", style: undefined, showEagle: false };
+  }
+  const diff = score - par;
+  if (diff === 0) return { className: "holeCell neutral", style: undefined, showEagle: false };
+  if (diff === -1) return { className: "holeCell birdie", style: undefined, showEagle: false };
+  if (diff <= -2) return { className: "holeCell eagle", style: undefined, showEagle: true };
+  if (diff >= 1) {
+    const bg = diff >= 4 ? "#1d4ed8" : diff === 3 ? "#3b82f6" : diff === 2 ? "#60a5fa" : "#93c5fd";
+    const color = diff >= 3 ? "#eff6ff" : "#0f172a";
+    return { className: "holeCell over", style: { background: bg, color }, showEagle: false };
+  }
+  return { className: "holeCell", style: undefined, showEagle: false };
+}
+
 export default function PublicEventDetailPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
@@ -107,6 +136,11 @@ export default function PublicEventDetailPage() {
   const [scoresCount, setScoresCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+
+  // Scorecard expansion
+  const [allScores, setAllScores] = useState<ScoreCard[] | null>(null);
+  const [scoresLoading, setScoresLoading] = useState(false);
+  const [expandedMember, setExpandedMember] = useState<number | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -136,6 +170,26 @@ export default function PublicEventDetailPage() {
   const isBackNineEvent = (event?.numholes ?? null) === 9 && (event?.startinghole ?? null) === 10
     || (event?.ninename || "").toLowerCase().includes("back");
 
+  // Fetch all scores on first click, then cache
+  const handlePlayerClick = useCallback(async (memberId: number) => {
+    if (expandedMember === memberId) {
+      setExpandedMember(null);
+      return;
+    }
+    if (!allScores && !scoresLoading) {
+      setScoresLoading(true);
+      try {
+        const scores = await publicFetch<ScoreCard[]>(`/public/${courseId}/events/${eventId}/scores`);
+        setAllScores(scores);
+      } catch {
+        setAllScores([]);
+      } finally {
+        setScoresLoading(false);
+      }
+    }
+    setExpandedMember(memberId);
+  }, [expandedMember, allScores, scoresLoading, courseId, eventId]);
+
   // Group all winnings by flight, then by payout type within each flight
   const flightGroups = useMemo(() => {
     const map = new Map<string, FlightGroup>();
@@ -149,7 +203,6 @@ export default function PublicEventDetailPage() {
           ? `Flight ${row.flight_id}`
           : null;
 
-      // OTHER with no flight goes to a separate bucket
       if (!flightLabel && !STROKE_TYPES.has(type) && !SKIN_TYPES.has(type)) {
         noFlightOther.push(row);
         continue;
@@ -189,7 +242,6 @@ export default function PublicEventDetailPage() {
       }
     }
 
-    // Sort within each flight group
     const result = Array.from(map.values()).map((fg) => ({
       ...fg,
       gross: [...fg.gross].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
@@ -209,11 +261,9 @@ export default function PublicEventDetailPage() {
       })),
     }));
 
-    // Build noFlightOther groups
     const otherGroups: { type: string; label: string; rows: WinningsRow[] }[] = [];
     for (const row of noFlightOther) {
       const type = (row.payout_type || "OTHER").toUpperCase();
-      // Group by description for OTHER type
       const groupKey = type === "OTHER" ? (row.description || "Other").trim() : type;
       let og = otherGroups.find((g) => g.type === groupKey);
       if (!og) {
@@ -226,32 +276,95 @@ export default function PublicEventDetailPage() {
     return { flights: result, otherGroups };
   }, [winnings]);
 
+  const renderScoreCard = (memberId: number) => {
+    if (expandedMember !== memberId) return null;
+    if (scoresLoading) return <div className="scoreCardRow"><div className="muted">Loading scorecard…</div></div>;
+    if (!allScores) return null;
+    const card = allScores.find((s) => s.member_id === memberId);
+    if (!card) return <div className="scoreCardRow"><div className="muted">No scorecard available</div></div>;
+
+    const numholes = card.numholes ?? 9;
+    const startinghole = card.startinghole ?? 1;
+    const holeCount = numholes === 18 ? 18 : 9;
+    const holes: number[] = [];
+    for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
+
+    const scores: (number | null)[] = [];
+    const pars: (number | null)[] = [];
+    for (let i = 0; i < holeCount; i++) {
+      // Scores are stored in hole1-hole9 (or hole1-hole18) regardless of starting hole
+      scores.push(card[`hole${i + 1}`] ?? null);
+      pars.push(card[`par${startinghole + i}`] ?? null);
+    }
+
+    return (
+      <div className="scoreCardRow">
+        <div className="scoreCardInner">
+          <div className="scoreHoleNums" style={{ gridTemplateColumns: `repeat(${holeCount}, minmax(14px, 1fr))` }}>
+            {holes.map((h) => <div key={h} className="holeNum">{h}</div>)}
+          </div>
+          <div className="scoreHoleCells" style={{ gridTemplateColumns: `repeat(${holeCount}, minmax(14px, 1fr))` }}>
+            {scores.map((score, idx) => {
+              const meta = getScoreMeta(score, pars[idx]);
+              return (
+                <div key={idx} className={meta.className} style={meta.style}>
+                  {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
+                  <span className="holeValue">{score ?? "—"}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="scoreTotals">
+            <span><strong>{card.gross ?? "—"}</strong> Gross</span>
+            <span><strong>{card.net ?? "—"}</strong> Net</span>
+            <span><strong>{card.adjustedscore ?? "—"}</strong> Adj</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderClickableName = (row: WinningsRow, content: React.ReactNode) => (
+    <div
+      className={`wname clickable${expandedMember === row.member_id ? " expanded" : ""}`}
+      onClick={() => handlePlayerClick(row.member_id)}
+    >
+      {content}
+    </div>
+  );
+
   const renderSkinRow = (row: WinningsRow) => {
     const desc = (row.description || "").trim();
     const holeMatch = desc.match(/^Hole\s+(\d+)/i);
     const hole = row.place ?? (holeMatch ? Number(mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent).replace(/^Hole\s+/i, "")) : null);
     const isScoreDesc = /^Score:\s*/i.test(desc);
     return (
-      <div key={row.moneylist_id} className="winningsRow">
-        <div className="wname">
-          {hole ? <span className="wplace">#{hole} </span> : null}
-          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
-          {!row.score && isScoreDesc ? <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span> : null}
+      <div key={row.moneylist_id} className="winningsRowWrap">
+        <div className="winningsRow">
+          {renderClickableName(row, <>
+            {hole ? <span className="wplace">#{hole} </span> : null}
+            {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+            {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+            {!row.score && isScoreDesc ? <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span> : null}
+          </>)}
+          <div className="wamount">{formatCurrency(row.amount)}</div>
         </div>
-        <div className="wamount">{formatCurrency(row.amount)}</div>
+        {renderScoreCard(row.member_id)}
       </div>
     );
   };
 
   const renderStrokeRow = (row: WinningsRow) => (
-    <div key={row.moneylist_id} className="winningsRow">
-      <div className="wname">
-        {row.place ? <span className="wplace">#{row.place} </span> : null}
-        {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-        {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+    <div key={row.moneylist_id} className="winningsRowWrap">
+      <div className="winningsRow">
+        {renderClickableName(row, <>
+          {row.place ? <span className="wplace">#{row.place} </span> : null}
+          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+        </>)}
+        <div className="wamount">{formatCurrency(row.amount)}</div>
       </div>
-      <div className="wamount">{formatCurrency(row.amount)}</div>
+      {renderScoreCard(row.member_id)}
     </div>
   );
 
@@ -298,7 +411,6 @@ export default function PublicEventDetailPage() {
               <div key={flight.flightKey} className="flightSection">
                 <div className="flightHeader">{flight.flightLabel}</div>
                 <div className="subEventCards">
-                  {/* Stroke Play */}
                   {hasStroke ? (
                     <div className="typeCard">
                       <div className="typeTitle">Stroke Play</div>
@@ -323,7 +435,6 @@ export default function PublicEventDetailPage() {
                     </div>
                   ) : null}
 
-                  {/* Skins / Power Skins */}
                   {flight.skinGroups.map((sg) => (
                     <div key={sg.type} className="typeCard">
                       <div className="typeTitle">{sg.label}</div>
@@ -333,7 +444,6 @@ export default function PublicEventDetailPage() {
                     </div>
                   ))}
 
-                  {/* Other sub-event types within this flight */}
                   {flight.other.map((og) => (
                     <div key={og.type} className="typeCard">
                       <div className="typeTitle">{og.label}</div>
@@ -347,7 +457,6 @@ export default function PublicEventDetailPage() {
             );
           })}
 
-          {/* Other payouts without flight */}
           {flightGroups.otherGroups.length > 0 ? (
             <div className="flightSection">
               <div className="flightHeader">Other</div>
@@ -357,11 +466,13 @@ export default function PublicEventDetailPage() {
                     <div className="typeTitle">{og.label}</div>
                     <div className="typeRows">
                       {og.rows.map((row) => (
-                        <div key={row.moneylist_id} className="winningsRow">
-                          <div className="wname">
-                            {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                        <div key={row.moneylist_id} className="winningsRowWrap">
+                          <div className="winningsRow">
+                            <div className="wname">
+                              {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                            </div>
+                            <div className="wamount">{formatCurrency(row.amount)}</div>
                           </div>
-                          <div className="wamount">{formatCurrency(row.amount)}</div>
                         </div>
                       ))}
                     </div>
@@ -489,6 +600,8 @@ export default function PublicEventDetailPage() {
           border-bottom: 1px solid #edf2f7;
         }
         .typeRows { display: grid; }
+        .winningsRowWrap { border-bottom: 1px solid #edf2f7; }
+        .winningsRowWrap:last-child { border-bottom: 0; }
         .winningsRow {
           display: grid;
           grid-template-columns: 1fr auto;
@@ -497,16 +610,85 @@ export default function PublicEventDetailPage() {
           padding: 6px 12px;
           color: #374151;
           font-size: 13px;
-          border-bottom: 1px solid #edf2f7;
         }
-        .typeRows .winningsRow:last-child,
-        .typeBlock .winningsRow:last-child { border-bottom: 0; }
         .wname { font-weight: 600; }
+        .wname.clickable { cursor: pointer; }
+        .wname.clickable:hover { color: #2563eb; }
+        .wname.expanded { color: #2563eb; }
         .wamount { font-weight: 700; color: #0f172a; text-align: right; }
         .wplace { font-weight: 700; color: #1f2937; }
         .wdesc { color: #64748b; font-weight: 500; }
         .wscore { color: #6b7280; font-weight: 500; }
         .emptyRow { color: #9ca3af; font-size: 12px; padding: 8px 12px; border-bottom: 1px solid #edf2f7; }
+
+        /* Inline scorecard */
+        .scoreCardRow {
+          padding: 6px 12px 8px;
+          background: #f9fafb;
+        }
+        .scoreCardInner {
+          display: grid;
+          gap: 4px;
+        }
+        .scoreHoleNums {
+          display: grid;
+          gap: 3px;
+          justify-items: center;
+        }
+        .holeNum {
+          text-align: center;
+          font-size: 9px;
+          color: #9ca3af;
+          font-weight: 600;
+        }
+        .scoreHoleCells {
+          display: grid;
+          gap: 3px;
+        }
+        .holeCell {
+          background: #ffffff;
+          border: 1px solid #e5e7eb;
+          padding: 3px 0;
+          text-align: center;
+          font-size: 10px;
+          font-weight: 600;
+          color: #374151;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          overflow: hidden;
+          border-radius: 2px;
+          min-height: 22px;
+        }
+        .holeCell.neutral { background: #ffffff; }
+        .holeCell.birdie { background: #fee2e2; color: #991b1b; }
+        .holeCell.eagle { background: #ffffff; color: #991b1b; }
+        .holeCell.over { border-color: #bfdbfe; }
+        .eagleIcon {
+          color: #f97316;
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          opacity: 0.25;
+          z-index: 0;
+        }
+        .holeValue { position: relative; z-index: 1; }
+        .scoreTotals {
+          display: flex;
+          gap: 14px;
+          font-size: 11px;
+          color: #6b7280;
+          padding-top: 2px;
+        }
+        .scoreTotals strong {
+          color: #0f172a;
+          font-weight: 700;
+          margin-right: 3px;
+        }
 
         .files { margin-top: 14px; display: grid; gap: 8px; }
         .fileList { display: grid; gap: 6px; }
@@ -545,7 +727,6 @@ export default function PublicEventDetailPage() {
         }
 
         @media print {
-          /* Hide everything outside the card */
           body * { visibility: hidden; }
           .card, .card * { visibility: visible; }
           .card {
@@ -568,6 +749,7 @@ export default function PublicEventDetailPage() {
           .typeTitle { font-size: 10px; padding: 5px 8px; }
           .subTypeTitle { font-size: 9px; padding: 4px 8px 2px; }
           .title { font-size: 20px; }
+          .scoreCardRow { display: none !important; }
         }
       `}</style>
     </div>
