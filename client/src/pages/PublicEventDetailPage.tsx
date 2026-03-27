@@ -273,11 +273,16 @@ export default function PublicEventDetailPage() {
                 {new Date(event.start_dt).toLocaleDateString()} - {new Date(event.end_dt).toLocaleDateString()}
               </div>
             </div>
-            {scoresCount > 0 ? (
-              <Link className="scoresBtn" to={`/public/${courseId}/events/${eventId}/scores`}>
-                View Scores
-              </Link>
-            ) : null}
+            <div className="headBtns">
+              {scoresCount > 0 ? (
+                <Link className="scoresBtn" to={`/public/${courseId}/events/${eventId}/scores`}>
+                  View Scores
+                </Link>
+              ) : null}
+              <button className="printBtn" onClick={() => window.print()}>
+                Print
+              </button>
+            </div>
           </div>
 
           {cleanText(event.eventdescription) ? <div className="desc">{cleanText(event.eventdescription)}</div> : null}
@@ -412,6 +417,7 @@ export default function PublicEventDetailPage() {
         .eventHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .title { font-size: 24px; font-weight: 800; color: #111827; line-height: 1.2; }
         .meta { font-size: 13px; color: #6b7280; margin-top: 3px; }
+        .headBtns { display: flex; gap: 8px; align-items: flex-start; }
         .scoresBtn {
           text-decoration: none;
           background: #0f172a;
@@ -424,6 +430,20 @@ export default function PublicEventDetailPage() {
           align-items: center;
           white-space: nowrap;
         }
+        .printBtn {
+          background: #f3f4f6;
+          color: #0f172a;
+          border: 1px solid #e5e7eb;
+          padding: 8px 14px;
+          border-radius: 999px;
+          font-weight: 700;
+          font-size: 12px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          white-space: nowrap;
+        }
+        .printBtn:hover { background: #e5e7eb; }
         .desc { font-size: 13px; color: #374151; margin-top: 8px; }
 
         /* Flight sections */
@@ -522,6 +542,32 @@ export default function PublicEventDetailPage() {
         }
         @media (max-width: 560px) {
           .eventHead { flex-direction: column; align-items: flex-start; }
+        }
+
+        @media print {
+          /* Hide everything outside the card */
+          body * { visibility: hidden; }
+          .card, .card * { visibility: visible; }
+          .card {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none;
+            padding: 0;
+            margin: 0;
+          }
+          .headBtns { display: none !important; }
+          .backLink { display: none !important; }
+          .page { padding: 0; margin: 0; }
+          .flightSection { break-inside: avoid; }
+          .typeCard { break-inside: avoid; }
+          .subEventCards { grid-template-columns: 1fr 1fr 1fr; }
+          .winningsRow { padding: 3px 8px; font-size: 11px; }
+          .flightHeader { font-size: 14px; margin-bottom: 8px; }
+          .typeTitle { font-size: 10px; padding: 5px 8px; }
+          .subTypeTitle { font-size: 9px; padding: 4px 8px 2px; }
+          .title { font-size: 20px; }
         }
       `}</style>
     </div>
