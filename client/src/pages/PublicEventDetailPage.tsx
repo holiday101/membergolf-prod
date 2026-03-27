@@ -283,10 +283,10 @@ export default function PublicEventDetailPage() {
     return { flights: result, otherGroups };
   }, [winnings]);
 
-  // Build modal content
-  const modalCard = useMemo(() => {
-    if (expandedMember === null || !allScores) return null;
-    return allScores.find((s) => s.member_id === expandedMember) ?? null;
+  // Build modal content - find ALL cards for this member
+  const modalCards = useMemo(() => {
+    if (expandedMember === null || !allScores) return [];
+    return allScores.filter((s) => s.member_id === expandedMember);
   }, [expandedMember, allScores]);
 
   const modalName = useMemo(() => {
@@ -487,50 +487,52 @@ export default function PublicEventDetailPage() {
             </div>
             {scoresLoading ? (
               <div className="muted" style={{ padding: 16 }}>Loading scorecard…</div>
-            ) : !modalCard ? (
+            ) : modalCards.length === 0 ? (
               <div className="muted" style={{ padding: 16 }}>No scorecard available</div>
-            ) : (() => {
-              const numholes = modalCard.numholes ?? 9;
-              const startinghole = modalCard.startinghole ?? 1;
-              const holeCount = numholes === 18 ? 18 : 9;
-              const holes: number[] = [];
-              for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
-              const scores: (number | null)[] = [];
-              const pars: (number | null)[] = [];
-              for (let i = 0; i < holeCount; i++) {
-                scores.push(modalCard[`hole${i + 1}`] ?? null);
-                pars.push(modalCard[`par${startinghole + i}`] ?? null);
-              }
-              return (
-                <div className="modalBody">
-                  <div className="modalScoreGrid" style={{ gridTemplateColumns: `repeat(${holeCount}, 1fr) auto auto auto` }}>
-                    {/* Header row */}
-                    {holes.map((h) => <div key={`h${h}`} className="holeNum">{h}</div>)}
-                    <div className="holeNum">Gross</div>
-                    <div className="holeNum">Net</div>
-                    <div className="holeNum">Adj</div>
-                    {/* Par row */}
-                    {pars.map((p, i) => <div key={`p${i}`} className="parCell">{p ?? ""}</div>)}
-                    <div className="parCell"></div>
-                    <div className="parCell"></div>
-                    <div className="parCell"></div>
-                    {/* Score row */}
-                    {scores.map((score, idx) => {
-                      const meta = getScoreMeta(score, pars[idx]);
-                      return (
-                        <div key={idx} className={meta.className} style={meta.style}>
-                          {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
-                          <span className="holeValue">{score ?? "—"}</span>
-                        </div>
-                      );
-                    })}
-                    <div className="totalCell">{modalCard.gross ?? "—"}</div>
-                    <div className="totalCell">{modalCard.net ?? "—"}</div>
-                    <div className="totalCell">{modalCard.adjustedscore ?? "—"}</div>
-                  </div>
-                </div>
-              );
-            })()}
+            ) : (
+              <div className="modalBody">
+                {modalCards.map((card, cardIdx) => {
+                  const numholes = card.numholes ?? 9;
+                  const startinghole = card.startinghole ?? 1;
+                  const holeCount = numholes === 18 ? 18 : 9;
+                  const holes: number[] = [];
+                  for (let i = 0; i < holeCount; i++) holes.push(startinghole + i);
+                  const scores: (number | null)[] = [];
+                  const pars: (number | null)[] = [];
+                  for (let i = 0; i < holeCount; i++) {
+                    scores.push(card[`hole${i + 1}`] ?? null);
+                    pars.push(card[`par${startinghole + i}`] ?? null);
+                  }
+                  return (
+                    <div key={card.card_id} className={`modalCardBlock${cardIdx > 0 ? " modalCardDivider" : ""}`}>
+                      {modalCards.length > 1 ? <div className="modalRoundLabel">Round {cardIdx + 1}</div> : null}
+                      <div className="modalScoreGrid" style={{ gridTemplateColumns: `repeat(${holeCount}, 1fr) auto auto auto` }}>
+                        {holes.map((h) => <div key={`h${h}`} className="holeNum">{h}</div>)}
+                        <div className="holeNum">Gross</div>
+                        <div className="holeNum">Net</div>
+                        <div className="holeNum">Adj</div>
+                        {pars.map((p, i) => <div key={`p${i}`} className="parCell">{p ?? ""}</div>)}
+                        <div className="parCell"></div>
+                        <div className="parCell"></div>
+                        <div className="parCell"></div>
+                        {scores.map((score, idx) => {
+                          const meta = getScoreMeta(score, pars[idx]);
+                          return (
+                            <div key={idx} className={meta.className} style={meta.style}>
+                              {meta.showEagle ? <span className="eagleIcon" aria-hidden="true">🦅</span> : null}
+                              <span className="holeValue">{score ?? "—"}</span>
+                            </div>
+                          );
+                        })}
+                        <div className="totalCell">{card.gross ?? "—"}</div>
+                        <div className="totalCell">{card.net ?? "—"}</div>
+                        <div className="totalCell">{card.adjustedscore ?? "—"}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       ) : null}
@@ -739,6 +741,16 @@ export default function PublicEventDetailPage() {
           font-size: 13px;
           font-weight: 800;
           color: #0f172a;
+        }
+        .modalCardBlock { }
+        .modalCardDivider { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e5e7eb; }
+        .modalRoundLabel {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #6b7280;
+          margin-bottom: 6px;
         }
 
         .files { margin-top: 14px; display: grid; gap: 8px; }
