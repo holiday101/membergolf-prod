@@ -68,6 +68,15 @@ BEGIN
     SELECT amount INTO v_amountperplayer
       FROM subEventMain WHERE subevent_id = p_subeventid;
 
+    -- If 2 or fewer players in flight, refund everyone their entry fee
+    IF v_countnet <= 2 THEN
+      UPDATE subEventPayNet
+         SET amount = v_amountperplayer, place = 1, used_yn = 1
+       WHERE subevent_id = p_subeventid AND flight_id = v_flightid;
+
+      ITERATE flight_loop;
+    END IF;
+
     SET v_placespaid = ROUND(v_countnet * v_payout, 0);
     IF v_placespaid < 1 AND v_countnet >= 1 THEN
       SET v_placespaid = 1;
