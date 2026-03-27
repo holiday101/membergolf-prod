@@ -183,7 +183,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         CASE
           WHEN w.payout_type = 'GROSS' THEN spg.score
           WHEN w.payout_type = 'NET'   THEN spn.score
-          WHEN w.payout_type IN ('SKINS','SKIN') THEN es.score
+          WHEN w.payout_type IN ('SKINS','SKIN','POWER_SKIN') THEN es.score
           ELSE NULL
         END AS score
       FROM (
@@ -228,7 +228,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         AND spn.member_id = w.member_id
         AND COALESCE(spn.flight_id, 0) = COALESCE(w.flight_id, 0)
         AND ROUND(spn.amount, 2) = ROUND(w.amount, 2)
-      LEFT JOIN eventSkin es ON w.payout_type IN ('SKINS','SKIN')
+      LEFT JOIN eventSkin es ON w.payout_type IN ('SKINS','SKIN','POWER_SKIN')
         AND es.subevent_id = w.subevent_id
         AND es.member_id = w.member_id
         AND COALESCE(es.flight_id, 0) = COALESCE(w.flight_id, 0)
@@ -239,7 +239,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         (w.flight_id IS NULL),
         w.flight_id,
         CASE WHEN w.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
-        FIELD(w.payout_type, 'GROSS', 'NET', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
+        FIELD(w.payout_type, 'GROSS', 'NET', 'SKIN', 'POWER_SKIN', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
         w.amount DESC
       `,
       [eventId, eventId, eventId, courseId]
@@ -2278,6 +2278,16 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
       [subeventId]
     );
 
+    // Determine if this subevent is a Power Skin type
+    const [subTypeRows] = await conn.query<any[]>(
+      `SELECT COALESCE(st.eventtypename, '') AS eventtypename
+       FROM subEventMain s
+       LEFT JOIN subEventType st ON st.eventtype_id = s.eventtype_id
+       WHERE s.subevent_id = ? LIMIT 1`,
+      [subeventId]
+    );
+    const skinPayoutType = (subTypeRows?.[0]?.eventtypename || '').toLowerCase().includes('power') ? 'POWER_SKIN' : 'SKIN';
+
     await conn.query(
       `
       INSERT INTO eventMoneyList
@@ -2303,7 +2313,7 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
         CONCAT('Hole ', es.hole) AS description,
         NULL AS place,
         es.flight_id,
-        'SKIN' AS payout_type,
+        ? AS payout_type,
         'eventSkin' AS source_table,
         es.eventskin_id AS source_id
       FROM eventSkin es
@@ -2312,7 +2322,7 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
         AND es.member_id IS NOT NULL
         AND COALESCE(es.amount, 0) <> 0
       `,
-      [subeventId]
+      [skinPayoutType, subeventId]
     );
 
     await conn.query(

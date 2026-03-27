@@ -48,6 +48,10 @@ function payoutLabel(value: string | null) {
       return "Net";
     case "SKINS":
       return "Skins";
+    case "SKIN":
+      return "Skin";
+    case "POWER_SKIN":
+      return "Power Skin";
     case "CHICAGO":
       return "Chicago";
     case "OTHER":
@@ -61,7 +65,7 @@ function mapBackNineSkinDescription(description: string | null, payoutType: stri
   if (!description) return "";
   if (!isBackNine) return description;
   const type = (payoutType || "").toUpperCase();
-  if (type !== "SKINS" && !/hole\s*\d+/i.test(description)) return description;
+  if (type !== "SKINS" && type !== "POWER_SKIN" && !/hole\s*\d+/i.test(description)) return description;
   return description.replace(/(\bHole\s*)([1-9])\b/gi, function (_m, p1, p2) {
     return p1 + String(Number(p2) + 9);
   });
@@ -144,7 +148,7 @@ export default function PublicEventDetailPage() {
       arr.push(row);
       map.set(type, arr);
     }
-    const order = ["SKINS", "SKIN", "BB_GROSS", "BB_NET", "CHICAGO", "OTHER"]; // Keep Other last.
+    const order = ["SKINS", "SKIN", "POWER_SKIN", "BB_GROSS", "BB_NET", "CHICAGO", "OTHER"]; // Keep Other last.
     return Array.from(map.entries())
       .sort((a, b) => {
         const ai = order.indexOf(a[0]);
@@ -254,7 +258,7 @@ export default function PublicEventDetailPage() {
                 null
               ) : (
                 otherPayoutGroups.flatMap((group) => {
-                  if (group.type === "SKINS" || group.type === "SKIN") {
+                  if (group.type === "SKINS" || group.type === "SKIN" || group.type === "POWER_SKIN") {
                     return Array.from(
                       group.rows.reduce((map, row) => {
                         const descriptionLabel = (row.description || "").trim();
