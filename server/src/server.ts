@@ -195,7 +195,9 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           ml.place,
           ml.description,
           ml.payout_type,
-          ml.subevent_id
+          ml.subevent_id,
+          ml.source_table,
+          ml.source_id
         FROM eventMoneyList ml
         LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
         WHERE (ml.event_id = ? OR se.event_id = ?)
@@ -211,7 +213,9 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           NULL AS place,
           op.description,
           'OTHER' AS payout_type,
-          NULL AS subevent_id
+          NULL AS subevent_id,
+          NULL AS source_table,
+          NULL AS source_id
         FROM eventOtherPay op
         WHERE op.event_id = ?
           AND op.amount <> 0
@@ -219,21 +223,14 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
       JOIN memberMain m ON m.member_id = w.member_id
       LEFT JOIN rosterFlight f ON f.flight_id = w.flight_id
       LEFT JOIN subEventPayGross spg ON w.payout_type = 'GROSS'
-        AND spg.subevent_id = w.subevent_id
-        AND spg.member_id = w.member_id
-        AND COALESCE(spg.flight_id, 0) = COALESCE(w.flight_id, 0)
-        AND ROUND(spg.amount, 2) = ROUND(w.amount, 2)
+        AND w.source_table = 'subEventPayGross'
+        AND spg.gross_id = w.source_id
       LEFT JOIN subEventPayNet spn ON w.payout_type = 'NET'
-        AND spn.subevent_id = w.subevent_id
-        AND spn.member_id = w.member_id
-        AND COALESCE(spn.flight_id, 0) = COALESCE(w.flight_id, 0)
-        AND ROUND(spn.amount, 2) = ROUND(w.amount, 2)
+        AND w.source_table = 'subEventPayNet'
+        AND spn.net_id = w.source_id
       LEFT JOIN eventSkin es ON w.payout_type IN ('SKINS','SKIN','POWER_SKIN')
-        AND es.subevent_id = w.subevent_id
-        AND es.member_id = w.member_id
-        AND COALESCE(es.flight_id, 0) = COALESCE(w.flight_id, 0)
-        AND ROUND(es.amount, 2) = ROUND(w.amount, 2)
-        AND es.hole = CAST(REGEXP_SUBSTR(w.description, '[0-9]+') AS UNSIGNED)
+        AND w.source_table = 'eventSkin'
+        AND es.eventskin_id = w.source_id
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
