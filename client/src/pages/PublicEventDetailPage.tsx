@@ -36,6 +36,15 @@ type EventFile = {
   url: string;
 };
 
+type FlightGroup = {
+  flightKey: string;
+  flightLabel: string;
+  gross: WinningsRow[];
+  net: WinningsRow[];
+  skinGroups: { type: string; label: string; rows: WinningsRow[] }[];
+  other: { type: string; label: string; rows: WinningsRow[] }[];
+};
+
 function payoutLabel(value: string | null) {
   switch ((value || "").toUpperCase()) {
     case "BB_GROSS":
@@ -83,6 +92,13 @@ function cleanText(value: string | null | undefined) {
     .trim();
 }
 
+const SKIN_TYPES = new Set(["SKINS", "SKIN", "POWER_SKIN"]);
+const STROKE_TYPES = new Set(["GROSS", "NET"]);
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount ?? 0);
+}
+
 export default function PublicEventDetailPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
@@ -117,62 +133,127 @@ export default function PublicEventDetailPage() {
     run();
   }, [courseId, eventId]);
 
-  const grossNetByFlight = useMemo(() => {
-    const byFlight = new Map<string, { flightLabel: string; gross: WinningsRow[]; net: WinningsRow[] }>();
-    for (const row of winnings) {
-      const type = (row.payout_type || "").toUpperCase();
-      if (type !== "GROSS" && type !== "NET") continue;
-      const descriptionLabel = (row.description || "").trim();
-      const flightLabel = row.flight_name ? `${row.flight_name.trim()} Flight` : row.flight_id ? `Flight ${row.flight_id}` : descriptionLabel || "Overall";
-      const key = `${row.flight_id ?? "na"}::${flightLabel}`;
-      const current = byFlight.get(key) ?? { flightLabel, gross: [], net: [] };
-      if (type === "GROSS") current.gross.push(row);
-      if (type === "NET") current.net.push(row);
-      byFlight.set(key, current);
-    }
-    return Array.from(byFlight.values()).map((group) => ({
-      ...group,
-      gross: [...group.gross].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
-      net: [...group.net].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
-    }));
-  }, [winnings]);
-
   const isBackNineEvent = (event?.numholes ?? null) === 9 && (event?.startinghole ?? null) === 10
     || (event?.ninename || "").toLowerCase().includes("back");
 
-  const otherPayoutGroups = useMemo(() => {
-    const map = new Map<string, WinningsRow[]>();
+  // Group all winnings by flight, then by payout type within each flight
+  const flightGroups = useMemo(() => {
+    const map = new Map<string, FlightGroup>();
+    const noFlightOther: WinningsRow[] = [];
+
     for (const row of winnings) {
       const type = (row.payout_type || "OTHER").toUpperCase();
-      if (type === "GROSS" || type === "NET") continue;
-      const arr = map.get(type) ?? [];
-      arr.push(row);
-      map.set(type, arr);
+      const flightLabel = row.flight_name
+        ? `${row.flight_name.trim()} Flight`
+        : row.flight_id
+          ? `Flight ${row.flight_id}`
+          : null;
+
+      // OTHER with no flight goes to a separate bucket
+      if (!flightLabel && !STROKE_TYPES.has(type) && !SKIN_TYPES.has(type)) {
+        noFlightOther.push(row);
+        continue;
+      }
+
+      const key = `${row.flight_id ?? "na"}::${flightLabel || "Overall"}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          flightKey: key,
+          flightLabel: flightLabel || "Overall",
+          gross: [],
+          net: [],
+          skinGroups: [],
+          other: [],
+        });
+      }
+      const group = map.get(key)!;
+
+      if (type === "GROSS") {
+        group.gross.push(row);
+      } else if (type === "NET") {
+        group.net.push(row);
+      } else if (SKIN_TYPES.has(type)) {
+        let skinGroup = group.skinGroups.find((sg) => sg.type === type);
+        if (!skinGroup) {
+          skinGroup = { type, label: payoutLabel(type), rows: [] };
+          group.skinGroups.push(skinGroup);
+        }
+        skinGroup.rows.push(row);
+      } else {
+        let otherGroup = group.other.find((og) => og.type === type);
+        if (!otherGroup) {
+          otherGroup = { type, label: payoutLabel(type), rows: [] };
+          group.other.push(otherGroup);
+        }
+        otherGroup.rows.push(row);
+      }
     }
-    const order = ["SKINS", "SKIN", "POWER_SKIN", "BB_GROSS", "BB_NET", "CHICAGO", "OTHER"]; // Keep Other last.
-    return Array.from(map.entries())
-      .sort((a, b) => {
-        const ai = order.indexOf(a[0]);
-        const bi = order.indexOf(b[0]);
-        const av = ai === -1 ? 999 : ai;
-        const bv = bi === -1 ? 999 : bi;
-        if (av !== bv) return av - bv;
-        return a[0].localeCompare(b[0]);
-      })
-      .map(([type, rows]) => ({
-        type,
-        label: payoutLabel(type),
-        rows: [...rows].sort((x, y) => {
-          const xf = x.flight_name || "";
-          const yf = y.flight_name || "";
-          if (xf !== yf) return xf.localeCompare(yf);
-          const xp = x.place ?? 999;
-          const yp = y.place ?? 999;
-          if (xp !== yp) return xp - yp;
-          return (y.amount ?? 0) - (x.amount ?? 0);
+
+    // Sort within each flight group
+    const result = Array.from(map.values()).map((fg) => ({
+      ...fg,
+      gross: [...fg.gross].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
+      net: [...fg.net].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
+      skinGroups: fg.skinGroups.map((sg) => ({
+        ...sg,
+        rows: [...sg.rows].sort((a, b) => {
+          const ah = Number((a.description || "").replace(/\D/g, "")) || 999;
+          const bh = Number((b.description || "").replace(/\D/g, "")) || 999;
+          if (ah !== bh) return ah - bh;
+          return (b.amount ?? 0) - (a.amount ?? 0);
         }),
-      }));
+      })),
+      other: fg.other.map((og) => ({
+        ...og,
+        rows: [...og.rows].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
+      })),
+    }));
+
+    // Build noFlightOther groups
+    const otherGroups: { type: string; label: string; rows: WinningsRow[] }[] = [];
+    for (const row of noFlightOther) {
+      const type = (row.payout_type || "OTHER").toUpperCase();
+      // Group by description for OTHER type
+      const groupKey = type === "OTHER" ? (row.description || "Other").trim() : type;
+      let og = otherGroups.find((g) => g.type === groupKey);
+      if (!og) {
+        og = { type: groupKey, label: type === "OTHER" ? groupKey : payoutLabel(type), rows: [] };
+        otherGroups.push(og);
+      }
+      og.rows.push(row);
+    }
+
+    return { flights: result, otherGroups };
   }, [winnings]);
+
+  const renderSkinRow = (row: WinningsRow) => {
+    const desc = (row.description || "").trim();
+    const holeMatch = desc.match(/^Hole\s+(\d+)/i);
+    const hole = row.place ?? (holeMatch ? Number(mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent).replace(/^Hole\s+/i, "")) : null);
+    const isScoreDesc = /^Score:\s*/i.test(desc);
+    return (
+      <div key={row.moneylist_id} className="winningsRow">
+        <div className="wname">
+          {hole ? <span className="wplace">#{hole} </span> : null}
+          {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+          {!row.score && isScoreDesc ? <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span> : null}
+        </div>
+        <div className="wamount">{formatCurrency(row.amount)}</div>
+      </div>
+    );
+  };
+
+  const renderStrokeRow = (row: WinningsRow) => (
+    <div key={row.moneylist_id} className="winningsRow">
+      <div className="wname">
+        {row.place ? <span className="wplace">#{row.place} </span> : null}
+        {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+        {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+      </div>
+      <div className="wamount">{formatCurrency(row.amount)}</div>
+    </div>
+  );
 
   return (
     <div className="page">
@@ -201,132 +282,89 @@ export default function PublicEventDetailPage() {
 
           {cleanText(event.eventdescription) ? <div className="desc">{cleanText(event.eventdescription)}</div> : null}
 
+          {/* Flight-based sections */}
+          {flightGroups.flights.map((flight) => {
+            const hasStroke = flight.gross.length > 0 || flight.net.length > 0;
+            const hasSkins = flight.skinGroups.length > 0;
+            const hasOther = flight.other.length > 0;
+            if (!hasStroke && !hasSkins && !hasOther) return null;
 
-          <div className="winningsLayout">
-            <div className="leftColumn">
-              {grossNetByFlight.length === 0 ? (
-                null
-              ) : (
-                grossNetByFlight.map((flight, idx) => (
-                  <div key={`flight-${idx}`} className="typeCard">
-                    <div className="typeTitle">{`${flight.flightLabel} - Stroke Play`}</div>
-                    <div className="twoTypes">
-                      <div className="typeBlock">
-                        <div className="subTypeTitle">Gross</div>
-                        {flight.gross.length === 0 ? (
-                          <div className="emptyRow">No gross payouts</div>
-                        ) : (
-                          flight.gross.map((row) => (
-                            <div key={row.moneylist_id} className="winningsRow">
-                              <div className="wname">
-                                {row.place ? <span className="wplace">#{row.place} </span> : null}
-                                {mapBackNineSkinDescription(row.description, row.payout_type, isBackNineEvent) ? (
-                                  <span className="wdesc">{mapBackNineSkinDescription(row.description, row.payout_type, isBackNineEvent)} • </span>
-                                ) : null}
-                                {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                                {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
-                              </div>
-                              <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="typeBlock">
-                        <div className="subTypeTitle">Net</div>
-                        {flight.net.length === 0 ? (
-                          <div className="emptyRow">No net payouts</div>
-                        ) : (
-                          flight.net.map((row) => (
-                            <div key={row.moneylist_id} className="winningsRow">
-                              <div className="wname">
-                                {row.place ? <span className="wplace">#{row.place} </span> : null}
-                                {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                                {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
-                              </div>
-                              <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="rightColumn">
-              {otherPayoutGroups.length === 0 ? (
-                null
-              ) : (
-                otherPayoutGroups.flatMap((group) => {
-                  if (group.type === "SKINS" || group.type === "SKIN" || group.type === "POWER_SKIN") {
-                    return Array.from(
-                      group.rows.reduce((map, row) => {
-                        const descriptionLabel = (row.description || "").trim();
-                        const flight = row.flight_name ? `${row.flight_name.trim()} Flight` : row.flight_id ? `Flight ${row.flight_id}` : descriptionLabel || "Overall";
-                        const arr = map.get(flight) ?? [];
-                        arr.push(row);
-                        map.set(flight, arr);
-                        return map;
-                      }, new Map<string, WinningsRow[]>()).entries()
-                    ).map(([flight, rows]) => (
-                      <div key={`${group.type}-${flight}`} className="typeCard">
-                        <div className="typeTitle">{`${flight} - ${group.type === "POWER_SKIN" ? "Power Skin" : "Skin"}`}</div>
-                        <div className="typeRows">
-                          {rows.map((row) => (
-                            <div key={row.moneylist_id} className="winningsRow">
-                              <div className="wname">
-                                {(() => {
-                                  const desc = (row.description || "").trim();
-                                  const holeMatch = desc.match(/^Hole\s+(\d+)/i);
-                                  const hole = row.place ?? (holeMatch ? Number(mapBackNineSkinDescription(desc, row.payout_type, isBackNineEvent).replace(/^Hole\s+/i, "")) : null);
-                                  if (hole) return <span className="wplace">#{hole} </span>;
-                                  return null;
-                                })()}
-                                {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                                {(() => {
-                                  const desc = (row.description || "").trim();
-                                  const isScoreDesc = /^Score:\s*/i.test(desc);
-                                  if (row.score != null) return <span className="wscore"> ({row.score})</span>;
-                                  if (isScoreDesc) return <span className="wscore"> ({desc.replace(/^Score:\s*/i, "")})</span>;
-                                  return null;
-                                })()}
-                              </div>
-                              <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
-                            </div>
-                          ))}
+            return (
+              <div key={flight.flightKey} className="flightSection">
+                <div className="flightHeader">{flight.flightLabel}</div>
+                <div className="subEventCards">
+                  {/* Stroke Play */}
+                  {hasStroke ? (
+                    <div className="typeCard">
+                      <div className="typeTitle">Stroke Play</div>
+                      <div className="twoTypes">
+                        <div className="typeBlock">
+                          <div className="subTypeTitle">Gross</div>
+                          {flight.gross.length === 0 ? (
+                            <div className="emptyRow">No gross payouts</div>
+                          ) : (
+                            flight.gross.map(renderStrokeRow)
+                          )}
+                        </div>
+                        <div className="typeBlock">
+                          <div className="subTypeTitle">Net</div>
+                          {flight.net.length === 0 ? (
+                            <div className="emptyRow">No net payouts</div>
+                          ) : (
+                            flight.net.map(renderStrokeRow)
+                          )}
                         </div>
                       </div>
-                    ));
-                  }
+                    </div>
+                  ) : null}
 
-                  return [
-                    <div key={group.type} className="typeCard">
-                      <div className="typeTitle">{group.label}</div>
+                  {/* Skins / Power Skins */}
+                  {flight.skinGroups.map((sg) => (
+                    <div key={sg.type} className="typeCard">
+                      <div className="typeTitle">{sg.label}</div>
                       <div className="typeRows">
-                        {group.rows.map((row) => {
-                          const descriptionLabel = (row.description || "").trim();
-                          const flight = row.flight_name ? `${row.flight_name.trim()} Flight` : row.flight_id ? `Flight ${row.flight_id}` : descriptionLabel || "Overall";
-                          return (
-                            <div key={row.moneylist_id} className="rowWrap">
-                              <div className="flightLabel">{flight}</div>
-                              <div className="winningsRow">
-                                <div className="wname">
-                                  {row.place ? <span className="wplace">#{row.place} </span> : null}
-                                  {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
-                                </div>
-                                <div className="wamount">{new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(row.amount ?? 0)}</div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                        {sg.rows.map(renderSkinRow)}
                       </div>
-                    </div>,
-                  ];
-                })
-              )}
+                    </div>
+                  ))}
+
+                  {/* Other sub-event types within this flight */}
+                  {flight.other.map((og) => (
+                    <div key={og.type} className="typeCard">
+                      <div className="typeTitle">{og.label}</div>
+                      <div className="typeRows">
+                        {og.rows.map(renderStrokeRow)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Other payouts without flight */}
+          {flightGroups.otherGroups.length > 0 ? (
+            <div className="flightSection">
+              <div className="flightHeader">Other</div>
+              <div className="subEventCards">
+                {flightGroups.otherGroups.map((og) => (
+                  <div key={og.type} className="typeCard">
+                    <div className="typeTitle">{og.label}</div>
+                    <div className="typeRows">
+                      {og.rows.map((row) => (
+                        <div key={row.moneylist_id} className="winningsRow">
+                          <div className="wname">
+                            {(row.lastname || "").trim()}, {(row.firstname || "").trim()}
+                          </div>
+                          <div className="wamount">{formatCurrency(row.amount)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {files.length > 0 ? (
             <div className="files">
@@ -370,7 +408,7 @@ export default function PublicEventDetailPage() {
           align-items: center;
           width: fit-content;
         }
-        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; }
         .eventHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
         .title { font-size: 24px; font-weight: 800; color: #111827; line-height: 1.2; }
         .meta { font-size: 13px; color: #6b7280; margin-top: 3px; }
@@ -387,11 +425,29 @@ export default function PublicEventDetailPage() {
           white-space: nowrap;
         }
         .desc { font-size: 13px; color: #374151; margin-top: 8px; }
-        .winningsLayout { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start; }
-        .leftColumn, .rightColumn { display: grid; gap: 10px; }
+
+        /* Flight sections */
+        .flightSection { margin-top: 20px; }
+        .flightHeader {
+          font-size: 16px;
+          font-weight: 800;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #0f172a;
+          padding: 10px 0 8px;
+          border-bottom: 3px solid #0f172a;
+          margin-bottom: 12px;
+        }
+        .subEventCards {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 12px;
+        }
+
+        /* Cards within a flight */
         .typeCard { border: 1px solid #e5e7eb; border-radius: 10px; background: #fafafa; overflow: hidden; }
         .typeTitle {
-          padding: 8px 10px;
+          padding: 8px 12px;
           font-size: 12px;
           font-weight: 800;
           text-transform: uppercase;
@@ -401,7 +457,6 @@ export default function PublicEventDetailPage() {
           background: #f3f4f6;
         }
         .twoTypes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
-
         .typeBlock { border-right: 1px solid #e5e7eb; }
         .typeBlock:last-child { border-right: 0; }
         .subTypeTitle {
@@ -410,28 +465,18 @@ export default function PublicEventDetailPage() {
           letter-spacing: 0.06em;
           color: #64748b;
           font-weight: 700;
-          padding: 6px 10px 4px;
+          padding: 6px 12px 4px;
           border-bottom: 1px solid #edf2f7;
         }
         .typeRows { display: grid; }
-        .rowWrap { border-bottom: 1px solid #edf2f7; }
-        .rowWrap:last-child { border-bottom: 0; }
-        .flightLabel {
-          font-size: 10px;
-          font-weight: 800;
-          color: #475569;
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          padding: 7px 10px 3px;
-        }
         .winningsRow {
           display: grid;
           grid-template-columns: 1fr auto;
           gap: 8px;
           align-items: center;
-          padding: 5px 10px 8px;
+          padding: 6px 12px;
           color: #374151;
-          font-size: 12px;
+          font-size: 13px;
           border-bottom: 1px solid #edf2f7;
         }
         .typeRows .winningsRow:last-child,
@@ -441,8 +486,8 @@ export default function PublicEventDetailPage() {
         .wplace { font-weight: 700; color: #1f2937; }
         .wdesc { color: #64748b; font-weight: 500; }
         .wscore { color: #6b7280; font-weight: 500; }
-        .empty { color: #9ca3af; font-size: 12px; padding: 8px 10px; }
-        .emptyRow { color: #9ca3af; font-size: 11px; padding: 7px 10px; border-bottom: 1px solid #edf2f7; }
+        .emptyRow { color: #9ca3af; font-size: 12px; padding: 8px 12px; border-bottom: 1px solid #edf2f7; }
+
         .files { margin-top: 14px; display: grid; gap: 8px; }
         .fileList { display: grid; gap: 6px; }
         .fileItem {
@@ -456,14 +501,8 @@ export default function PublicEventDetailPage() {
           gap: 6px;
           border: 1px solid #e5e7eb;
         }
-        .fileItemImage {
-          background: transparent;
-          border: 0;
-          padding: 0;
-        }
-        .fileItemImage .fileImage {
-          border: 0;
-        }
+        .fileItemImage { background: transparent; border: 0; padding: 0; }
+        .fileItemImage .fileImage { border: 0; }
         .fileItem a { color: #374151; text-decoration: none; }
         .fileImage {
           max-width: 320px;
@@ -474,10 +513,9 @@ export default function PublicEventDetailPage() {
         }
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
-        @media (max-width: 920px) {
-          .winningsLayout { grid-template-columns: 1fr; }
-        }
+
         @media (max-width: 640px) {
+          .subEventCards { grid-template-columns: 1fr; }
           .twoTypes { grid-template-columns: 1fr; }
           .typeBlock { border-right: 0; border-bottom: 1px solid #e5e7eb; }
           .typeBlock:last-child { border-bottom: 0; }
