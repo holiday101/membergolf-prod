@@ -4557,29 +4557,54 @@ app.post("/members", authMiddleware, async (req, res) => {
   const schema = z.object({
     firstname: z.string().min(1).max(50),
     lastname: z.string().min(1).max(50),
-    email: z.string().email().max(255).optional().nullable(),
     handicap: z.number().optional().nullable(),
     handicap18: z.number().optional().nullable(),
+    roster_ids: z.array(z.number().int()).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
+  const conn = await pool.getConnection();
   try {
-    const [result] = await pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO memberMain (course_id, firstname, lastname, email, handicap, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    await conn.beginTransaction();
+
+    const [result] = await conn.execute<mysql.ResultSetHeader>(
+      "INSERT INTO memberMain (course_id, firstname, lastname, handicap, rhandicap, handicap18) VALUES (?, ?, ?, ?, ?, ?)",
       [
         payload.courseId,
         parsed.data.firstname.trim(),
         parsed.data.lastname.trim(),
-        parsed.data.email ? parsed.data.email.toLowerCase().trim() : null,
         parsed.data.handicap ?? null,
         parsed.data.handicap ?? null,
         parsed.data.handicap18 ?? null,
       ]
     );
-    res.status(201).json({ id: result.insertId });
+    const memberId = result.insertId;
+    const hdcpValue = parsed.data.handicap != null && Number.isFinite(parsed.data.handicap)
+      ? Math.trunc(parsed.data.handicap)
+      : 0;
+
+    const rosterIds = parsed.data.roster_ids ?? [];
+    for (const rosterId of rosterIds) {
+      const [rosterRows] = await conn.query<any[]>(
+        "SELECT roster_id FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
+        [rosterId, payload.courseId]
+      );
+      if (rosterRows.length) {
+        await conn.execute(
+          "INSERT INTO rosterMemberLink (roster_id, member_id, hdcp) VALUES (?, ?, ?)",
+          [rosterId, memberId, hdcpValue]
+        );
+      }
+    }
+
+    await conn.commit();
+    res.status(201).json({ id: memberId });
   } catch {
+    await conn.rollback();
     res.status(500).json({ error: "Server error" });
+  } finally {
+    conn.release();
   }
 });
 

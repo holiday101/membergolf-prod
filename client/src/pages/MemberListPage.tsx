@@ -10,6 +10,11 @@ type Member = {
   handicap: number | null;
 };
 
+type Roster = {
+  roster_id: number;
+  rostername: string;
+};
+
 export default function MemberListPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
@@ -17,11 +22,12 @@ export default function MemberListPage() {
   const [busy, setBusy] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
   const [handicap, setHandicap] = useState("");
   const [handicap18, setHandicap18] = useState("");
   const [query, setQuery] = useState("");
   const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
+  const [rosters, setRosters] = useState<Roster[]>([]);
+  const [selectedRosterIds, setSelectedRosterIds] = useState<Set<number>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,6 +42,19 @@ export default function MemberListPage() {
       }
     };
     loadCourseSettings();
+
+    const loadRosters = async () => {
+      try {
+        const res = await apiFetch("/rosters");
+        if (!res.ok) return;
+        const data: Roster[] = await res.json();
+        setRosters(data);
+        setSelectedRosterIds(new Set(data.map((r) => r.roster_id)));
+      } catch {
+        // ignore
+      }
+    };
+    loadRosters();
   }, []);
 
   const loadMembers = async () => {
@@ -80,17 +99,17 @@ export default function MemberListPage() {
         body: JSON.stringify({
           firstname: firstName.trim(),
           lastname: lastName.trim(),
-          email: email.trim() ? email.trim().toLowerCase() : null,
           handicap: handicap ? Number(handicap) : null,
           handicap18: handicap18 ? Number(handicap18) : null,
+          roster_ids: Array.from(selectedRosterIds),
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       setFirstName("");
       setLastName("");
-      setEmail("");
       setHandicap("");
       setHandicap18("");
+      setSelectedRosterIds(new Set(rosters.map((r) => r.roster_id)));
       await loadMembers();
     } catch (e: any) {
       setError(e.message ?? "Failed to add member");
@@ -172,11 +191,7 @@ export default function MemberListPage() {
               </label>
             </div>
 
-            <div className="rowInputs rowInputsThree">
-              <label className="formLabel">
-                Email
-                <input value={email} onChange={(e) => setEmail(e.target.value)} />
-              </label>
+            <div className="rowInputs rowInputsTwo">
               <label className="formLabel">
                 Handicap (9)
                 <input value={handicap} onChange={(e) => setHandicap(e.target.value)} />
@@ -186,6 +201,31 @@ export default function MemberListPage() {
                 <input value={handicap18} onChange={(e) => setHandicap18(e.target.value)} />
               </label>
             </div>
+
+            {rosters.length > 0 && (
+              <div className="rosterSection">
+                <div className="rosterLabel">Rosters</div>
+                <div className="rosterList">
+                  {rosters.map((r) => (
+                    <label key={r.roster_id} className="rosterCheck">
+                      <input
+                        type="checkbox"
+                        checked={selectedRosterIds.has(r.roster_id)}
+                        onChange={() => {
+                          setSelectedRosterIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(r.roster_id)) next.delete(r.roster_id);
+                            else next.add(r.roster_id);
+                            return next;
+                          });
+                        }}
+                      />
+                      {r.rostername}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="actions">
               <button className="btn primary" onClick={submit} disabled={busy}>
@@ -215,7 +255,6 @@ export default function MemberListPage() {
         input { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
         .rowInputs { display: grid; gap: 10px; }
         .rowInputsTwo { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .rowInputsThree { grid-template-columns: minmax(0, 2fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr); }
         .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         @media (max-width: 760px) {
           .rowInputsTwo, .rowInputsThree { grid-template-columns: 1fr; }
@@ -244,6 +283,11 @@ export default function MemberListPage() {
           justify-content: center;
         }
         .iconBtn:hover { background: #f7f8fb; }
+        .rosterSection { display: grid; gap: 6px; }
+        .rosterLabel { color: #6b7280; font-weight: 600; font-size: 12px; }
+        .rosterList { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+        .rosterCheck { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #374151; cursor: pointer; }
+        .rosterCheck input[type="checkbox"] { width: auto; margin: 0; }
         .error { color: #a00; font-size: 12px; }
       `}</style>
     </div>
