@@ -137,7 +137,8 @@ export default function PublicEventDetailPage() {
     }));
   }, [winnings]);
 
-  const isBackNineEvent = (event?.numholes ?? null) === 9 && (event?.startinghole ?? null) === 10;
+  const isBackNineEvent = (event?.numholes ?? null) === 9 && (event?.startinghole ?? null) === 10
+    || (event?.ninename || "").toLowerCase().includes("back");
 
   const otherPayoutGroups = useMemo(() => {
     const map = new Map<string, WinningsRow[]>();
