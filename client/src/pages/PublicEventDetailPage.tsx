@@ -65,7 +65,7 @@ function mapBackNineSkinDescription(description: string | null, payoutType: stri
   if (!description) return "";
   if (!isBackNine) return description;
   const type = (payoutType || "").toUpperCase();
-  if (type !== "SKINS" && type !== "POWER_SKIN" && !/hole\s*\d+/i.test(description)) return description;
+  if (type !== "SKINS" && type !== "SKIN" && type !== "POWER_SKIN" && !/hole\s*\d+/i.test(description)) return description;
   return description.replace(/(\bHole\s*)([1-9])\b/gi, function (_m, p1, p2) {
     return p1 + String(Number(p2) + 9);
   });
@@ -270,7 +270,7 @@ export default function PublicEventDetailPage() {
                       }, new Map<string, WinningsRow[]>()).entries()
                     ).map(([flight, rows]) => (
                       <div key={`${group.type}-${flight}`} className="typeCard">
-                        <div className="typeTitle">{`${flight} - Skin`}</div>
+                        <div className="typeTitle">{`${flight} - ${group.type === "POWER_SKIN" ? "Power Skin" : "Skin"}`}</div>
                         <div className="typeRows">
                           {rows.map((row) => (
                             <div key={row.moneylist_id} className="winningsRow">
