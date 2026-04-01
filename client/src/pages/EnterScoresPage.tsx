@@ -119,6 +119,16 @@ function computeGross(holes: Record<number, string>): number {
   return Object.values(holes).reduce((sum, v) => sum + (Number(v) || 0), 0);
 }
 
+function isDateOutsideEvent(cardDate: string, event: EventRow | null): boolean {
+  if (!cardDate || !event) return false;
+  const d = cardDate;
+  const s = event.start_dt ? toInputDate(event.start_dt) : "";
+  const e = event.end_dt ? toInputDate(event.end_dt) : "";
+  if (s && d < s) return true;
+  if (e && d > e) return true;
+  return false;
+}
+
 function defaultCardDate(cards: CardRow[]): string {
   const withDate = cards
     .filter((c) => c.card_dt)
@@ -589,6 +599,11 @@ export default function EnterScoresPage() {
                   />
                 </label>
               </div>
+              {isDateOutsideEvent(cardForm.card_dt, event) && (
+                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
+                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
+                </div>
+              )}
               <div className="actions">
                 <button className="btn primary" onClick={saveCard} disabled={busy}>
                   {busy ? "Saving…" : "Save card"}
@@ -749,6 +764,11 @@ export default function EnterScoresPage() {
                   />
                 </label>
               </div>
+              {isDateOutsideEvent(addCardForm.card_dt, event) && (
+                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
+                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
+                </div>
+              )}
               <div className="actions">
                 <button className="btn primary" onClick={createCard} disabled={busy}>
                   {busy ? "Saving…" : "Enter Score"}
