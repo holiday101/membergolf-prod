@@ -58,6 +58,31 @@ export default function UserListPage() {
     return sorted.filter((u) => u.course_id === id);
   }, [users, courseFilter, isGlobalUser, myCourseId]);
 
+  const groupedUsers = useMemo(() => {
+    if (!isGlobalUser || courseFilter !== "all") return null;
+    const groups: { key: string; label: string; users: User[] }[] = [];
+    const byKey = new Map<string, User[]>();
+    for (const u of filteredUsers) {
+      const key = u.course_id == null ? "_global" : String(u.course_id);
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key)!.push(u);
+    }
+    // Global users first
+    if (byKey.has("_global")) {
+      groups.push({ key: "_global", label: "Global Users", users: byKey.get("_global")! });
+      byKey.delete("_global");
+    }
+    // Remaining courses sorted alphabetically by name
+    const courseGroups = [...byKey.entries()].map(([key, users]) => ({
+      key,
+      label: users[0]?.coursename || `Course #${key}`,
+      users,
+    }));
+    courseGroups.sort((a, b) => a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+    groups.push(...courseGroups);
+    return groups;
+  }, [filteredUsers, isGlobalUser, courseFilter]);
+
   async function loadData() {
     setLoading(true);
     setError("");
@@ -145,6 +170,30 @@ export default function UserListPage() {
           <div className="muted">Loading…</div>
         ) : filteredUsers.length === 0 ? (
           <div className="muted">No users found.</div>
+        ) : groupedUsers ? (
+          groupedUsers.map((group) => (
+            <div key={group.key} className="courseGroup">
+              <div className="courseGroupHeading">{group.label}</div>
+              <div className="table">
+                <div className="tableHead">
+                  <span>Name</span>
+                  <span>Email</span>
+                  <span>Action</span>
+                </div>
+                {group.users.map((u) => (
+                  <div key={u.id} className="tableRow">
+                    <span>{(u.last_name || "").trim()}, {(u.first_name || "").trim()}</span>
+                    <span>{u.email}</span>
+                    <span>
+                      <Link className="btn small" to={`/users/${u.id}/edit`}>
+                        Edit
+                      </Link>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
         ) : (
           <div className="table">
             <div className="tableHead">
@@ -187,6 +236,10 @@ export default function UserListPage() {
         .alert { padding: 10px 12px; border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; color: #991b1b; }
         .muted { color: #6b7280; }
         .table { display: grid; gap: 8px; margin-top: 10px; }
+        .courseGroup { margin-top: 14px; }
+        .courseGroup:first-child { margin-top: 0; }
+        .courseGroupHeading { font-size: 13px; font-weight: 700; color: #374151; background: #f3f4f6; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; }
+        .courseGroup .tableHead, .courseGroup .tableRow { grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.1fr) 70px; }
         .tableHead, .tableRow { display: grid; gap: 8px; grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.1fr) minmax(120px, 1fr) 70px; align-items: center; }
         .tableHead { font-weight: 600; font-size: 12px; color: #6b7280; }
         .tableRow { padding: 6px 0; border-top: 1px solid #f3f4f6; font-size: 12px; }
