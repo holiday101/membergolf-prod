@@ -1864,7 +1864,10 @@ app.get("/subevents/:id/skins", authMiddleware, async (req, res) => {
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      `SELECT sm.subevent_id, sm.course_id, LOWER(st.eventtypename) AS eventtypename
+       FROM subEventMain sm
+       LEFT JOIN subEventType st ON st.eventtype_id = sm.eventtype_id
+       WHERE sm.subevent_id = ? LIMIT 1`,
       [subeventId]
     );
     const sub = subRows?.[0];
@@ -1873,33 +1876,64 @@ app.get("/subevents/:id/skins", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const [rows] = await pool.query<any[]>(
-      `
-      SELECT
-        es.eventskin_id,
-        es.member_id,
-        m.firstname,
-        m.lastname,
-        es.flight_id,
-        rf.flightname,
-        es.hole,
-        es.score,
-        es.amount,
-        (es.hole - 1 + COALESCE((
-          SELECT MAX(n.startinghole)
-          FROM eventCard ec
-          LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
-          WHERE ec.card_id = es.card_id
-        ), 1)) AS holenum
-      FROM eventSkin es
-      INNER JOIN memberMain m ON m.member_id = es.member_id
-      INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
-      WHERE es.subevent_id = ?
-      ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
-      `,
-      [subeventId]
-    );
-    res.json(rows);
+    if (sub.eventtypename === "skins net") {
+      const [rows] = await pool.query<any[]>(
+        `
+        SELECT
+          es.eventskin_id,
+          es.member_id,
+          m.firstname,
+          m.lastname,
+          es.flight_id,
+          rf.flightname,
+          es.hole,
+          es.score,
+          es.amount,
+          (es.hole - 1 + COALESCE((
+            SELECT MAX(n.startinghole)
+            FROM eventCard ec
+            LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
+            WHERE ec.event_id = es.event_id AND ec.member_id = es.member_id
+            LIMIT 1
+          ), 1)) AS holenum
+        FROM subEventSkinNetResults es
+        INNER JOIN memberMain m ON m.member_id = es.member_id
+        INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
+        WHERE es.subevent_id = ?
+        ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
+        `,
+        [subeventId]
+      );
+      res.json(rows);
+    } else {
+      const [rows] = await pool.query<any[]>(
+        `
+        SELECT
+          es.eventskin_id,
+          es.member_id,
+          m.firstname,
+          m.lastname,
+          es.flight_id,
+          rf.flightname,
+          es.hole,
+          es.score,
+          es.amount,
+          (es.hole - 1 + COALESCE((
+            SELECT MAX(n.startinghole)
+            FROM eventCard ec
+            LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
+            WHERE ec.card_id = es.card_id
+          ), 1)) AS holenum
+        FROM eventSkin es
+        INNER JOIN memberMain m ON m.member_id = es.member_id
+        INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
+        WHERE es.subevent_id = ?
+        ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
+        `,
+        [subeventId]
+      );
+      res.json(rows);
+    }
   } catch (err) {
     console.error("subevent skins list error", err);
     res.status(500).json({ error: "Server error" });
@@ -1943,7 +1977,9 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
         COALESCE(n.startinghole, 1) AS startinghole,
         ec.hole1, ec.hole2, ec.hole3, ec.hole4, ec.hole5, ec.hole6, ec.hole7, ec.hole8, ec.hole9,
         n.hole1 AS par1, n.hole2 AS par2, n.hole3 AS par3, n.hole4 AS par4, n.hole5 AS par5,
-        n.hole6 AS par6, n.hole7 AS par7, n.hole8 AS par8, n.hole9 AS par9
+        n.hole6 AS par6, n.hole7 AS par7, n.hole8 AS par8, n.hole9 AS par9,
+        n.handicaphole1, n.handicaphole2, n.handicaphole3, n.handicaphole4, n.handicaphole5,
+        n.handicaphole6, n.handicaphole7, n.handicaphole8, n.handicaphole9
       FROM eventCard ec
       INNER JOIN memberMain m ON m.member_id = ec.member_id
       INNER JOIN rosterMemberLink rml ON rml.member_id = ec.member_id AND rml.roster_id = ?
@@ -1972,7 +2008,10 @@ app.post("/subevents/:id/skins/post", authMiddleware, async (req, res) => {
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      `SELECT sm.subevent_id, sm.course_id, sm.event_id, LOWER(st.eventtypename) AS eventtypename
+       FROM subEventMain sm
+       LEFT JOIN subEventType st ON st.eventtype_id = sm.eventtype_id
+       WHERE sm.subevent_id = ? LIMIT 1`,
       [subeventId]
     );
     const sub = subRows?.[0];
@@ -1981,7 +2020,11 @@ app.post("/subevents/:id/skins/post", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    await pool.query("CALL spSkinCodeX(?)", [subeventId]);
+    if (sub.eventtypename === "skins net") {
+      await pool.query("CALL spNetSkin(?, ?)", [sub.event_id, subeventId]);
+    } else {
+      await pool.query("CALL spSkinCodeX(?)", [subeventId]);
+    }
     await syncEventMoneyListForSubevent(subeventId);
     res.json({ ok: true });
   } catch (err) {
@@ -2036,23 +2079,29 @@ app.patch("/subevents/:id/skins/:skinId", authMiddleware, async (req, res) => {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
+    const [subRows2] = await pool.query<any[]>(
+      `SELECT sm.subevent_id, sm.course_id, LOWER(st.eventtypename) AS eventtypename
+       FROM subEventMain sm
+       LEFT JOIN subEventType st ON st.eventtype_id = sm.eventtype_id
+       WHERE sm.subevent_id = ? LIMIT 1`,
+      [subeventId]
+    );
+    const sub = subRows2?.[0];
+    if (!sub) return res.status(404).json({ error: "Not found" });
+    if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const table = sub.eventtypename === "skins net" ? "subEventSkinNetResults" : "eventSkin";
+
     const [rows] = await pool.query<any[]>(
-      `
-      SELECT es.eventskin_id, s.course_id
-      FROM eventSkin es
-      INNER JOIN subEventMain s ON s.subevent_id = es.subevent_id
-      WHERE es.subevent_id = ? AND es.eventskin_id = ?
-      LIMIT 1
-      `,
+      `SELECT eventskin_id FROM ${table} WHERE subevent_id = ? AND eventskin_id = ? LIMIT 1`,
       [subeventId, skinId]
     );
     const row = rows?.[0];
     if (!row) return res.status(404).json({ error: "Not found" });
-    if (!isGlobal(payload) && row.course_id !== payload.courseId) {
-      return res.status(403).json({ error: "Forbidden" });
-    }
 
-    await pool.execute("UPDATE eventSkin SET amount = ? WHERE eventskin_id = ?", [
+    await pool.execute(`UPDATE ${table} SET amount = ? WHERE eventskin_id = ?`, [
       parsed.data.amount,
       skinId,
     ]);
@@ -2281,7 +2330,7 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
       [subeventId]
     );
 
-    // Determine if this subevent is a Power Skin type
+    // Determine subevent skin type
     const [subTypeRows] = await conn.query<any[]>(
       `SELECT COALESCE(st.eventtypename, '') AS eventtypename
        FROM subEventMain s
@@ -2289,44 +2338,85 @@ async function syncEventMoneyListForSubevent(subeventId: number) {
        WHERE s.subevent_id = ? LIMIT 1`,
       [subeventId]
     );
-    const skinPayoutType = (subTypeRows?.[0]?.eventtypename || '').toLowerCase().includes('power') ? 'POWER_SKIN' : 'SKIN';
+    const subTypeName = (subTypeRows?.[0]?.eventtypename || '').toLowerCase();
+    const isSkinsNet = subTypeName === 'skins net';
+    const skinPayoutType = subTypeName.includes('power') ? 'POWER_SKIN' : 'SKIN';
 
-    await conn.query(
-      `
-      INSERT INTO eventMoneyList
-        (
-          member_id,
-          amount,
-          event_id,
-          subevent_id,
-          payout_date,
-          description,
-          place,
-          flight_id,
-          payout_type,
-          source_table,
-          source_id
-        )
-      SELECT
-        es.member_id,
-        ROUND(es.amount, 2) AS amount,
-        es.event_id,
-        es.subevent_id,
-        DATE(e.end_dt) AS payout_date,
-        CONCAT('Hole ', es.hole) AS description,
-        NULL AS place,
-        es.flight_id,
-        ? AS payout_type,
-        'eventSkin' AS source_table,
-        es.eventskin_id AS source_id
-      FROM eventSkin es
-      INNER JOIN eventMain e ON e.event_id = es.event_id
-      WHERE es.subevent_id = ?
-        AND es.member_id IS NOT NULL
-        AND COALESCE(es.amount, 0) <> 0
-      `,
-      [skinPayoutType, subeventId]
-    );
+    if (isSkinsNet) {
+      await conn.query(
+        `
+        INSERT INTO eventMoneyList
+          (
+            member_id,
+            amount,
+            event_id,
+            subevent_id,
+            payout_date,
+            description,
+            place,
+            flight_id,
+            payout_type,
+            source_table,
+            source_id
+          )
+        SELECT
+          es.member_id,
+          ROUND(es.amount, 2) AS amount,
+          es.event_id,
+          es.subevent_id,
+          DATE(e.end_dt) AS payout_date,
+          CONCAT('Hole ', es.hole) AS description,
+          NULL AS place,
+          es.flight_id,
+          'SKIN' AS payout_type,
+          'subEventSkinNetResults' AS source_table,
+          es.eventskin_id AS source_id
+        FROM subEventSkinNetResults es
+        INNER JOIN eventMain e ON e.event_id = es.event_id
+        WHERE es.subevent_id = ?
+          AND es.member_id IS NOT NULL
+          AND COALESCE(es.amount, 0) <> 0
+        `,
+        [subeventId]
+      );
+    } else {
+      await conn.query(
+        `
+        INSERT INTO eventMoneyList
+          (
+            member_id,
+            amount,
+            event_id,
+            subevent_id,
+            payout_date,
+            description,
+            place,
+            flight_id,
+            payout_type,
+            source_table,
+            source_id
+          )
+        SELECT
+          es.member_id,
+          ROUND(es.amount, 2) AS amount,
+          es.event_id,
+          es.subevent_id,
+          DATE(e.end_dt) AS payout_date,
+          CONCAT('Hole ', es.hole) AS description,
+          NULL AS place,
+          es.flight_id,
+          ? AS payout_type,
+          'eventSkin' AS source_table,
+          es.eventskin_id AS source_id
+        FROM eventSkin es
+        INNER JOIN eventMain e ON e.event_id = es.event_id
+        WHERE es.subevent_id = ?
+          AND es.member_id IS NOT NULL
+          AND COALESCE(es.amount, 0) <> 0
+        `,
+        [skinPayoutType, subeventId]
+      );
+    }
 
     await conn.query(
       `

@@ -61,6 +61,15 @@ type SkinCardRow = {
   par7: number | null;
   par8: number | null;
   par9: number | null;
+  handicaphole1: number | null;
+  handicaphole2: number | null;
+  handicaphole3: number | null;
+  handicaphole4: number | null;
+  handicaphole5: number | null;
+  handicaphole6: number | null;
+  handicaphole7: number | null;
+  handicaphole8: number | null;
+  handicaphole9: number | null;
 };
 
 function getHoleLabels(numholes: number | null, startinghole: number | null) {
@@ -97,6 +106,25 @@ function getCardScore(row: SkinCardRow, displayHole: number) {
 function getCardPar(row: SkinCardRow, displayHole: number) {
   const storage = storageHoleNumber(displayHole, row.numholes, row.startinghole);
   return (row as any)[`par${storage}`] as number | null | undefined;
+}
+
+function getCardHandicapHole(row: SkinCardRow, displayHole: number) {
+  const storage = storageHoleNumber(displayHole, row.numholes, row.startinghole);
+  return (row as any)[`handicaphole${storage}`] as number | null | undefined;
+}
+
+function getNetScore(gross: number | null | undefined, handicap: number | null | undefined, handicapHoleRank: number | null | undefined): number | null {
+  if (typeof gross !== "number" || typeof handicap !== "number" || typeof handicapHoleRank !== "number") return null;
+  if (handicap >= 0) {
+    if (handicapHoleRank <= handicap) {
+      if (handicapHoleRank + 9 <= handicap) return gross - 2;
+      return gross - 1;
+    }
+    return gross;
+  }
+  // negative handicap: add strokes on easiest holes
+  if ((9 - handicapHoleRank) < Math.abs(handicap)) return gross + 1;
+  return gross;
 }
 
 export default function SubEventDetailPage() {
@@ -160,7 +188,8 @@ export default function SubEventDetailPage() {
   const selectedTypeName = (types.find((t) => String(t.eventtype_id) === form.eventtype_id)?.eventtypename ?? "").toLowerCase();
   const typeName = selectedTypeName || savedTypeName;
   const isPowerSkinType = typeName.includes("power skin");
-  const isSkinsType = savedTypeName.includes("skin") && !savedTypeName.includes("power skin");
+  const isSkinsNetType = savedTypeName.includes("skins net");
+  const isSkinsType = savedTypeName.includes("skin") && !savedTypeName.includes("power skin") && !savedTypeName.includes("skins net");
 
   const loadSkins = async () => {
     if (!id) return;
@@ -190,8 +219,8 @@ export default function SubEventDetailPage() {
   };
 
   useEffect(() => {
-    if (isSkinsType || isPowerSkinType) loadSkins();
-  }, [id, isSkinsType, isPowerSkinType]);
+    if (isSkinsType || isPowerSkinType || isSkinsNetType) loadSkins();
+  }, [id, isSkinsType, isPowerSkinType, isSkinsNetType]);
 
   const save = async () => {
     if (!id) return;
@@ -648,6 +677,119 @@ export default function SubEventDetailPage() {
               ) : null}
             </div>
           ) : null}
+          {isSkinsNetType ? (
+            <div className="skinsCardsWrap">
+              <div className="card wideCard">
+                <div className="titleRow">
+                <div className="title">Skins Net</div>
+                <div className="actionsRight">
+                  <button className="btn" onClick={unpostSkins} disabled={skinsBusy}>
+                    {skinsBusy ? "Working…" : "Un-Post Scores"}
+                  </button>
+                  <button className="btn primary" onClick={postSkins} disabled={skinsBusy}>
+                    {skinsBusy ? "Working…" : "Post Skins Net"}
+                  </button>
+                </div>
+              </div>
+              {skinsLoading ? <div className="muted">Loading skins…</div> : null}
+              {!skinsLoading ? (
+                <div className="skinsTable">
+                  <div className="skinsHead">
+                    <span>Flight</span>
+                    <span>Member</span>
+                    <span>Hole</span>
+                    <span>Score</span>
+                    <span>Amount</span>
+                    <span></span>
+                  </div>
+                  {skins.map((s) => (
+                    <div key={s.eventskin_id} className="skinsRow">
+                      <span>{s.flightname ?? s.flight_id ?? "—"}</span>
+                      <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
+                      <span>{s.holenum ?? s.hole ?? "—"}</span>
+                      <span>{s.score ?? "—"}</span>
+                      <input
+                        value={amountEdits[s.eventskin_id] ?? ""}
+                        onChange={(e) =>
+                          setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
+                        }
+                      />
+                      <button
+                        className="btn"
+                        onClick={() => updateSkinAmount(s.eventskin_id)}
+                        disabled={skinsBusy}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  ))}
+                  {!skins.length ? <div className="muted">No skins posted yet.</div> : null}
+                </div>
+              ) : null}
+              </div>
+              {!skinsLoading && skins.length > 0 ? (
+                <div className="card wideCard">
+                  <div className="title">Skins Net Card Details</div>
+                  <div className="skinsDetails">
+                    <div className="detailsList">
+                      {skinCardFlights.map((flight) => {
+                      const headerLabels = getHoleLabels(flight.rows[0]?.numholes ?? 9, flight.rows[0]?.startinghole ?? 1);
+                      return (
+                        <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection">
+                          <div className="flightHeader">{flight.flightname ?? flight.flight_id ?? "Unassigned"}</div>
+                          <div className="detailHeadRow">
+                            <span>Name</span>
+                            <span>Card Date</span>
+                            <span>Hdcp</span>
+                            <div className="holesHeadGrid">
+                              {headerLabels.map((h) => (
+                                <span key={`head-${flight.flight_id ?? "na"}-${h}`}>{h}</span>
+                              ))}
+                            </div>
+                            <span>Gross</span>
+                            <span>Net</span>
+                          </div>
+                          {flight.rows.map((row) => {
+                            const labels = getHoleLabels(row.numholes, row.startinghole);
+                            return (
+                              <div key={row.card_id} className="detailRow">
+                                <div className="detailMeta">
+                                  <span className="memberTag">{(row.lastname || "").trim()}, {(row.firstname || "").trim()}</span>
+                                </div>
+                                <div className="dateCell">{row.card_dt ? new Date(row.card_dt).toLocaleDateString() : "—"}</div>
+                                <div className="statCell">{row.handicap ?? "—"}</div>
+                                <div className="scoreGrid">
+                                  {labels.map((h) => {
+                                    const score = getCardScore(row, h);
+                                    const par = getCardPar(row, h);
+                                    const hcpHole = getCardHandicapHole(row, h);
+                                    const net = getNetScore(score, row.handicap, hcpHole);
+                                    const displayScore = net ?? score;
+                                    const meta = getScoreMeta(displayScore, par);
+                                    const gotStroke = typeof score === "number" && typeof net === "number" && net !== score;
+                                    return (
+                                      <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
+                                        {typeof displayScore === "number" ? displayScore : "—"}
+                                        {gotStroke ? <span className="grossHint">({score})</span> : null}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                                <div className="statCell">{row.gross ?? "—"}</div>
+                                <div className="statCell">{row.net ?? "—"}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                      {!skinCards.length ? <div className="muted">No card details available.</div> : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </>
       ) : null}
       <style>{`
@@ -716,6 +858,7 @@ export default function SubEventDetailPage() {
                 .memberTag { color: #1f2937; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .scoreGrid { display: grid; grid-template-columns: repeat(9, minmax(28px, 1fr)); gap: 2px; align-items: stretch; }
                 .scoreCell { border: 1px solid #e5e7eb; border-radius: 3px; padding: 2px 0; font-size: 11px; color: #111827; background: #fff; font-weight: 600; text-align: center; display: grid; place-items: center; line-height: 1; }
+        .grossHint { font-size: 8px; color: #6b7280; font-weight: 400; line-height: 1; }
         .scoreCell.neutral { background: #f8fafc; }
         .scoreCell.birdie { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
         .scoreCell.eagle { background: #fecaca; color: #7f1d1d; border-color: #fca5a5; font-weight: 700; }
