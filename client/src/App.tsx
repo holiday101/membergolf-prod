@@ -34,7 +34,6 @@ import PublicMoneyListPage from "./pages/PublicMoneyListPage";
 import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
 import PublicEventScoresPage from "./pages/PublicEventScoresPage";
-import MarketingPage from "./pages/MarketingPage";
 import MarketingPageV2 from "./pages/MarketingPageV2";
 import BlogIndexPage from "./pages/BlogIndexPage";
 import BlogPostPage from "./pages/BlogPostPage";
