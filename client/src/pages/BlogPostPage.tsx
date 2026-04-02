@@ -33,7 +33,6 @@ export default function BlogPostPage() {
 
   if (!post) return <Navigate to="/blog" replace />;
 
-  const currentIndex = blogPosts.findIndex((p) => p.slug === post.slug);
   const sorted = [...blogPosts].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
