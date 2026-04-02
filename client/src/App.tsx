@@ -42,7 +42,7 @@ import BlogPostPage from "./pages/BlogPostPage";
 import AppShell from "./components/AppShell";
 
 function HomeRedirect() {
-  return getToken() ? <Navigate to="/calendar" replace /> : <MarketingPage />;
+  return getToken() ? <Navigate to="/calendar" replace /> : <MarketingPageV2 />;
 }
 
 function LoginRedirect() {
