@@ -35,6 +35,9 @@ import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
 import PublicEventScoresPage from "./pages/PublicEventScoresPage";
 import MarketingPage from "./pages/MarketingPage";
+import MarketingPageV2 from "./pages/MarketingPageV2";
+import BlogIndexPage from "./pages/BlogIndexPage";
+import BlogPostPage from "./pages/BlogPostPage";
 
 import AppShell from "./components/AppShell";
 
@@ -51,6 +54,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/login" element={<LoginRedirect />} />
+      <Route path="/v2" element={<MarketingPageV2 />} />
+      <Route path="/blog" element={<BlogIndexPage />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
 
       <Route path="/public/:courseId" element={<PublicShell />}>
         <Route index element={<PublicCalendarPage />} />
