@@ -184,7 +184,7 @@ export default function PublicEventDetailPage() {
     }
     const el = e.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
-    setPopoverAnchor({ top: rect.bottom + window.scrollY + 4, left: rect.left + window.scrollX, width: Math.max(rect.width, 420) });
+    setPopoverAnchor({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 420) });
     setExpandedName(`${(row.firstname || "").trim()} ${(row.lastname || "").trim()}`);
 
     if (!allScores && !scoresLoading) {
