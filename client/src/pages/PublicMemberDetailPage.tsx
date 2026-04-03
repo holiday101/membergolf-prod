@@ -519,12 +519,16 @@ export default function PublicMemberDetailPage() {
                     <div className="calcRow calcHead">
                       <div>Card Date</div>
                       <div>Event</div>
+                      <div>Gross</div>
+                      <div>Net</div>
                       <div>HDiff</div>
                     </div>
                     {data.handicap_calculation.rounds.map((r) => (
                       <div key={r.card_id} className={`calcRow ${r.used_in_calc ? "usedRow" : ""}`}>
                         <div>{formatDate(r.card_dt)}</div>
                         <div>{r.eventname ?? "Event"}</div>
+                        <div>{r.gross ?? "—"}</div>
+                        <div>{r.net ?? "—"}</div>
                         <div>{formatHdiff(r.hdiff)}</div>
                       </div>
                     ))}
@@ -688,7 +692,7 @@ export default function PublicMemberDetailPage() {
         .calcTable { display: grid; gap: 4px; }
         .calcRow {
           display: grid;
-          grid-template-columns: 100px 1fr 70px;
+          grid-template-columns: 100px 1fr 50px 50px 70px;
           gap: 8px;
           align-items: center;
           font-size: 11px;
