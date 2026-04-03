@@ -374,26 +374,19 @@ export default function PublicEventDetailPage() {
               <div key={flight.flightKey} className="flightSection">
                 <div className="flightHeader">{flight.flightLabel}</div>
                 <div className="subEventCards">
-                  {hasStroke ? (
+                  {flight.gross.length > 0 ? (
                     <div className="typeCard">
-                      <div className="typeTitle">Stroke Play</div>
-                      <div className="twoTypes">
-                        <div className="typeBlock">
-                          <div className="subTypeTitle">Gross</div>
-                          {flight.gross.length === 0 ? (
-                            <div className="emptyRow">No gross payouts</div>
-                          ) : (
-                            flight.gross.map(renderStrokeRow)
-                          )}
-                        </div>
-                        <div className="typeBlock">
-                          <div className="subTypeTitle">Net</div>
-                          {flight.net.length === 0 ? (
-                            <div className="emptyRow">No net payouts</div>
-                          ) : (
-                            flight.net.map(renderStrokeRow)
-                          )}
-                        </div>
+                      <div className="typeTitle">Stroke Play - Gross</div>
+                      <div className="typeRows">
+                        {flight.gross.map(renderStrokeRow)}
+                      </div>
+                    </div>
+                  ) : null}
+                  {flight.net.length > 0 ? (
+                    <div className="typeCard">
+                      <div className="typeTitle">Stroke Play - Net</div>
+                      <div className="typeRows">
+                        {flight.net.map(renderStrokeRow)}
                       </div>
                     </div>
                   ) : null}
