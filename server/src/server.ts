@@ -605,6 +605,7 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
           c.numholes,
           c.gross,
           c.net,
+          c.adjustedscore,
           c.hdiff,
           e.eventname
         FROM eventCard c

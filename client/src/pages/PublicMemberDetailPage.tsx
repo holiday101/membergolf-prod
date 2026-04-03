@@ -88,6 +88,7 @@ type MemberDetail = {
       numholes: number | null;
       gross: number | null;
       net: number | null;
+      adjustedscore: number | null;
       hdiff: number | null;
       eventname: string | null;
       used_in_calc: boolean;
@@ -521,6 +522,7 @@ export default function PublicMemberDetailPage() {
                       <div>Event</div>
                       <div>Gross</div>
                       <div>Net</div>
+                      <div>Adj</div>
                       <div>HDiff</div>
                     </div>
                     {data.handicap_calculation.rounds.map((r) => (
@@ -529,6 +531,7 @@ export default function PublicMemberDetailPage() {
                         <div>{r.eventname ?? "Event"}</div>
                         <div>{r.gross ?? "—"}</div>
                         <div>{r.net ?? "—"}</div>
+                        <div>{r.adjustedscore ?? "—"}</div>
                         <div>{formatHdiff(r.hdiff)}</div>
                       </div>
                     ))}
@@ -692,7 +695,7 @@ export default function PublicMemberDetailPage() {
         .calcTable { display: grid; gap: 4px; }
         .calcRow {
           display: grid;
-          grid-template-columns: 100px 1fr 50px 50px 70px;
+          grid-template-columns: 100px 1fr 50px 50px 50px 70px;
           gap: 8px;
           align-items: center;
           font-size: 11px;
