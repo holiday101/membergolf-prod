@@ -559,6 +559,7 @@ export default function SubEventDetailPage() {
                                 </div>
                               );
                             })}
+                            <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                           </div>
                         );
                       })}
@@ -667,6 +668,7 @@ export default function SubEventDetailPage() {
                               </div>
                             );
                           })}
+                          <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                         </div>
                       );
                     })}
@@ -780,6 +782,7 @@ export default function SubEventDetailPage() {
                               </div>
                             );
                           })}
+                          <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                         </div>
                       );
                     })}
@@ -864,6 +867,7 @@ export default function SubEventDetailPage() {
         .scoreCell.eagle { background: #fecaca; color: #7f1d1d; border-color: #fca5a5; font-weight: 700; }
         .scoreCell.drawnHole { outline: 2px solid #f59e0b; outline-offset: -1px; }
         .statCell { text-align: center; font-size: 11px; color: #374151; font-weight: 600; }
+        .flightCardCount { font-size: 11px; color: #6b7280; font-weight: 600; text-align: right; padding: 4px 0; border-top: 1px solid #e5e7eb; }
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
         @media (max-width: 760px) {
