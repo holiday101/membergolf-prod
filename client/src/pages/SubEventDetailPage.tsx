@@ -528,11 +528,12 @@ export default function SubEventDetailPage() {
                               <span>Gross</span>
                               <span>Net</span>
                             </div>
-                            {flight.rows.map((row) => {
+                            {flight.rows.map((row, idx) => {
                               const labels = getHoleLabels(row.numholes, row.startinghole);
                               return (
                                 <div key={row.card_id} className="detailRow">
                                   <div className="detailMeta">
+                                    <span className="rowNum">{idx + 1}</span>
                                     <span className="memberTag">{(row.lastname || "").trim()}, {(row.firstname || "").trim()}</span>
                                   </div>
                                   <div className="dateCell">{row.card_dt ? new Date(row.card_dt).toLocaleDateString() : "—"}</div>
@@ -559,7 +560,6 @@ export default function SubEventDetailPage() {
                                 </div>
                               );
                             })}
-                            <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                           </div>
                         );
                       })}
@@ -642,11 +642,12 @@ export default function SubEventDetailPage() {
                             <span>Gross</span>
                             <span>Net</span>
                           </div>
-                          {flight.rows.map((row) => {
+                          {flight.rows.map((row, idx) => {
                             const labels = getHoleLabels(row.numholes, row.startinghole);
                             return (
                               <div key={row.card_id} className="detailRow">
                                 <div className="detailMeta">
+                                  <span className="rowNum">{idx + 1}</span>
                                   <span className="memberTag">{(row.lastname || "").trim()}, {(row.firstname || "").trim()}</span>
                                 </div>
                                 <div className="dateCell">{row.card_dt ? new Date(row.card_dt).toLocaleDateString() : "—"}</div>
@@ -668,7 +669,6 @@ export default function SubEventDetailPage() {
                               </div>
                             );
                           })}
-                          <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                         </div>
                       );
                     })}
@@ -751,11 +751,12 @@ export default function SubEventDetailPage() {
                             <span>Gross</span>
                             <span>Net</span>
                           </div>
-                          {flight.rows.map((row) => {
+                          {flight.rows.map((row, idx) => {
                             const labels = getHoleLabels(row.numholes, row.startinghole);
                             return (
                               <div key={row.card_id} className="detailRow">
                                 <div className="detailMeta">
+                                  <span className="rowNum">{idx + 1}</span>
                                   <span className="memberTag">{(row.lastname || "").trim()}, {(row.firstname || "").trim()}</span>
                                 </div>
                                 <div className="dateCell">{row.card_dt ? new Date(row.card_dt).toLocaleDateString() : "—"}</div>
@@ -782,7 +783,6 @@ export default function SubEventDetailPage() {
                               </div>
                             );
                           })}
-                          <div className="flightCardCount">{flight.rows.length} card{flight.rows.length !== 1 ? "s" : ""}</div>
                         </div>
                       );
                     })}
@@ -867,7 +867,7 @@ export default function SubEventDetailPage() {
         .scoreCell.eagle { background: #fecaca; color: #7f1d1d; border-color: #fca5a5; font-weight: 700; }
         .scoreCell.drawnHole { outline: 2px solid #f59e0b; outline-offset: -1px; }
         .statCell { text-align: center; font-size: 11px; color: #374151; font-weight: 600; }
-        .flightCardCount { font-size: 11px; color: #6b7280; font-weight: 600; text-align: right; padding: 4px 0; border-top: 1px solid #e5e7eb; }
+        .rowNum { color: #9ca3af; font-size: 10px; font-weight: 600; min-width: 18px; text-align: right; }
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
         @media (max-width: 760px) {
