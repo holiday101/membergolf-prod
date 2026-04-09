@@ -25,6 +25,7 @@ export default function RosterListPage() {
   const [busy, setBusy] = useState(false);
   const [rosterName, setRosterName] = useState("");
   const [activeYn, setActiveYn] = useState(true);
+  const [holes, setHoles] = useState<number>(9);
   const [selectedRoster, setSelectedRoster] = useState<Roster | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flightName, setFlightName] = useState("");
@@ -33,8 +34,6 @@ export default function RosterListPage() {
   const [flightBusy, setFlightBusy] = useState(false);
   const [deleteFlightId, setDeleteFlightId] = useState<number | null>(null);
   const [deleteRosterId, setDeleteRosterId] = useState<number | null>(null);
-  const [holes, setHoles] = useState<number>(9);
-  const [editingRoster, setEditingRoster] = useState<Roster | null>(null);
   const [editName, setEditName] = useState("");
   const [editActiveYn, setEditActiveYn] = useState(true);
   const [editHoles, setEditHoles] = useState<number>(9);
@@ -59,6 +58,14 @@ export default function RosterListPage() {
   useEffect(() => {
     loadRosters();
   }, []);
+
+  const selectRoster = (r: Roster) => {
+    setSelectedRoster(r);
+    setEditName(r.rostername ?? "");
+    setEditActiveYn(r.active_yn !== 0);
+    setEditHoles(r.holes ?? 9);
+    loadFlights(r.roster_id);
+  };
 
   const loadFlights = async (rosterId: number) => {
     try {
@@ -166,19 +173,8 @@ export default function RosterListPage() {
     }
   };
 
-  const startEdit = (r: Roster) => {
-    setEditingRoster(r);
-    setEditName(r.rostername ?? "");
-    setEditActiveYn(r.active_yn !== 0);
-    setEditHoles(r.holes ?? 9);
-  };
-
-  const cancelEdit = () => {
-    setEditingRoster(null);
-  };
-
   const saveEdit = async () => {
-    if (!editingRoster) return;
+    if (!selectedRoster) return;
     if (!editName.trim()) {
       setError("Roster name is required.");
       return;
@@ -186,7 +182,7 @@ export default function RosterListPage() {
     setEditBusy(true);
     setError("");
     try {
-      const res = await apiFetch(`/rosters/${editingRoster.roster_id}`, {
+      const res = await apiFetch(`/rosters/${selectedRoster.roster_id}`, {
         method: "PUT",
         body: JSON.stringify({
           rostername: editName.trim(),
@@ -195,8 +191,10 @@ export default function RosterListPage() {
         }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setEditingRoster(null);
       await loadRosters();
+      setSelectedRoster((prev) =>
+        prev ? { ...prev, rostername: editName.trim(), active_yn: editActiveYn ? 1 : 0, holes: editHoles } : null
+      );
     } catch (e: any) {
       setError(e.message ?? "Failed to update roster");
     } finally {
@@ -241,7 +239,7 @@ export default function RosterListPage() {
 
             <div className="actions">
               <button className="btn primary" onClick={submit} disabled={busy}>
-                {busy ? "Saving…" : "Add roster"}
+                {busy ? "Saving..." : "Add roster"}
               </button>
             </div>
           </div>
@@ -249,7 +247,7 @@ export default function RosterListPage() {
 
         <section className="card rosterList">
           <h2>Rosters</h2>
-          {loading ? <div>Loading…</div> : null}
+          {loading ? <div>Loading...</div> : null}
           <div className="list">
             <div className="row header rosterRow">
               <div className="name">Roster</div>
@@ -263,112 +261,91 @@ export default function RosterListPage() {
                 className={`row rosterRow clickable ${selectedRoster?.roster_id === r.roster_id ? "selected" : ""}`}
                 role="button"
                 tabIndex={0}
-                onClick={() => {
-                  if (editingRoster?.roster_id === r.roster_id) return;
-                  setSelectedRoster(r);
-                  loadFlights(r.roster_id);
-                }}
+                onClick={() => selectRoster(r)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    if (editingRoster?.roster_id === r.roster_id) return;
-                    setSelectedRoster(r);
-                    loadFlights(r.roster_id);
+                    selectRoster(r);
                   }
                 }}
               >
-                {editingRoster?.roster_id === r.roster_id ? (
-                  <>
-                    <div className="name">
-                      <input
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        style={{ width: "100%" }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    <div className="holesCol">
-                      <select
-                        value={editHoles}
-                        onChange={(e) => setEditHoles(Number(e.target.value))}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value={9}>9</option>
-                        <option value={18}>18</option>
-                      </select>
-                    </div>
-                    <div className="status">
-                      <input
-                        type="checkbox"
-                        checked={editActiveYn}
-                        onChange={(e) => setEditActiveYn(e.target.checked)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    <div className="actionsCol">
-                      <button
-                        className="btn primary"
-                        onClick={(e) => { e.stopPropagation(); saveEdit(); }}
-                        disabled={editBusy}
-                      >
-                        {editBusy ? "..." : "Save"}
-                      </button>
-                      <button
-                        className="btn"
-                        onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="name">{r.rostername ?? "—"}</div>
-                    <div className="holesCol">{r.holes ?? 9}</div>
-                    <div className="status">{r.active_yn === 0 ? "No" : "Yes"}</div>
-                    <div className="actionsCol">
-                      <button
-                        className="iconBtn"
-                        onClick={(e) => { e.stopPropagation(); startEdit(r); }}
-                        aria-label="Edit roster"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        className="btn viewMembersBtn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/rosters/${r.roster_id}/members`);
-                        }}
-                      >
-                        View Members
-                      </button>
-                      <button
-                        className="iconBtn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteRoster(r.roster_id);
-                        }}
-                        disabled={deleteRosterId === r.roster_id}
-                        aria-label="Delete roster"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  </>
-                )}
+                <div className="name">{r.rostername ?? "---"}</div>
+                <div className="holesCol">{r.holes ?? 9}</div>
+                <div className="status">{r.active_yn === 0 ? "No" : "Yes"}</div>
+                <div className="actionsCol">
+                  <button
+                    className="btn viewMembersBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/rosters/${r.roster_id}/members`);
+                    }}
+                  >
+                    View Members
+                  </button>
+                  <button
+                    className="iconBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteRoster(r.roster_id);
+                    }}
+                    disabled={deleteRosterId === r.roster_id}
+                    aria-label="Delete roster"
+                  >
+                    🗑
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         </section>
 
-        <section className="card rosterFlights">
-          <h2>Roster Flights</h2>
-          {!selectedRoster ? (
-            <div className="muted">Select a roster to manage flights.</div>
-          ) : (
-            <>
-              <div className="subTitle">{selectedRoster.rostername ?? "Roster"}</div>
+        {!selectedRoster ? (
+          <section className="card rightPlaceholder">
+            <div className="muted">Select a roster to manage.</div>
+          </section>
+        ) : (
+          <>
+            <section className="card editRoster">
+              <h2>Edit Roster</h2>
+              <div className="form">
+                <label className="formLabel">
+                  Roster Name
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </label>
+
+                <label className="formLabel">
+                  Holes
+                  <select
+                    value={editHoles}
+                    onChange={(e) => setEditHoles(Number(e.target.value))}
+                  >
+                    <option value={9}>9</option>
+                    <option value={18}>18</option>
+                  </select>
+                </label>
+
+                <label className="formLabel checkbox">
+                  <input
+                    type="checkbox"
+                    checked={editActiveYn}
+                    onChange={(e) => setEditActiveYn(e.target.checked)}
+                  />
+                  Active
+                </label>
+
+                <div className="actions">
+                  <button className="btn primary" onClick={saveEdit} disabled={editBusy}>
+                    {editBusy ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section className="card rosterFlights">
+              <h2>Flights</h2>
               <div className="list">
                 <div className="row header flightsRow">
                   <div className="name">Flight</div>
@@ -377,9 +354,9 @@ export default function RosterListPage() {
                 </div>
                 {flights.map((f) => (
                   <div key={f.flight_id} className="row flightsRow">
-                    <div className="name">{f.flightname ?? "—"}</div>
+                    <div className="name">{f.flightname ?? "---"}</div>
                     <div className="status">
-                      {(f.hdcp1 ?? "—")} / {(f.hdcp2 ?? "—")}
+                      {(f.hdcp1 ?? "---")} / {(f.hdcp2 ?? "---")}
                     </div>
                     <div className="actionsCol">
                       <button
@@ -393,8 +370,14 @@ export default function RosterListPage() {
                     </div>
                   </div>
                 ))}
+                {flights.length === 0 && (
+                  <div className="muted" style={{ padding: "6px" }}>No flights yet.</div>
+                )}
               </div>
+            </section>
 
+            <section className="card addFlight">
+              <h2>Add Flight</h2>
               <div className="form">
                 <label className="formLabel">
                   Flight Name
@@ -415,13 +398,13 @@ export default function RosterListPage() {
                 </div>
                 <div className="actions">
                   <button className="btn primary" onClick={submitFlight} disabled={flightBusy}>
-                    {flightBusy ? "Saving…" : "Add flight"}
+                    {flightBusy ? "Saving..." : "Add flight"}
                   </button>
                 </div>
               </div>
-            </>
-          )}
-        </section>
+            </section>
+          </>
+        )}
 
       </div>
 
@@ -430,13 +413,16 @@ export default function RosterListPage() {
         .grid {
           display: grid;
           gap: 14px;
-          grid-template-columns: minmax(320px, 480px) minmax(320px, 1fr);
-          grid-template-rows: auto auto;
+          grid-template-columns: minmax(280px, 420px) minmax(280px, 1fr);
+          grid-template-rows: auto auto auto;
           grid-auto-rows: min-content;
         }
         .addRoster { grid-column: 1; grid-row: 1; }
-        .rosterList { grid-column: 1; grid-row: 2; }
-        .rosterFlights { grid-column: 2; grid-row: 1 / span 2; }
+        .rosterList { grid-column: 1; grid-row: 2 / span 2; }
+        .rightPlaceholder { grid-column: 2; grid-row: 1 / span 3; }
+        .editRoster { grid-column: 2; grid-row: 1; }
+        .rosterFlights { grid-column: 2; grid-row: 2; }
+        .addFlight { grid-column: 2; grid-row: 3; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
         h2 { margin: 0 0 10px; font-size: 16px; }
         .form { display: grid; gap: 10px; }
@@ -455,13 +441,12 @@ export default function RosterListPage() {
         .row.clickable { cursor: pointer; }
         .row.clickable:hover { background: #e0f2fe; }
         .row.selected { background: #dbeafe; }
-        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 180px; align-items: center; }
+        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 150px; align-items: center; }
         .holesCol { font-size: 11px; text-align: center; }
         .flightsRow { display: grid; grid-template-columns: 1fr 90px 34px; align-items: center; }
         .name { font-weight: 600; font-size: 12px; }
         .status { font-size: 11px; }
         .error { color: #a00; font-size: 12px; }
-        .subTitle { font-size: 12px; color: #6b7280; margin-bottom: 8px; font-weight: 600; }
         .rowInputs { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
         .muted { color: #6b7280; font-size: 12px; }
         .actionsCol { display: flex; justify-content: flex-end; gap: 6px; align-items: center; }
@@ -480,7 +465,8 @@ export default function RosterListPage() {
 
         @media (max-width: 900px) {
           .grid { grid-template-columns: 1fr; }
-          .rosterList, .rosterFlights, .addRoster { grid-column: 1; }
+          .rosterList, .addRoster, .rightPlaceholder,
+          .editRoster, .rosterFlights, .addFlight { grid-column: 1; }
         }
       `}</style>
     </div>
