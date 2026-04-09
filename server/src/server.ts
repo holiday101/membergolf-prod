@@ -4758,8 +4758,8 @@ app.get("/rosters", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
   const [rows] = await pool.query<any[]>(
     payload?.courseId
-      ? "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC"
-      : "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain ORDER BY rostername ASC",
+      ? "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC"
+      : "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain ORDER BY rostername ASC",
     payload?.courseId ? [payload.courseId] : []
   );
   res.json(rows);
@@ -4772,16 +4772,72 @@ app.post("/rosters", authMiddleware, async (req, res) => {
   const schema = z.object({
     rostername: z.string().min(1).max(50),
     active_yn: z.number().int().optional().nullable(),
+    holes: z.number().int().refine(v => v === 9 || v === 18, { message: "Must be 9 or 18" }).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
   try {
     const [result] = await pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO rosterMain (rostername, course_id, active_yn) VALUES (?, ?, ?)",
-      [parsed.data.rostername.trim(), payload.courseId, parsed.data.active_yn ?? 1]
+      "INSERT INTO rosterMain (rostername, course_id, active_yn, holes) VALUES (?, ?, ?, ?)",
+      [parsed.data.rostername.trim(), payload.courseId, parsed.data.active_yn ?? 1, parsed.data.holes ?? 9]
     );
     res.status(201).json({ id: result.insertId });
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.put("/rosters/:id", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+  const schema = z.object({
+    rostername: z.string().min(1).max(50).optional(),
+    active_yn: z.number().int().optional().nullable(),
+    holes: z.number().int().refine(v => v === 9 || v === 18, { message: "Must be 9 or 18" }).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const [rows] = await pool.query<any[]>(
+    "SELECT roster_id, course_id FROM rosterMain WHERE roster_id = ? LIMIT 1",
+    [id]
+  );
+  const roster = rows?.[0];
+  if (!roster) return res.status(404).json({ error: "Not found" });
+  if (roster.course_id !== payload.courseId) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const fields: string[] = [];
+  const values: any[] = [];
+
+  if (parsed.data.rostername !== undefined) {
+    fields.push("rostername=?");
+    values.push(parsed.data.rostername.trim());
+  }
+  if (parsed.data.active_yn !== undefined) {
+    fields.push("active_yn=?");
+    values.push(parsed.data.active_yn ?? 1);
+  }
+  if (parsed.data.holes !== undefined) {
+    fields.push("holes=?");
+    values.push(parsed.data.holes);
+  }
+
+  if (!fields.length) return res.status(400).json({ error: "No fields to update" });
+
+  values.push(id);
+  try {
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      `UPDATE rosterMain SET ${fields.join(", ")} WHERE roster_id = ?`,
+      values
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.json({ id });
   } catch {
     res.status(500).json({ error: "Server error" });
   }
@@ -4830,7 +4886,7 @@ app.get("/rosters/:id", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const [rows] = await pool.query<any[]>(
-    "SELECT roster_id, rostername, course_id, active_yn FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
+    "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
     [id, payload.courseId]
   );
   const roster = rows?.[0];
