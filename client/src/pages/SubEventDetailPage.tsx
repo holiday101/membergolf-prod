@@ -322,6 +322,24 @@ export default function SubEventDetailPage() {
     }
   };
 
+  const skinFlights = useMemo(() => {
+    const groups = new Map<string, SkinRow[]>();
+    for (const row of skins) {
+      const key = String(row.flight_id ?? "na") + "::" + String(row.flightname ?? "Unassigned");
+      const arr = groups.get(key) ?? [];
+      arr.push(row);
+      groups.set(key, arr);
+    }
+    return Array.from(groups.entries()).map(([key, rows]) => {
+      const parts = key.split("::");
+      return {
+        flight_id: parts[0] === "na" ? null : Number(parts[0]),
+        flightname: parts.slice(1).join("::") || null,
+        rows,
+      };
+    });
+  }, [skins]);
+
   const skinCardFlights = useMemo(() => {
     const groups = new Map<string, SkinCardRow[]>();
     for (const row of skinCards) {
@@ -473,33 +491,36 @@ export default function SubEventDetailPage() {
                 {skinsLoading ? <div className="muted">Loading…</div> : null}
                 {!skinsLoading ? (
                   <div className="skinsTable">
-                    <div className="skinsHead">
-                      <span>Flight</span>
-                      <span>Member</span>
-                      <span>Hole</span>
-                      <span>Score</span>
-                      <span>Amount</span>
-                      <span></span>
-                    </div>
-                    {skins.map((s) => (
-                      <div key={s.eventskin_id} className="skinsRow">
-                        <span>{s.flightname ?? s.flight_id ?? "—"}</span>
-                        <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
-                        <span>{s.holenum ?? s.hole ?? "—"}</span>
-                        <span>{s.score ?? "—"}</span>
-                        <input
-                          value={amountEdits[s.eventskin_id] ?? ""}
-                          onChange={(e) =>
-                            setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
-                          }
-                        />
-                        <button
-                          className="btn"
-                          onClick={() => updateSkinAmount(s.eventskin_id)}
-                          disabled={skinsBusy}
-                        >
-                          Save
-                        </button>
+                    {skinFlights.map((flight) => (
+                      <div key={`ps-flight-${flight.flight_id ?? "na"}`} className="skinFlightSection">
+                        <div className="skinFlightHeader">{flight.flightname ?? "Unassigned"}</div>
+                        <div className="skinsHead">
+                          <span>Member</span>
+                          <span>Hole</span>
+                          <span>Score</span>
+                          <span>Amount</span>
+                          <span></span>
+                        </div>
+                        {flight.rows.map((s) => (
+                          <div key={s.eventskin_id} className="skinsRow">
+                            <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
+                            <span>{s.holenum ?? s.hole ?? "—"}</span>
+                            <span>{s.score ?? "—"}</span>
+                            <input
+                              value={amountEdits[s.eventskin_id] ?? ""}
+                              onChange={(e) =>
+                                setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
+                              }
+                            />
+                            <button
+                              className="btn"
+                              onClick={() => updateSkinAmount(s.eventskin_id)}
+                              disabled={skinsBusy}
+                            >
+                              Save
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     ))}
                     {!skins.length ? <div className="muted">No results posted yet.</div> : null}
@@ -584,36 +605,39 @@ export default function SubEventDetailPage() {
                   </button>
                 </div>
               </div>
-              {skinsLoading ? <div className="muted">Loading skins…</div> : null}
+              {skinsLoading ? <div className="muted">Loading skins...</div> : null}
               {!skinsLoading ? (
                 <div className="skinsTable">
-                  <div className="skinsHead">
-                    <span>Flight</span>
-                    <span>Member</span>
-                    <span>Hole</span>
-                    <span>Score</span>
-                    <span>Amount</span>
-                    <span></span>
-                  </div>
-                  {skins.map((s) => (
-                    <div key={s.eventskin_id} className="skinsRow">
-                      <span>{s.flightname ?? s.flight_id ?? "—"}</span>
-                      <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
-                      <span>{s.holenum ?? s.hole ?? "—"}</span>
-                      <span>{s.score ?? "—"}</span>
-                      <input
-                        value={amountEdits[s.eventskin_id] ?? ""}
-                        onChange={(e) =>
-                          setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
-                        }
-                      />
-                      <button
-                        className="btn"
-                        onClick={() => updateSkinAmount(s.eventskin_id)}
-                        disabled={skinsBusy}
-                      >
-                        Save
-                      </button>
+                  {skinFlights.map((flight) => (
+                    <div key={`sk-flight-${flight.flight_id ?? "na"}`} className="skinFlightSection">
+                      <div className="skinFlightHeader">{flight.flightname ?? "Unassigned"}</div>
+                      <div className="skinsHead">
+                        <span>Member</span>
+                        <span>Hole</span>
+                        <span>Score</span>
+                        <span>Amount</span>
+                        <span></span>
+                      </div>
+                      {flight.rows.map((s) => (
+                        <div key={s.eventskin_id} className="skinsRow">
+                          <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
+                          <span>{s.holenum ?? s.hole ?? "---"}</span>
+                          <span>{s.score ?? "---"}</span>
+                          <input
+                            value={amountEdits[s.eventskin_id] ?? ""}
+                            onChange={(e) =>
+                              setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
+                            }
+                          />
+                          <button
+                            className="btn"
+                            onClick={() => updateSkinAmount(s.eventskin_id)}
+                            disabled={skinsBusy}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ))}
                   {!skins.length ? <div className="muted">No skins posted yet.</div> : null}
@@ -693,36 +717,39 @@ export default function SubEventDetailPage() {
                   </button>
                 </div>
               </div>
-              {skinsLoading ? <div className="muted">Loading skins…</div> : null}
+              {skinsLoading ? <div className="muted">Loading skins...</div> : null}
               {!skinsLoading ? (
                 <div className="skinsTable">
-                  <div className="skinsHead">
-                    <span>Flight</span>
-                    <span>Member</span>
-                    <span>Hole</span>
-                    <span>Score</span>
-                    <span>Amount</span>
-                    <span></span>
-                  </div>
-                  {skins.map((s) => (
-                    <div key={s.eventskin_id} className="skinsRow">
-                      <span>{s.flightname ?? s.flight_id ?? "—"}</span>
-                      <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
-                      <span>{s.holenum ?? s.hole ?? "—"}</span>
-                      <span>{s.score ?? "—"}</span>
-                      <input
-                        value={amountEdits[s.eventskin_id] ?? ""}
-                        onChange={(e) =>
-                          setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
-                        }
-                      />
-                      <button
-                        className="btn"
-                        onClick={() => updateSkinAmount(s.eventskin_id)}
-                        disabled={skinsBusy}
-                      >
-                        Save
-                      </button>
+                  {skinFlights.map((flight) => (
+                    <div key={`sn-flight-${flight.flight_id ?? "na"}`} className="skinFlightSection">
+                      <div className="skinFlightHeader">{flight.flightname ?? "Unassigned"}</div>
+                      <div className="skinsHead">
+                        <span>Member</span>
+                        <span>Hole</span>
+                        <span>Score</span>
+                        <span>Amount</span>
+                        <span></span>
+                      </div>
+                      {flight.rows.map((s) => (
+                        <div key={s.eventskin_id} className="skinsRow">
+                          <span>{(s.lastname || "").trim()}, {(s.firstname || "").trim()}</span>
+                          <span>{s.holenum ?? s.hole ?? "---"}</span>
+                          <span>{s.score ?? "---"}</span>
+                          <input
+                            value={amountEdits[s.eventskin_id] ?? ""}
+                            onChange={(e) =>
+                              setAmountEdits((prev) => ({ ...prev, [s.eventskin_id]: e.target.value }))
+                            }
+                          />
+                          <button
+                            className="btn"
+                            onClick={() => updateSkinAmount(s.eventskin_id)}
+                            disabled={skinsBusy}
+                          >
+                            Save
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ))}
                   {!skins.length ? <div className="muted">No skins posted yet.</div> : null}
@@ -836,7 +863,7 @@ export default function SubEventDetailPage() {
         .skinsTable { display: grid; gap: 8px; margin-top: 8px; }
         .skinsHead, .skinsRow {
           display: grid;
-          grid-template-columns: 1fr 2fr 70px 70px 110px 80px;
+          grid-template-columns: 2fr 70px 70px 110px 80px;
           gap: 8px;
           align-items: center;
         }
@@ -847,6 +874,8 @@ export default function SubEventDetailPage() {
           border-top: 1px solid #f3f4f6;
           padding-top: 6px;
         }
+        .skinFlightSection { margin-bottom: 12px; }
+        .skinFlightHeader { font-size: 13px; font-weight: 800; color: #1e3a8a; padding: 6px 0 4px; border-bottom: 2px solid #dbeafe; margin-bottom: 4px; }
         .skinsDetails { margin-top: 8px; display: grid; gap: 8px; }
         .detailsTitle { font-size: 13px; font-weight: 700; color: #111827; }
         .detailsHint { font-size: 11px; color: #6b7280; }
@@ -873,6 +902,7 @@ export default function SubEventDetailPage() {
         @media (max-width: 760px) {
           .skinsHead { display: none; }
           .skinsRow { grid-template-columns: 1fr; gap: 6px; }
+          .skinFlightHeader { font-size: 12px; }
           .detailHeadRow { display: none; }
           .detailRow { grid-template-columns: 1fr; align-items: start; }
           .dateCell { text-align: left; }
