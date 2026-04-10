@@ -115,8 +115,8 @@ export default function PostHandicapsPage() {
       @page { margin: 0.2in; }
       body { font-family: Arial, sans-serif; margin: 0; color: #111827; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-      th, td { border-top: 1px solid #d1d5db; padding: 2px 4px; font-size: 9px; line-height: 1.0; text-align: left; }
-      thead th { border-top: none; font-size: 9px; font-weight: 700; color: #374151; }
+      th, td { border-top: 1px solid #d1d5db; padding: 2px 4px; font-size: 14px; line-height: 1.0; text-align: left; }
+      thead th { border-top: none; font-size: 14px; font-weight: 700; color: #374151; }
       th:nth-child(1), td:nth-child(1) { width: 64%; }
       th:nth-child(2), td:nth-child(2) { width: 18%; }
       th:nth-child(3), td:nth-child(3) { width: 18%; }
