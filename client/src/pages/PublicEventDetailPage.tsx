@@ -350,7 +350,7 @@ export default function PublicEventDetailPage() {
               </div>
             </div>
             <div className="headBtns">
-              {scoresCount > 0 ? (
+              {scoresCount > 0 && winnings.length > 0 ? (
                 <Link className="scoresBtn" to={`/public/${courseId}/events/${eventId}/scores`}>
                   View Scores
                 </Link>

@@ -126,6 +126,7 @@ export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
+  const [hasWinnings, setHasWinnings] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("gross");
@@ -136,12 +137,19 @@ export default function PublicEventScoresPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, scoresRes] = await Promise.all([
+        const [eventRes, winningsRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
-          publicFetch<ScoreRow[]>(`/public/${courseId}/events/${eventId}/scores`),
+          publicFetch<{ moneylist_id: number }[]>(`/public/${courseId}/events/${eventId}/winnings`),
         ]);
         setEvent(eventRes);
-        setScores(scoresRes);
+        if (!winningsRes || winningsRes.length === 0) {
+          setHasWinnings(false);
+          setScores([]);
+        } else {
+          setHasWinnings(true);
+          const scoresRes = await publicFetch<ScoreRow[]>(`/public/${courseId}/events/${eventId}/scores`);
+          setScores(scoresRes);
+        }
       } catch (e: any) {
         setError(e.message ?? "Failed to load scores");
       } finally {
@@ -183,7 +191,9 @@ export default function PublicEventScoresPage() {
             {new Date(event.start_dt).toLocaleDateString()} - {new Date(event.end_dt).toLocaleDateString()}
           </div>
 
-          {scores.length === 0 ? (
+          {!hasWinnings ? (
+            <div className="empty">Scores are not yet available for this event.</div>
+          ) : scores.length === 0 ? (
             <div className="empty">No scores posted</div>
           ) : (
             <>
