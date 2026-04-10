@@ -84,7 +84,8 @@ BEGIN
       INTO v_totalscores
     FROM memberHandicap
     WHERE member_id = v_memberid
-      AND card_dt < v_eventdt;
+      AND card_dt < v_eventdt
+      AND event_id <> pEventID;
 
     IF v_totalscores >= v_cardsmax THEN
       SET v_UB = v_cardsused - 1;
@@ -123,6 +124,7 @@ BEGIN
         FROM memberHandicap
         WHERE member_id = v_memberid
           AND card_dt < v_eventdt
+          AND event_id <> pEventID
         ORDER BY card_dt DESC, card_id DESC
         LIMIT v_cardsmax
       ) recent

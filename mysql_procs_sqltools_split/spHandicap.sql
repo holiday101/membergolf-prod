@@ -48,7 +48,8 @@ BEGIN
       INTO v_totalscores
       FROM memberHandicap
      WHERE member_id = v_memberid
-       AND card_dt < v_eventdt;
+       AND card_dt < v_eventdt
+       AND event_id <> p_eventid;
 
     IF v_totalscores >= v_cardsmax THEN
       SET v_ub = v_cardsused - 1;
@@ -77,11 +78,13 @@ BEGIN
               FROM memberHandicap
              WHERE member_id = v_memberid
                AND card_dt < v_eventdt
+               AND event_id <> p_eventid
              ORDER BY card_dt DESC, card_id DESC
              LIMIT v_cardsmax
           ) last_cards ON mh.card_id = last_cards.card_id
          WHERE mh.member_id = v_memberid
            AND mh.card_dt < v_eventdt
+           AND mh.event_id <> p_eventid
          ORDER BY mh.hdiff
          LIMIT v_limit
       ) t2;
