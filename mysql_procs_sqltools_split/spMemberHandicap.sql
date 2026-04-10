@@ -27,6 +27,7 @@ BEGIN
     FROM eventCard
    WHERE member_id = p_memberid
      AND card_dt < v_eventdt
+     AND event_id <> p_eventid
      AND event_id IN (
        SELECT event_id FROM eventMain WHERE course_id = v_courseid AND handicap_yn = 1
      );
@@ -58,6 +59,7 @@ BEGIN
             FROM eventCard
            WHERE member_id = p_memberid
              AND card_dt < v_eventdt
+             AND event_id <> p_eventid
              AND event_id IN (
                SELECT event_id FROM eventMain WHERE course_id = v_courseid AND handicap_yn = 1
              )
@@ -66,6 +68,7 @@ BEGIN
         ) last_cards ON ec.card_id = last_cards.card_id
        WHERE ec.member_id = p_memberid
          AND ec.card_dt < v_eventdt
+         AND ec.event_id <> p_eventid
        ORDER BY ec.hdiff
        LIMIT v_limit
     ) t2;
