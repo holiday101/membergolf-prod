@@ -197,14 +197,6 @@ export default function PostHandicapsPage() {
 
       <div className="card">
         <div className="headerRow">
-          <label className="dateField">
-            Cards before:
-            <input
-              type="date"
-              value={cutoffDate}
-              onChange={(e) => setCutoffDate(e.target.value)}
-            />
-          </label>
           <div className="headerActions">
             <button className="btn" onClick={handlePrint}>
               Print
@@ -212,6 +204,14 @@ export default function PostHandicapsPage() {
             <button className="btn primary" onClick={run} disabled={loading}>
               {loading ? "Running…" : "Post Handicaps"}
             </button>
+            <label className="dateField">
+              All Cards Before
+              <input
+                type="date"
+                value={cutoffDate}
+                onChange={(e) => setCutoffDate(e.target.value)}
+              />
+            </label>
           </div>
         </div>
 
@@ -256,7 +256,7 @@ export default function PostHandicapsPage() {
           width: fit-content;
         }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
-        .headerRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+        .headerRow { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-bottom: 10px; }
         .dateField { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #374151; }
         .dateField input { padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 12px; }
         .headerActions { display: flex; gap: 8px; }
