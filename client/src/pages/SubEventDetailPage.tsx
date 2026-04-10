@@ -52,6 +52,15 @@ type SkinCardRow = {
   hole7: number | null;
   hole8: number | null;
   hole9: number | null;
+  hole10: number | null;
+  hole11: number | null;
+  hole12: number | null;
+  hole13: number | null;
+  hole14: number | null;
+  hole15: number | null;
+  hole16: number | null;
+  hole17: number | null;
+  hole18: number | null;
   par1: number | null;
   par2: number | null;
   par3: number | null;
@@ -61,6 +70,15 @@ type SkinCardRow = {
   par7: number | null;
   par8: number | null;
   par9: number | null;
+  par10: number | null;
+  par11: number | null;
+  par12: number | null;
+  par13: number | null;
+  par14: number | null;
+  par15: number | null;
+  par16: number | null;
+  par17: number | null;
+  par18: number | null;
   handicaphole1: number | null;
   handicaphole2: number | null;
   handicaphole3: number | null;
@@ -70,9 +88,19 @@ type SkinCardRow = {
   handicaphole7: number | null;
   handicaphole8: number | null;
   handicaphole9: number | null;
+  handicaphole10: number | null;
+  handicaphole11: number | null;
+  handicaphole12: number | null;
+  handicaphole13: number | null;
+  handicaphole14: number | null;
+  handicaphole15: number | null;
+  handicaphole16: number | null;
+  handicaphole17: number | null;
+  handicaphole18: number | null;
 };
 
 function getHoleLabels(numholes: number | null, startinghole: number | null) {
+  if (numholes === 18) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
   if (numholes === 9 && startinghole === 10) return [10, 11, 12, 13, 14, 15, 16, 17, 18];
   return [1, 2, 3, 4, 5, 6, 7, 8, 9];
 }
@@ -535,7 +563,7 @@ export default function SubEventDetailPage() {
                       {skinCardFlights.map((flight) => {
                         const headerLabels = getHoleLabels(flight.rows[0]?.numholes ?? 9, flight.rows[0]?.startinghole ?? 1);
                         return (
-                          <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection">
+                          <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection" style={{ "--hole-cols": headerLabels.length } as React.CSSProperties}>
                             <div className="flightHeader">{flight.flightname ?? flight.flight_id ?? "Unassigned"}</div>
                             <div className="detailHeadRow">
                               <span>Name</span>
@@ -652,7 +680,7 @@ export default function SubEventDetailPage() {
                       {skinCardFlights.map((flight) => {
                       const headerLabels = getHoleLabels(flight.rows[0]?.numholes ?? 9, flight.rows[0]?.startinghole ?? 1);
                       return (
-                        <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection">
+                        <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection" style={{ "--hole-cols": headerLabels.length } as React.CSSProperties}>
                           <div className="flightHeader">{flight.flightname ?? flight.flight_id ?? "Unassigned"}</div>
                           <div className="detailHeadRow">
                             <span>Name</span>
@@ -764,7 +792,7 @@ export default function SubEventDetailPage() {
                       {skinCardFlights.map((flight) => {
                       const headerLabels = getHoleLabels(flight.rows[0]?.numholes ?? 9, flight.rows[0]?.startinghole ?? 1);
                       return (
-                        <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection">
+                        <div key={`flight-${flight.flight_id ?? "na"}-${flight.flightname ?? ""}`} className="flightSection" style={{ "--hole-cols": headerLabels.length } as React.CSSProperties}>
                           <div className="flightHeader">{flight.flightname ?? flight.flight_id ?? "Unassigned"}</div>
                           <div className="detailHeadRow">
                             <span>Name</span>
@@ -883,12 +911,12 @@ export default function SubEventDetailPage() {
         .flightSection { display: grid; gap: 2px; }
         .flightHeader { font-size: 12px; font-weight: 800; color: #1e3a8a; padding: 2px 0 4px; border-bottom: 1px solid #dbeafe; }
         .detailHeadRow { display: grid; grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px; gap: 8px; align-items: center; color: #6b7280; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 0; }
-        .holesHeadGrid { display: grid; grid-template-columns: repeat(9, minmax(26px, 1fr)); gap: 4px; text-align: center; }
+        .holesHeadGrid { display: grid; grid-template-columns: repeat(var(--hole-cols, 9), minmax(26px, 1fr)); gap: 4px; text-align: center; }
         .detailRow { display: grid; grid-template-columns: minmax(220px, 320px) minmax(92px, 110px) 60px 1fr 60px 60px; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #e5e7eb; }
         .detailMeta { display: flex; gap: 8px; align-items: center; min-width: 0; font-size: 11px; }
         .dateCell { color: #6b7280; font-size: 11px; white-space: nowrap; text-align: left; }
                 .memberTag { color: #1f2937; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                .scoreGrid { display: grid; grid-template-columns: repeat(9, minmax(28px, 1fr)); gap: 2px; align-items: stretch; }
+                .scoreGrid { display: grid; grid-template-columns: repeat(var(--hole-cols, 9), minmax(28px, 1fr)); gap: 2px; align-items: stretch; }
                 .scoreCell { border: 1px solid #e5e7eb; border-radius: 3px; padding: 2px 0; font-size: 11px; color: #111827; background: #fff; font-weight: 600; text-align: center; display: grid; place-items: center; line-height: 1; }
         .grossHint { font-size: 8px; color: #6b7280; font-weight: 400; line-height: 1; }
         .scoreCell.neutral { background: #f8fafc; }
@@ -907,7 +935,7 @@ export default function SubEventDetailPage() {
           .detailRow { grid-template-columns: 1fr; align-items: start; }
           .dateCell { text-align: left; }
           .detailMeta { flex-wrap: wrap; }
-          .scoreGrid { grid-template-columns: repeat(9, minmax(24px, 1fr)); }
+          .scoreGrid { grid-template-columns: repeat(var(--hole-cols, 9), minmax(24px, 1fr)); }
         }
       `}</style>
     </div>

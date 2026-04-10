@@ -1977,10 +1977,15 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
         COALESCE(n.numholes, 9) AS numholes,
         COALESCE(n.startinghole, 1) AS startinghole,
         ec.hole1, ec.hole2, ec.hole3, ec.hole4, ec.hole5, ec.hole6, ec.hole7, ec.hole8, ec.hole9,
+        ec.hole10, ec.hole11, ec.hole12, ec.hole13, ec.hole14, ec.hole15, ec.hole16, ec.hole17, ec.hole18,
         n.hole1 AS par1, n.hole2 AS par2, n.hole3 AS par3, n.hole4 AS par4, n.hole5 AS par5,
         n.hole6 AS par6, n.hole7 AS par7, n.hole8 AS par8, n.hole9 AS par9,
+        n.hole10 AS par10, n.hole11 AS par11, n.hole12 AS par12, n.hole13 AS par13, n.hole14 AS par14,
+        n.hole15 AS par15, n.hole16 AS par16, n.hole17 AS par17, n.hole18 AS par18,
         n.handicaphole1, n.handicaphole2, n.handicaphole3, n.handicaphole4, n.handicaphole5,
-        n.handicaphole6, n.handicaphole7, n.handicaphole8, n.handicaphole9
+        n.handicaphole6, n.handicaphole7, n.handicaphole8, n.handicaphole9,
+        n.handicaphole10, n.handicaphole11, n.handicaphole12, n.handicaphole13, n.handicaphole14,
+        n.handicaphole15, n.handicaphole16, n.handicaphole17, n.handicaphole18
       FROM eventCard ec
       INNER JOIN memberMain m ON m.member_id = ec.member_id
       INNER JOIN rosterMemberLink rml ON rml.member_id = ec.member_id AND rml.roster_id = ?
