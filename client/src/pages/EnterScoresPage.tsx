@@ -457,6 +457,20 @@ export default function EnterScoresPage() {
                 {(selectedCard.lastname || "").trim()}, {(selectedCard.firstname || "").trim()}
               </div>
               <div className="formRow">
+                <span className="formLabelText">Date</span>
+                <input
+                  type="date"
+                  className="dateInput"
+                  value={cardForm.card_dt}
+                  onChange={(e) => setCardForm((p) => ({ ...p, card_dt: e.target.value }))}
+                />
+              </div>
+              {isDateOutsideEvent(cardForm.card_dt, event) && (
+                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
+                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
+                </div>
+              )}
+              <div className="formRow">
                 <span className="formLabelText">Member</span>
                 <input
                   ref={editMemberRef}
@@ -579,31 +593,15 @@ export default function EnterScoresPage() {
                   </div>
                 </div>
               )}
-              <div className="row twoCols">
-                <label className="formLabel inlineLabel">
-                  <span>Date</span>
-                  <input
-                    type="date"
-                    className="dateInput"
-                    value={cardForm.card_dt}
-                    onChange={(e) => setCardForm((p) => ({ ...p, card_dt: e.target.value }))}
-                  />
-                </label>
-                <label className="formLabel inlineLabel">
-                  <span>Gross</span>
-                  <input
-                    className="grossInput"
-                    value={String(computeGross(cardForm.holes))}
-                    readOnly
-                    aria-readonly="true"
-                  />
-                </label>
+              <div className="formRow">
+                <span className="formLabelText">Gross</span>
+                <input
+                  className="grossInput"
+                  value={String(computeGross(cardForm.holes))}
+                  readOnly
+                  aria-readonly="true"
+                />
               </div>
-              {isDateOutsideEvent(cardForm.card_dt, event) && (
-                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
-                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
-                </div>
-              )}
               <div className="actions">
                 <button className="btn primary" onClick={saveCard} disabled={busy}>
                   {busy ? "Saving…" : "Save card"}
@@ -615,6 +613,20 @@ export default function EnterScoresPage() {
             </div>
           ) : (
             <div className="form">
+              <div className="formRow">
+                <span className="formLabelText">Date</span>
+                <input
+                  type="date"
+                  className="dateInput"
+                  value={addCardForm.card_dt}
+                  onChange={(e) => setAddCardForm((p) => ({ ...p, card_dt: e.target.value }))}
+                />
+              </div>
+              {isDateOutsideEvent(addCardForm.card_dt, event) && (
+                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
+                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
+                </div>
+              )}
               <div className="formRow">
                 <span className="formLabelText">Member</span>
                 <input
@@ -744,31 +756,15 @@ export default function EnterScoresPage() {
                   </div>
                 </div>
               )}
-              <div className="row twoCols">
-                <label className="formLabel inlineLabel">
-                  <span>Date</span>
-                  <input
-                    type="date"
-                    className="dateInput"
-                    value={addCardForm.card_dt}
-                    onChange={(e) => setAddCardForm((p) => ({ ...p, card_dt: e.target.value }))}
-                  />
-                </label>
-                <label className="formLabel inlineLabel">
-                  <span>Gross</span>
-                  <input
-                    className="grossInput"
-                    value={String(computeGross(addCardForm.holes))}
-                    readOnly
-                    aria-readonly="true"
-                  />
-                </label>
+              <div className="formRow">
+                <span className="formLabelText">Gross</span>
+                <input
+                  className="grossInput"
+                  value={String(computeGross(addCardForm.holes))}
+                  readOnly
+                  aria-readonly="true"
+                />
               </div>
-              {isDateOutsideEvent(addCardForm.card_dt, event) && (
-                <div style={{ color: "#b45309", background: "#fef3c7", padding: "4px 8px", borderRadius: 4, fontSize: "0.85em", marginTop: -4 }}>
-                  Date is outside event dates ({toInputDate(event?.start_dt)} – {toInputDate(event?.end_dt)})
-                </div>
-              )}
               <div className="actions">
                 <button className="btn primary" onClick={createCard} disabled={busy}>
                   {busy ? "Saving…" : "Enter Score"}
