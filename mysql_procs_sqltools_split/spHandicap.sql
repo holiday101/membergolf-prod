@@ -1,4 +1,4 @@
-CREATE PROCEDURE spHandicap(IN p_eventid INT)
+CREATE PROCEDURE spHandicap(IN p_eventid INT, IN p_cutoffdt DATETIME)
 BEGIN
   DECLARE v_courseid INT;
   DECLARE v_eventdt DATETIME;
@@ -22,6 +22,10 @@ BEGIN
     INTO v_eventdt, v_courseid
     FROM eventMain
    WHERE event_id = p_eventid;
+
+  IF p_cutoffdt IS NOT NULL THEN
+    SET v_eventdt = p_cutoffdt;
+  END IF;
 
   SELECT cardsmax, cardsused
     INTO v_cardsmax, v_cardsused
