@@ -14,6 +14,7 @@ type SubEventDetail = {
   addedmoney: number | null;
   drawn_hole: number | null;
   startinghole: number;
+  numholes: number | null;
 };
 
 type SkinRow = {
@@ -482,8 +483,8 @@ export default function SubEventDetailPage() {
                   onChange={(e) => setForm((p) => ({ ...p, drawn_hole: e.target.value }))}
                 >
                   <option value="">Select hole</option>
-                  {[1,2,3,4,5,6,7,8,9].map((h) => (
-                    <option key={h} value={String(h)}>Hole {h + (data?.startinghole ?? 1) - 1}</option>
+                  {getHoleLabels(data?.numholes ?? null, data?.startinghole ?? null).map((displayHole, i) => (
+                    <option key={displayHole} value={String(i + 1)}>Hole {displayHole}</option>
                   ))}
                 </select>
               </div>
