@@ -565,74 +565,104 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     const cardsmax = Number(courseRows?.[0]?.cardsmax ?? 0);
     const cardsused = Number(courseRows?.[0]?.cardsused ?? 0);
 
-    const [eligibleCountRows] = await pool.query<any[]>(
-      `
-        SELECT COUNT(*) AS total
-        FROM eventCard c
-        JOIN eventMain e ON e.event_id = c.event_id
-        WHERE c.course_id = ? AND c.member_id = ?
-          AND e.handicap_yn = 1
-          AND c.card_dt < NOW()
-      `,
-      [courseId, memberId]
-    );
-    const totalScores = Number(eligibleCountRows?.[0]?.total ?? 0);
-
     const capCardsMax = Math.max(cardsmax, 0);
     const capCardsUsed = Math.max(cardsused, 0);
-    let usedBase = 0;
-    if (totalScores >= capCardsMax && capCardsMax > 0) {
-      usedBase = capCardsUsed - 1;
-    } else if (totalScores <= 3) usedBase = 0;
-    else if (totalScores <= 5) usedBase = 1;
-    else if (totalScores <= 7) usedBase = 2;
-    else if (totalScores <= 9) usedBase = 3;
-    else if (totalScores <= 11) usedBase = 4;
-    else if (totalScores <= 13) usedBase = 5;
-    else if (totalScores <= 15) usedBase = 6;
-    else if (totalScores <= 17) usedBase = 7;
-    else if (totalScores <= 19) usedBase = 8;
-    else usedBase = 9;
+    const cutoffDt = courseRows?.[0]?.last_handicap_cutoff_dt ?? null;
 
-    const usedCount = totalScores > 0 ? Math.max(0, usedBase + 1) : 0;
+    async function computeHandicapCalc(beforeDate: string | null) {
+      const dateExpr = beforeDate ? "?" : "NOW()";
+      const dateParams = beforeDate ? [beforeDate] : [];
 
-    const [recentEligibleRounds] = await pool.query<any[]>(
-      `
-        SELECT
-          c.card_id,
-          c.event_id,
-          c.card_dt,
-          c.numholes,
-          c.gross,
-          c.net,
-          c.adjustedscore,
-          c.hdiff,
-          e.eventname
-        FROM eventCard c
-        JOIN eventMain e ON e.event_id = c.event_id
-        WHERE c.course_id = ? AND c.member_id = ?
-          AND e.handicap_yn = 1
-          AND c.card_dt < NOW()
-        ORDER BY c.card_dt DESC, c.card_id DESC
-        LIMIT ?
-      `,
-      [courseId, memberId, capCardsMax > 0 ? capCardsMax : 0]
-    );
+      const [eligibleCountRows] = await pool.query<any[]>(
+        `SELECT COUNT(*) AS total
+         FROM eventCard c
+         JOIN eventMain e ON e.event_id = c.event_id
+         WHERE c.course_id = ? AND c.member_id = ?
+           AND e.handicap_yn = 1
+           AND c.card_dt < ${dateExpr}`,
+        [courseId, memberId, ...dateParams]
+      );
+      const totalScores = Number(eligibleCountRows?.[0]?.total ?? 0);
 
-    const usedCardIds = new Set<number>(
-      [...recentEligibleRounds]
-        .filter((r) => typeof r.hdiff === "number")
-        .sort((a, b) => {
-          if (a.hdiff !== b.hdiff) return a.hdiff - b.hdiff;
-          if (a.card_dt !== b.card_dt) return String(b.card_dt).localeCompare(String(a.card_dt));
-          return (b.card_id ?? 0) - (a.card_id ?? 0);
-        })
-        .slice(0, usedCount)
-        .map((r) => Number(r.card_id))
-    );
-    const usedHdiffSum = [...recentEligibleRounds]
-      .filter((r) => usedCardIds.has(Number(r.card_id)) && typeof r.hdiff === "number")
-      .reduce((sum, r) => sum + Number(r.hdiff), 0);
+      let usedBase = 0;
+      if (totalScores >= capCardsMax && capCardsMax > 0) {
+        usedBase = capCardsUsed - 1;
+      } else if (totalScores <= 3) usedBase = 0;
+      else if (totalScores <= 5) usedBase = 1;
+      else if (totalScores <= 7) usedBase = 2;
+      else if (totalScores <= 9) usedBase = 3;
+      else if (totalScores <= 11) usedBase = 4;
+      else if (totalScores <= 13) usedBase = 5;
+      else if (totalScores <= 15) usedBase = 6;
+      else if (totalScores <= 17) usedBase = 7;
+      else if (totalScores <= 19) usedBase = 8;
+      else usedBase = 9;
+
+      const usedCount = totalScores > 0 ? Math.max(0, usedBase + 1) : 0;
+
+      const [recentEligibleRounds] = await pool.query<any[]>(
+        `SELECT
+           c.card_id, c.event_id, c.card_dt, c.numholes,
+           c.gross, c.net, c.adjustedscore, c.hdiff, e.eventname
+         FROM eventCard c
+         JOIN eventMain e ON e.event_id = c.event_id
+         WHERE c.course_id = ? AND c.member_id = ?
+           AND e.handicap_yn = 1
+           AND c.card_dt < ${dateExpr}
+         ORDER BY c.card_dt DESC, c.card_id DESC
+         LIMIT ?`,
+        [courseId, memberId, ...dateParams, capCardsMax > 0 ? capCardsMax : 0]
+      );
+
+      const usedCardIds = new Set<number>(
+        [...recentEligibleRounds]
+          .filter((r) => typeof r.hdiff === "number")
+          .sort((a, b) => {
+            if (a.hdiff !== b.hdiff) return a.hdiff - b.hdiff;
+            if (a.card_dt !== b.card_dt) return String(b.card_dt).localeCompare(String(a.card_dt));
+            return (b.card_id ?? 0) - (a.card_id ?? 0);
+          })
+          .slice(0, usedCount)
+          .map((r) => Number(r.card_id))
+      );
+      const usedHdiffSum = [...recentEligibleRounds]
+        .filter((r) => usedCardIds.has(Number(r.card_id)) && typeof r.hdiff === "number")
+        .reduce((sum, r) => sum + Number(r.hdiff), 0);
+
+      return {
+        total_scores: totalScores,
+        used_count: usedCount,
+        used_hdiff_sum: Number(usedHdiffSum.toFixed(4)),
+        rounds: recentEligibleRounds.map((r) => ({
+          ...r,
+          used_in_calc: usedCardIds.has(Number(r.card_id)),
+        })),
+      };
+    }
+
+    // Current handicap: rounds before cutoff (or all rounds if no cutoff)
+    const currentCalc = await computeHandicapCalc(cutoffDt ? String(cutoffDt) : null);
+
+    // Pending handicap: if cutoff exists, recalculate with all rounds up to now
+    let pendingObj: any = null;
+    if (cutoffDt) {
+      const fullCalc = await computeHandicapCalc(null); // up to NOW()
+      const cutoffTime = new Date(cutoffDt).getTime();
+      const pendingRounds = fullCalc.rounds.filter(
+        (r) => new Date(r.card_dt).getTime() >= cutoffTime
+      );
+      if (pendingRounds.length > 0) {
+        pendingObj = {
+          total_scores: fullCalc.total_scores,
+          used_count: fullCalc.used_count,
+          used_hdiff_sum: fullCalc.used_hdiff_sum,
+          pending_handicap: fullCalc.used_count > 0
+            ? Number((fullCalc.used_hdiff_sum / fullCalc.used_count).toFixed(2))
+            : null,
+          rounds: pendingRounds,
+        };
+      }
+    }
 
     const roundsSql = `
       SELECT
@@ -693,17 +723,12 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     res.json({
       member,
       groups,
-      handicap_cutoff_dt: courseRows?.[0]?.last_handicap_cutoff_dt ?? null,
+      handicap_cutoff_dt: cutoffDt,
       handicap_calculation: {
         cardsmax: capCardsMax,
         cardsused: capCardsUsed,
-        total_scores: totalScores,
-        used_count: usedCount,
-        used_hdiff_sum: Number(usedHdiffSum.toFixed(4)),
-        rounds: recentEligibleRounds.map((r) => ({
-          ...r,
-          used_in_calc: usedCardIds.has(Number(r.card_id)),
-        })),
+        current: currentCalc,
+        pending: pendingObj,
       },
     });
   } catch {

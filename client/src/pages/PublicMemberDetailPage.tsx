@@ -42,6 +42,26 @@ type Winning = {
   eventname: string | null;
 };
 
+type CalcRound = {
+  card_id: number;
+  event_id: number | null;
+  card_dt: string | null;
+  numholes: number | null;
+  gross: number | null;
+  net: number | null;
+  adjustedscore: number | null;
+  hdiff: number | null;
+  eventname: string | null;
+  used_in_calc: boolean;
+};
+
+type CalcResult = {
+  total_scores: number;
+  used_count: number;
+  used_hdiff_sum: number;
+  rounds: CalcRound[];
+};
+
 type MemberDetail = {
   member: {
     member_id: number;
@@ -79,21 +99,8 @@ type MemberDetail = {
   handicap_calculation?: {
     cardsmax: number;
     cardsused: number;
-    total_scores: number;
-    used_count: number;
-    used_hdiff_sum: number;
-    rounds: Array<{
-      card_id: number;
-      event_id: number | null;
-      card_dt: string | null;
-      numholes: number | null;
-      gross: number | null;
-      net: number | null;
-      adjustedscore: number | null;
-      hdiff: number | null;
-      eventname: string | null;
-      used_in_calc: boolean;
-    }>;
+    current: CalcResult;
+    pending: (CalcResult & { pending_handicap: number | null }) | null;
   };
 };
 
@@ -113,6 +120,31 @@ function formatAverage(value: number | null) {
 function formatHdiff(value: number | null | undefined) {
   if (typeof value !== "number" || Number.isNaN(value)) return "—";
   return Number(value).toFixed(2);
+}
+
+function CalcTable({ rounds }: { rounds: CalcRound[] }) {
+  return (
+    <div className="calcTable">
+      <div className="calcRow calcHead">
+        <div>Card Date</div>
+        <div>Event</div>
+        <div>Gross</div>
+        <div>Net</div>
+        <div>Adj</div>
+        <div>HDiff</div>
+      </div>
+      {rounds.map((r) => (
+        <div key={r.card_id} className={`calcRow ${r.used_in_calc ? "usedRow" : ""}`}>
+          <div>{formatDate(r.card_dt)}</div>
+          <div>{r.eventname ?? "Event"}</div>
+          <div>{r.gross ?? "—"}</div>
+          <div>{r.net ?? "—"}</div>
+          <div>{r.adjustedscore ?? "—"}</div>
+          <div>{formatHdiff(r.hdiff)}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function getHoleLabels(numholes: number | null, startinghole: number | null): number[] {
@@ -510,40 +542,34 @@ export default function PublicMemberDetailPage() {
             {data.handicap_calculation ? (
               <>
                 <div className="calcMeta">
-                  <span>Total Eligible Rounds: {data.handicap_calculation.total_scores}</span>
+                  <span>Total Eligible Rounds: {data.handicap_calculation.current.total_scores}</span>
                   <span>Recent Pool (cardsmax): {data.handicap_calculation.cardsmax}</span>
-                  <span>Used in Calc: {data.handicap_calculation.used_count}</span>
-                  <span>Total HDiff Used: {formatHdiff(data.handicap_calculation.used_hdiff_sum)}</span>
+                  <span>Used in Calc: {data.handicap_calculation.current.used_count}</span>
+                  <span>Total HDiff Used: {formatHdiff(data.handicap_calculation.current.used_hdiff_sum)}</span>
                 </div>
-                {data.handicap_calculation.rounds.length === 0 ? (
+                {data.handicap_calculation.current.rounds.length === 0 ? (
                   <div className="empty">No handicap-eligible rounds</div>
                 ) : (
-                  <div className="calcTable">
-                    <div className="calcRow calcHead">
-                      <div>Card Date</div>
-                      <div>Event</div>
-                      <div>Gross</div>
-                      <div>Net</div>
-                      <div>Adj</div>
-                      <div>HDiff</div>
-                    </div>
-                    {data.handicap_calculation.rounds.map((r) => (
-                      <div key={r.card_id} className={`calcRow ${r.used_in_calc ? "usedRow" : ""}`}>
-                        <div>{formatDate(r.card_dt)}</div>
-                        <div>{r.eventname ?? "Event"}</div>
-                        <div>{r.gross ?? "—"}</div>
-                        <div>{r.net ?? "—"}</div>
-                        <div>{r.adjustedscore ?? "—"}</div>
-                        <div>{formatHdiff(r.hdiff)}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <CalcTable rounds={data.handicap_calculation.current.rounds} />
                 )}
               </>
             ) : (
               <div className="empty">No calculation details</div>
             )}
           </section>
+
+          {data.handicap_calculation?.pending && data.handicap_calculation.pending.rounds.length > 0 && (
+            <section className="card">
+              <h3>Pending Rounds</h3>
+              <div className="calcMeta">
+                <span>Rounds since last cutoff: {data.handicap_calculation.pending.rounds.length}</span>
+                <span>Pending Handicap: {formatHdiff(data.handicap_calculation.pending.pending_handicap)}</span>
+                <span>Total Eligible (including pending): {data.handicap_calculation.pending.total_scores}</span>
+                <span>Would Use in Calc: {data.handicap_calculation.pending.used_count}</span>
+              </div>
+              <CalcTable rounds={data.handicap_calculation.pending.rounds} />
+            </section>
+          )}
         </div>
       ) : null}
 
