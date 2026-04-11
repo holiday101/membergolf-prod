@@ -569,7 +569,7 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     const capCardsUsed = Math.max(cardsused, 0);
     const cutoffDt = courseRows?.[0]?.last_handicap_cutoff_dt ?? null;
 
-    async function computeHandicapCalc(beforeDate: string | null) {
+    async function computeHandicapCalc(beforeDate: any) {
       const dateExpr = beforeDate ? "?" : "NOW()";
       const dateParams = beforeDate ? [beforeDate] : [];
 
@@ -641,7 +641,7 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     }
 
     // Current handicap: rounds before cutoff (or all rounds if no cutoff)
-    const currentCalc = await computeHandicapCalc(cutoffDt ? String(cutoffDt) : null);
+    const currentCalc = await computeHandicapCalc(cutoffDt ?? null);
 
     // Pending handicap: if cutoff exists, recalculate with all rounds up to now
     let pendingObj: any = null;
