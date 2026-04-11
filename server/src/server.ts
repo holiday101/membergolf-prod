@@ -4082,7 +4082,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
       roster_id: z.number().int().optional().nullable(),
       amount: z.number().optional().nullable(),
       addedmoney: z.number().optional().nullable(),
-      drawn_hole: z.number().int().min(1).max(9).optional().nullable(),
+      drawn_hole: z.number().int().min(1).max(18).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
