@@ -1833,13 +1833,12 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.drawn_hole,
         c.autoflight_yn,
         COALESCE(n.startinghole, 1) AS startinghole,
-        COALESCE(CAST(nh.eventnumholename AS UNSIGNED), n.numholes) AS numholes
+        n.numholes AS numholes
       FROM subEventMain s
       LEFT JOIN eventMain e ON e.event_id = s.event_id
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
       LEFT JOIN courseMain c ON c.course_id = s.course_id
       LEFT JOIN courseNine n ON n.nine_id = e.nine_id
-      LEFT JOIN subEventNumHole nh ON nh.eventnumhole_id = s.eventnumhole_id
       WHERE s.subevent_id = ?
       LIMIT 1
       `,
