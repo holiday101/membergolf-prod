@@ -4455,7 +4455,7 @@ app.post("/api/events/:id/handicaps", authMiddleware, async (req, res) => {
 
     const cutoffDate = req.body?.cutoffDate ?? null;
     await pool.query("CALL spHandicap(?, ?)", [id, cutoffDate]);
-    await pool.execute("UPDATE eventMain SET last_handicap_posted = NOW() WHERE event_id = ?", [id]);
+    await pool.execute("UPDATE eventMain SET last_handicap_posted = NOW(), last_handicap_cutoff_dt = ? WHERE event_id = ?", [cutoffDate, id]);
 
     const [rows] = await pool.query<any[]>(
       `
@@ -4470,10 +4470,10 @@ app.post("/api/events/:id/handicaps", authMiddleware, async (req, res) => {
     );
 
     const [meta] = await pool.query<any[]>(
-      "SELECT last_handicap_posted FROM eventMain WHERE event_id = ? LIMIT 1",
+      "SELECT last_handicap_posted, last_handicap_cutoff_dt FROM eventMain WHERE event_id = ? LIMIT 1",
       [id]
     );
-    res.json({ rows, last_posted: meta?.[0]?.last_handicap_posted ?? null });
+    res.json({ rows, last_posted: meta?.[0]?.last_handicap_posted ?? null, last_cutoff_dt: meta?.[0]?.last_handicap_cutoff_dt ?? null });
   } catch (err) {
     console.error("post handicaps error", err);
     res.status(500).json({ error: "Server error" });
@@ -4487,7 +4487,7 @@ app.get("/api/events/:id/handicaps", authMiddleware, async (req, res) => {
     if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
 
     const [eventRows] = await pool.query<any[]>(
-      "SELECT event_id, course_id, last_handicap_posted, start_dt FROM eventMain WHERE event_id = ? LIMIT 1",
+      "SELECT event_id, course_id, last_handicap_posted, last_handicap_cutoff_dt, start_dt FROM eventMain WHERE event_id = ? LIMIT 1",
       [id]
     );
     if (!eventRows.length) return res.status(404).json({ error: "Not found" });
@@ -4506,7 +4506,7 @@ app.get("/api/events/:id/handicaps", authMiddleware, async (req, res) => {
       `,
       [id]
     );
-    res.json({ rows, last_posted: eventRows[0].last_handicap_posted ?? null, start_dt: eventRows[0].start_dt ?? null });
+    res.json({ rows, last_posted: eventRows[0].last_handicap_posted ?? null, last_cutoff_dt: eventRows[0].last_handicap_cutoff_dt ?? null, start_dt: eventRows[0].start_dt ?? null });
   } catch (err) {
     console.error("get handicaps error", err);
     res.status(500).json({ error: "Server error" });

@@ -622,3 +622,6 @@ ALTER TABLE subEventMain ADD COLUMN IF NOT EXISTS drawn_hole INT NULL;
 
 -- Seed: Power Skin subevent type (insert only if not already present)
 INSERT IGNORE INTO subEventType (eventtypename) VALUES ('Power Skin');
+
+-- Migration: persist the cutoff date used when handicaps are posted
+ALTER TABLE eventMain ADD COLUMN IF NOT EXISTS last_handicap_cutoff_dt DATE NULL;

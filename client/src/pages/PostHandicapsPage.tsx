@@ -19,6 +19,7 @@ export default function PostHandicapsPage() {
   const [error, setError] = useState("");
   const [ran, setRan] = useState(false);
   const [lastPosted, setLastPosted] = useState<string | null>(null);
+  const [lastCutoffDt, setLastCutoffDt] = useState<string | null>(null);
   const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
   const [cutoffDate, setCutoffDate] = useState("");
 
@@ -56,13 +57,17 @@ export default function PostHandicapsPage() {
       const data = await res.json();
       setRows(data?.rows ?? []);
       setLastPosted(data?.last_posted ?? null);
+      setLastCutoffDt(data?.last_cutoff_dt ?? null);
       setRan(Boolean((data?.rows ?? []).length));
-      if (data?.start_dt) {
+      if (data?.last_cutoff_dt) {
+        setCutoffDate(data.last_cutoff_dt.slice(0, 10));
+      } else if (data?.start_dt) {
         setCutoffDate(data.start_dt.slice(0, 10));
       }
     } catch {
       setRows([]);
       setLastPosted(null);
+      setLastCutoffDt(null);
       setRan(false);
     }
   };
@@ -81,6 +86,7 @@ export default function PostHandicapsPage() {
       const data = await res.json();
       setRows(data?.rows ?? []);
       setLastPosted(data?.last_posted ?? null);
+      setLastCutoffDt(cutoffDate || null);
       setRan(true);
     } catch (e: any) {
       setError(e.message ?? "Failed to post handicaps");
@@ -189,7 +195,10 @@ export default function PostHandicapsPage() {
         <div>
           <div className="eventTitle">{eventName ?? "Post Handicaps"}</div>
           {lastPosted ? (
-            <div className="subtle">Last posted: {new Date(lastPosted).toLocaleString()}</div>
+            <div className="subtle">
+              Last posted: {new Date(lastPosted).toLocaleString()}
+              {lastCutoffDt ? ` · Cards before: ${lastCutoffDt.slice(0, 10)}` : null}
+            </div>
           ) : null}
         </div>
       </div>
