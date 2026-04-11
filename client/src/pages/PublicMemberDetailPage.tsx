@@ -75,6 +75,7 @@ type MemberDetail = {
     hole18?: number | null;
     rounds: Round[];
   }>;
+  handicap_cutoff_dt?: string | null;
   handicap_calculation?: {
     cardsmax: number;
     cardsused: number;
