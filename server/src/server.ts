@@ -559,7 +559,7 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     );
 
     const [courseRows] = await pool.query<any[]>(
-      "SELECT cardsmax, cardsused FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT cardsmax, cardsused, last_handicap_cutoff_dt FROM courseMain WHERE course_id = ? LIMIT 1",
       [courseId]
     );
     const cardsmax = Number(courseRows?.[0]?.cardsmax ?? 0);
@@ -693,6 +693,7 @@ app.get("/api/public/:courseId/members/:memberId", async (req, res) => {
     res.json({
       member,
       groups,
+      handicap_cutoff_dt: courseRows?.[0]?.last_handicap_cutoff_dt ?? null,
       handicap_calculation: {
         cardsmax: capCardsMax,
         cardsused: capCardsUsed,
@@ -4458,6 +4459,7 @@ app.post("/api/events/:id/handicaps", authMiddleware, async (req, res) => {
     const cutoffDate = req.body?.cutoffDate ?? null;
     await pool.query("CALL spHandicap(?, ?)", [id, cutoffDate]);
     await pool.execute("UPDATE eventMain SET last_handicap_posted = NOW(), last_handicap_cutoff_dt = ? WHERE event_id = ?", [cutoffDate, id]);
+    await pool.execute("UPDATE courseMain SET last_handicap_cutoff_dt = ? WHERE course_id = ?", [cutoffDate, eventRows[0].course_id]);
 
     const [rows] = await pool.query<any[]>(
       `

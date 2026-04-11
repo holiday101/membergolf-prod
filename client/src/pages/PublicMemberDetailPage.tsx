@@ -301,7 +301,8 @@ export default function PublicMemberDetailPage() {
             <h2>
               {fullName}{" "}
               <span style={{ fontWeight: 500, color: "#6b7280" }}>
-                ({formatHandicap(data.member.handicap, true)})
+                ({formatHandicap(data.member.handicap, true)}
+                {data.handicap_cutoff_dt ? ` as of ${new Date(data.handicap_cutoff_dt + "T00:00:00").toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "numeric" })}` : ""})
               </span>
             </h2>
             <div className="stats">

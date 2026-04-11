@@ -625,3 +625,6 @@ INSERT IGNORE INTO subEventType (eventtypename) VALUES ('Power Skin');
 
 -- Migration: persist the cutoff date used when handicaps are posted
 ALTER TABLE eventMain ADD COLUMN IF NOT EXISTS last_handicap_cutoff_dt DATE NULL;
+
+-- Migration: persist the cutoff date on courseMain for public member profile display
+ALTER TABLE courseMain ADD COLUMN IF NOT EXISTS last_handicap_cutoff_dt DATE NULL;
