@@ -52,7 +52,7 @@ BEGIN
     SELECT flight_id, hdcp1, hdcp2 FROM rosterFlight WHERE roster_id = v_rosterid;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
-  CALL spHandicap(p_eventid);
+  CALL spHandicap(p_eventid, NULL);
 
   SELECT amount, roster_id
     INTO v_skinamount, v_rosterid

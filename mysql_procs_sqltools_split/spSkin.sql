@@ -23,7 +23,7 @@ BEGIN
     FROM subEventMain
    WHERE subevent_id = p_subeventid;
 
-  CALL spHandicap(v_eventid);
+  CALL spHandicap(v_eventid, NULL);
 
   SELECT amount, roster_id
     INTO v_skinamount, v_rosterid
