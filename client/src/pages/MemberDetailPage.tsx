@@ -37,7 +37,6 @@ type MemberDetail = {
     member_id: number;
     firstname: string | null;
     lastname: string | null;
-    email?: string | null;
     handicap: number | null;
     handicap18: number | null;
   };
@@ -151,8 +150,10 @@ export default function MemberDetailPage() {
   const [error, setError] = useState<string>("");
   const [notice, setNotice] = useState<string>("");
   const [busy, setBusy] = useState(false);
-  const [email, setEmail] = useState("");
-  const [emailBusy, setEmailBusy] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [firstDraft, setFirstDraft] = useState("");
+  const [lastDraft, setLastDraft] = useState("");
+  const [nameBusy, setNameBusy] = useState(false);
   const [decimalHandicapEnabled, setDecimalHandicapEnabled] = useState(false);
 
   useEffect(() => {
@@ -179,7 +180,6 @@ export default function MemberDetailPage() {
         if (!res.ok) throw new Error(await res.text());
         const detail = await res.json();
         setData(detail);
-        setEmail(detail?.member?.email ?? "");
       } catch (e: any) {
         setError(e.message ?? "Failed to load member");
       } finally {
@@ -217,51 +217,51 @@ export default function MemberDetailPage() {
     }
   };
 
-  const saveEmail = async () => {
+  const beginEditName = () => {
+    if (!data) return;
+    setFirstDraft(data.member.firstname ?? "");
+    setLastDraft(data.member.lastname ?? "");
+    setError("");
+    setNotice("");
+    setEditingName(true);
+  };
+
+  const cancelEditName = () => {
+    setEditingName(false);
+    setFirstDraft("");
+    setLastDraft("");
+    setError("");
+    setNotice("");
+  };
+
+  const saveName = async () => {
     if (!memberId) return;
-    setEmailBusy(true);
+    const first = firstDraft.trim();
+    const last = lastDraft.trim();
+    if (!first || !last) {
+      setError("First and last name are required.");
+      return;
+    }
+    setNameBusy(true);
     setError("");
     setNotice("");
     try {
       const res = await apiFetch(`/members/${memberId}`, {
         method: "PUT",
-        body: JSON.stringify({ email: email.trim() ? email.trim().toLowerCase() : null }),
+        body: JSON.stringify({ firstname: first, lastname: last }),
       });
       if (!res.ok) throw new Error(await res.text());
       const updated = await apiFetch(`/members/${memberId}`);
       if (updated.ok) {
         const detail = await updated.json();
         setData(detail);
-        setEmail(detail?.member?.email ?? "");
       }
-      setNotice("Email saved.");
+      setEditingName(false);
+      setNotice("Name saved.");
     } catch (e: any) {
-      setError(e.message ?? "Failed to save email");
+      setError(e.message ?? "Failed to save name");
     } finally {
-      setEmailBusy(false);
-    }
-  };
-
-  const sendInvite = async () => {
-    const value = email.trim();
-    if (!value) {
-      setError("Email is required to send an invite.");
-      return;
-    }
-    setEmailBusy(true);
-    setError("");
-    setNotice("");
-    try {
-      const res = await apiFetch("/auth/invite", {
-        method: "POST",
-        body: JSON.stringify({ email: value.toLowerCase() }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setNotice("Invite sent.");
-    } catch (e: any) {
-      setError(e.message ?? "Failed to send invite");
-    } finally {
-      setEmailBusy(false);
+      setNameBusy(false);
     }
   };
 
@@ -282,39 +282,66 @@ export default function MemberDetailPage() {
           <section className="card">
             <div className="titleRow">
               <div className="nameRow">
-                <h2>{fullName}</h2>
-                <button
-                  className="trashBtn"
-                  onClick={deleteMember}
-                  disabled={busy}
-                  aria-label="Delete member"
-                  title="Delete member"
-                >
-                  {busy ? (
-                    "…"
-                  ) : (
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v11a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm1 2h4v1h-4V5Zm-1 4a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0v-7a1 1 0 0 1 1-1Zm6 1a1 1 0 1 0-2 0v7a1 1 0 1 0 2 0v-7Z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  )}
-                </button>
-              </div>
-              <div className="emailRow">
-                <input
-                  className="emailInput"
-                  placeholder="member@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <button className="btn" onClick={saveEmail} disabled={emailBusy}>
-                  Save
-                </button>
-                <button className="btn primary" onClick={sendInvite} disabled={emailBusy}>
-                  Send Invite
-                </button>
+                {editingName ? (
+                  <>
+                    <input
+                      className="textInput"
+                      placeholder="First name"
+                      value={firstDraft}
+                      onChange={(e) => setFirstDraft(e.target.value)}
+                      disabled={nameBusy}
+                      autoFocus
+                    />
+                    <input
+                      className="textInput"
+                      placeholder="Last name"
+                      value={lastDraft}
+                      onChange={(e) => setLastDraft(e.target.value)}
+                      disabled={nameBusy}
+                    />
+                    <button className="btn primary" onClick={saveName} disabled={nameBusy}>
+                      {nameBusy ? "Saving…" : "Save"}
+                    </button>
+                    <button className="btn" onClick={cancelEditName} disabled={nameBusy}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2>{fullName}</h2>
+                    <button
+                      className="pencilBtn"
+                      onClick={beginEditName}
+                      aria-label="Edit name"
+                      title="Edit name"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M14.06 4.19a2 2 0 0 1 2.83 0l2.92 2.92a2 2 0 0 1 0 2.83L8.5 21.25a1 1 0 0 1-.47.26l-4.24 1.06a1 1 0 0 1-1.21-1.21l1.06-4.24a1 1 0 0 1 .26-.47L14.06 4.19Zm1.41 1.41L5.66 15.41l-.7 2.83 2.83-.7 9.81-9.81-2.13-2.13Zm3.54.71-1.42 1.41 2.13 2.13 1.41-1.41-2.12-2.13Z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      className="trashBtn"
+                      onClick={deleteMember}
+                      disabled={busy}
+                      aria-label="Delete member"
+                      title="Delete member"
+                    >
+                      {busy ? (
+                        "…"
+                      ) : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h1v11a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7h1a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm1 2h4v1h-4V5Zm-1 4a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0v-7a1 1 0 0 1 1-1Zm6 1a1 1 0 1 0-2 0v7a1 1 0 1 0 2 0v-7Z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
             <div className="stats">
@@ -470,29 +497,35 @@ export default function MemberDetailPage() {
         h2 { margin: 0; font-size: 18px; }
         h3 { margin: 0 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; }
         .titleRow { display: grid; gap: 8px; margin-bottom: 10px; }
-        .nameRow { display: flex; align-items: center; gap: 10px; }
-        .emailRow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .emailInput {
+        .nameRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .textInput {
           padding: 6px 10px;
           border-radius: 8px;
           border: 1px solid #d1d5db;
           font-size: 12px;
-          min-width: 220px;
+          min-width: 140px;
         }
-        .trashBtn {
+        .trashBtn, .pencilBtn {
           width: 30px;
           height: 30px;
           border-radius: 10px;
-          border: 1px solid #fecaca;
-          background: #fee2e2;
-          color: #b91c1c;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
           justify-content: center;
         }
-        .trashBtn svg { width: 16px; height: 16px; }
-        .trashBtn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .trashBtn {
+          border: 1px solid #fecaca;
+          background: #fee2e2;
+          color: #b91c1c;
+        }
+        .pencilBtn {
+          border: 1px solid #e5e7eb;
+          background: #f3f4f6;
+          color: #374151;
+        }
+        .trashBtn svg, .pencilBtn svg { width: 16px; height: 16px; }
+        .trashBtn:disabled, .pencilBtn:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn {
           border: 1px solid #d1d5db;
           background: #fff;
