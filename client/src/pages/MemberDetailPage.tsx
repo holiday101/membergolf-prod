@@ -604,7 +604,6 @@ export default function MemberDetailPage() {
           z-index: 0;
         }
         .holeValue { position: relative; z-index: 1; }
-        .holeCell:nth-child(even) { background: inherit; }
         .empty { color: #9ca3af; font-size: 12px; padding: 4px 0; }
         .error { color: #a00; font-size: 12px; }
         .toast {
