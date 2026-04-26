@@ -208,6 +208,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
         WHERE (ml.event_id = ? OR se.event_id = ?)
           AND ml.amount <> 0
+          AND ml.source_table != 'eventOtherPay'
 
         UNION ALL
 
