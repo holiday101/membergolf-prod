@@ -241,10 +241,12 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
+        f.flightname,
         w.flight_id,
         CASE WHEN w.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
         FIELD(w.payout_type, 'GROSS', 'NET', 'SKIN', 'POWER_SKIN', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
-        w.amount DESC
+        m.lastname,
+        m.firstname
       `,
       [eventId, eventId, eventId, courseId]
     );

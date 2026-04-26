@@ -253,24 +253,28 @@ export default function PublicEventDetailPage() {
       }
     }
 
+    const byName = (a: WinningsRow, b: WinningsRow) =>
+      `${a.lastname ?? ""}, ${a.firstname ?? ""}`.localeCompare(`${b.lastname ?? ""}, ${b.firstname ?? ""}`, undefined, { sensitivity: "base" });
+
     const result = Array.from(map.values()).map((fg) => ({
       ...fg,
-      gross: [...fg.gross].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
-      net: [...fg.net].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
+      gross: [...fg.gross].sort(byName),
+      net: [...fg.net].sort(byName),
       skinGroups: fg.skinGroups.map((sg) => ({
         ...sg,
         rows: [...sg.rows].sort((a, b) => {
           const ah = Number((a.description || "").replace(/\D/g, "")) || 999;
           const bh = Number((b.description || "").replace(/\D/g, "")) || 999;
           if (ah !== bh) return ah - bh;
-          return (b.amount ?? 0) - (a.amount ?? 0);
+          return byName(a, b);
         }),
       })),
       other: fg.other.map((og) => ({
         ...og,
-        rows: [...og.rows].sort((a, b) => (a.place ?? 999) - (b.place ?? 999) || (b.amount ?? 0) - (a.amount ?? 0)),
+        rows: [...og.rows].sort(byName),
       })),
     }));
+    result.sort((a, b) => a.flightLabel.localeCompare(b.flightLabel, undefined, { sensitivity: "base" }));
 
     const otherGroups: { type: string; label: string; rows: WinningsRow[] }[] = [];
     for (const row of noFlightOther) {
@@ -284,7 +288,7 @@ export default function PublicEventDetailPage() {
       og.rows.push(row);
     }
 
-    return { flights: result, otherGroups };
+    return { flights: result, otherGroups: otherGroups.map((og) => ({ ...og, rows: [...og.rows].sort(byName) })) };
   }, [winnings]);
 
   // Find the specific card by card_id
