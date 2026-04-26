@@ -269,10 +269,9 @@ export default function PublicEventDetailPage() {
           return byName(a, b);
         }),
       })),
-      other: fg.other.map((og) => ({
-        ...og,
-        rows: [...og.rows].sort(byName),
-      })),
+      other: fg.other
+        .map((og) => ({ ...og, rows: [...og.rows].sort(byName) }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
     }));
     result.sort((a, b) => a.flightLabel.localeCompare(b.flightLabel, undefined, { sensitivity: "base" }));
 
@@ -288,7 +287,12 @@ export default function PublicEventDetailPage() {
       og.rows.push(row);
     }
 
-    return { flights: result, otherGroups: otherGroups.map((og) => ({ ...og, rows: [...og.rows].sort(byName) })) };
+    return {
+      flights: result,
+      otherGroups: otherGroups
+        .map((og) => ({ ...og, rows: [...og.rows].sort(byName) }))
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
+    };
   }, [winnings]);
 
   // Find the specific card by card_id
