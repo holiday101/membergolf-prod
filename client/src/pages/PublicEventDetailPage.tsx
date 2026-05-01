@@ -256,10 +256,18 @@ export default function PublicEventDetailPage() {
     const byName = (a: WinningsRow, b: WinningsRow) =>
       `${a.lastname ?? ""}, ${a.firstname ?? ""}`.localeCompare(`${b.lastname ?? ""}, ${b.firstname ?? ""}`, undefined, { sensitivity: "base" });
 
+    const byPlace = (a: WinningsRow, b: WinningsRow) => {
+      if (a.place == null && b.place == null) return (b.amount ?? 0) - (a.amount ?? 0);
+      if (a.place == null) return 1;
+      if (b.place == null) return -1;
+      if (a.place !== b.place) return a.place - b.place;
+      return (b.amount ?? 0) - (a.amount ?? 0);
+    };
+
     const result = Array.from(map.values()).map((fg) => ({
       ...fg,
-      gross: [...fg.gross].sort(byName),
-      net: [...fg.net].sort(byName),
+      gross: [...fg.gross].sort(byPlace),
+      net: [...fg.net].sort(byPlace),
       skinGroups: fg.skinGroups.map((sg) => ({
         ...sg,
         rows: [...sg.rows].sort((a, b) => {

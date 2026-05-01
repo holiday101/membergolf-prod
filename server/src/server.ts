@@ -245,8 +245,8 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         w.flight_id,
         CASE WHEN w.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
         FIELD(w.payout_type, 'GROSS', 'NET', 'SKIN', 'POWER_SKIN', 'BB_GROSS', 'BB_NET', 'CHICAGO', 'OTHER'),
-        m.lastname,
-        m.firstname
+        w.place,
+        w.amount DESC
       `,
       [eventId, eventId, eventId, courseId]
     );
