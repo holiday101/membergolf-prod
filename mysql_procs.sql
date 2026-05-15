@@ -3271,9 +3271,10 @@ BEGIN
     2) drawn_hole is 1-9: one hole is drawn for the entire event.
     3) Iterate every flight in that roster.
     4) For each flight, find the lowest score on drawn_hole among eligible cards.
-    5) ALL players tied at that low score win (ties ARE winners, unlike regular skins).
-    6) Pot per flight = amount_per_player * number_of_players_in_flight.
-       Winners split the pot equally.
+    5) ALL cards tied at that low score win (ties ARE winners, unlike regular skins).
+       A player with two cards both matching the low score wins twice.
+    6) Pot per flight = amount_per_player * number_of_cards_in_flight.
+       Each winning card gets an equal share of the pot.
     7) Results stored in eventSkin table (same as gross skins).
   */
 
@@ -3371,8 +3372,8 @@ BEGIN
       ITERATE flight_loop;
     END IF;
 
-    /* Count all distinct members tied at the low score (ALL ties win). */
-    SELECT COUNT(DISTINCT ec.member_id)
+    /* Count winning cards (not distinct members) — each card with the low score is one win. */
+    SELECT COUNT(ec.card_id)
       INTO v_winnercount
       FROM eventCard ec
      WHERE ec.event_id = v_eventid
@@ -3400,10 +3401,10 @@ BEGIN
       ITERATE flight_loop;
     END IF;
 
-    /* Pot = amount_per_player * players in flight. Each winner gets equal share. */
+    /* Pot = amount_per_player * cards in flight. Each winning card gets equal share. */
     SET v_perperson = (v_skinamount * v_playercount) / v_winnercount;
 
-    /* Insert one row per distinct winning member (use their first card if multiple). */
+    /* Insert one row per winning card — a player with two winning cards gets two rows. */
     INSERT INTO eventSkin (event_id, member_id, subevent_id, flight_id, hole, score, amount, card_id)
     SELECT
       v_eventid,
@@ -3413,7 +3414,7 @@ BEGIN
       v_drawnhole,
       v_minscore,
       v_perperson,
-      MIN(ec.card_id)
+      ec.card_id
     FROM eventCard ec
     WHERE ec.event_id = v_eventid
       AND ec.member_id IN (
@@ -3434,8 +3435,7 @@ BEGIN
           WHEN 8 THEN ec.hole8
           WHEN 9 THEN ec.hole9
         END
-      ) = v_minscore
-    GROUP BY ec.member_id;
+      ) = v_minscore;
 
   END LOOP;
 
