@@ -3209,8 +3209,8 @@ BEGIN
     1) Read subevent context from subEventMain (event_id, roster_id, amount).
     2) Iterate every flight in that roster.
     3) For each flight, evaluate skins hole-by-hole (1..9).
-    4) On each hole, only the player with the OUTRIGHT lowest score wins
-       (ties do not win). A player can win multiple holes.
+    4) On each hole, ALL players tied at the lowest score win
+       (ties ARE winners). A player can win multiple holes.
     5) Pot per flight = amount_per_player * number_of_players_in_flight.
        Each winning skin row gets an equal split of that pot.
     6) Results stored in eventSkin table.
@@ -3227,8 +3227,6 @@ BEGIN
   DECLARE v_hole INT;
   DECLARE v_minscore INT;
   DECLARE v_tiecount INT;
-  DECLARE v_memberid INT;
-  DECLARE v_cardid INT;
 
   DECLARE v_playercount INT;
   DECLARE v_winnercount INT;
@@ -3281,6 +3279,7 @@ BEGIN
        )
        AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2;
 
+    /* v_winnercount tracks total skin rows inserted (used to split the pot equally). */
     SET v_winnercount = 0;
     SET v_hole = 1;
 
@@ -3315,7 +3314,7 @@ BEGIN
 
       /* If no scores for this hole/flight, move on. */
       IF v_minscore IS NOT NULL THEN
-        /* Count distinct members tied at the low score for this hole. */
+        /* Count distinct members tied at the low score. */
         SELECT COUNT(DISTINCT ec.member_id)
           INTO v_tiecount
           FROM eventCard ec
@@ -3340,40 +3339,44 @@ BEGIN
              END
            ) = v_minscore;
 
-        /* Only the outright sole winner gets the skin for this hole. */
-        IF v_tiecount = 1 THEN
-          SELECT ec.member_id, ec.card_id
-            INTO v_memberid, v_cardid
-            FROM eventCard ec
-           WHERE ec.event_id = v_eventid
-             AND ec.member_id IN (
-               SELECT rml.member_id
-                 FROM rosterMemberLink rml
-                WHERE rml.roster_id = v_rosterid
-             )
-             AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
-             AND (
-               CASE v_hole
-                 WHEN 1 THEN ec.hole1
-                 WHEN 2 THEN ec.hole2
-                 WHEN 3 THEN ec.hole3
-                 WHEN 4 THEN ec.hole4
-                 WHEN 5 THEN ec.hole5
-                 WHEN 6 THEN ec.hole6
-                 WHEN 7 THEN ec.hole7
-                 WHEN 8 THEN ec.hole8
-                 WHEN 9 THEN ec.hole9
-               END
-             ) = v_minscore
-           ORDER BY ec.card_id
-           LIMIT 1;
-
+        /* All tied players win — insert one row per distinct winning member. */
+        IF v_tiecount >= 1 THEN
           INSERT INTO eventSkin
             (event_id, member_id, subevent_id, flight_id, hole, score, amount, card_id)
-          VALUES
-            (v_eventid, v_memberid, p_subeventid, v_flightid, v_hole, v_minscore, 0, v_cardid);
+          SELECT
+            v_eventid,
+            ec.member_id,
+            p_subeventid,
+            v_flightid,
+            v_hole,
+            v_minscore,
+            0,
+            MIN(ec.card_id)
+          FROM eventCard ec
+          WHERE ec.event_id = v_eventid
+            AND ec.member_id IN (
+              SELECT rml.member_id
+                FROM rosterMemberLink rml
+               WHERE rml.roster_id = v_rosterid
+            )
+            AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
+            AND (
+              CASE v_hole
+                WHEN 1 THEN ec.hole1
+                WHEN 2 THEN ec.hole2
+                WHEN 3 THEN ec.hole3
+                WHEN 4 THEN ec.hole4
+                WHEN 5 THEN ec.hole5
+                WHEN 6 THEN ec.hole6
+                WHEN 7 THEN ec.hole7
+                WHEN 8 THEN ec.hole8
+                WHEN 9 THEN ec.hole9
+              END
+            ) = v_minscore
+          GROUP BY ec.member_id;
 
-          SET v_winnercount = v_winnercount + 1;
+          /* Accumulate total skin rows so the pot splits evenly across all wins. */
+          SET v_winnercount = v_winnercount + v_tiecount;
         END IF;
       END IF;
 
@@ -3383,7 +3386,7 @@ BEGIN
     /*
       Apply payout per skin within this flight.
       pot = amount_per_player * player_count
-      per-skin amount = pot / winner_count
+      per-skin amount = pot / total_skin_rows
     */
     IF v_winnercount > 0 AND v_playercount > 0 AND v_skinamount IS NOT NULL THEN
       SET v_perskin = (v_skinamount * v_playercount) / v_winnercount;

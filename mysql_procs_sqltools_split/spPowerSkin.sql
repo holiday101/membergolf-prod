@@ -4,27 +4,28 @@ BEGIN
     spPowerSkin
     -----------
     Purpose:
-    1) Read subevent context from subEventMain (event_id, roster_id, amount, drawn_hole).
-    2) drawn_hole is 1-18: one hole is drawn for the entire event.
-    3) Iterate every flight in that roster.
-    4) For each flight, find the lowest score on drawn_hole among eligible cards.
-    5) ALL players tied at that low score win (ties ARE winners, unlike regular skins).
-    6) Pot per flight = amount_per_player * number_of_players_in_flight.
-       Winners split the pot equally.
-    7) Results stored in eventSkin table (same as gross skins).
+    1) Read subevent context from subEventMain (event_id, roster_id, amount).
+    2) Iterate every flight in that roster.
+    3) For each flight, evaluate skins hole-by-hole (1..9).
+    4) On each hole, ALL players tied at the lowest score win
+       (ties ARE winners). A player can win multiple holes.
+    5) Pot per flight = amount_per_player * number_of_players_in_flight.
+       Each winning skin row gets an equal split of that pot.
+    6) Results stored in eventSkin table.
   */
 
   DECLARE v_eventid INT;
   DECLARE v_rosterid INT;
   DECLARE v_skinamount DECIMAL(12,2);
-  DECLARE v_drawnhole INT;
-  DECLARE v_numholes INT DEFAULT 9;
 
   DECLARE v_flightid INT;
   DECLARE v_hdcp1 DECIMAL(12,2);
   DECLARE v_hdcp2 DECIMAL(12,2);
 
+  DECLARE v_hole INT;
   DECLARE v_minscore INT;
+  DECLARE v_tiecount INT;
+
   DECLARE v_playercount INT;
   DECLARE v_winnercount INT;
   DECLARE v_perskin DECIMAL(12,2);
@@ -40,29 +41,14 @@ BEGIN
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
   /* Load subevent context. */
-  SELECT event_id, roster_id, amount, drawn_hole
-    INTO v_eventid, v_rosterid, v_skinamount, v_drawnhole
+  SELECT event_id, roster_id, amount
+    INTO v_eventid, v_rosterid, v_skinamount
     FROM subEventMain
    WHERE subevent_id = p_subeventid
    LIMIT 1;
 
   IF v_eventid IS NULL OR v_rosterid IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spPowerSkin: subevent/event/roster not found';
-  END IF;
-
-  /* Determine hole count from courseNine (9 or 18). */
-  SELECT cn.numholes
-    INTO v_numholes
-    FROM eventMain em
-    JOIN courseNine cn ON em.nine_id = cn.nine_id
-   WHERE em.event_id = v_eventid;
-
-  IF v_numholes IS NULL THEN
-    SET v_numholes = 9;
-  END IF;
-
-  IF v_drawnhole IS NULL OR v_drawnhole < 1 OR v_drawnhole > v_numholes THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spPowerSkin: drawn_hole must be set (1-numholes)';
   END IF;
 
   /* Clear any existing results for this subevent. */
@@ -91,105 +77,18 @@ BEGIN
        )
        AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2;
 
-    /* Find lowest score on drawn_hole for this flight. */
-    SELECT MIN(
-      CASE v_drawnhole
-        WHEN 1 THEN ec.hole1
-        WHEN 2 THEN ec.hole2
-        WHEN 3 THEN ec.hole3
-        WHEN 4 THEN ec.hole4
-        WHEN 5 THEN ec.hole5
-        WHEN 6 THEN ec.hole6
-        WHEN 7 THEN ec.hole7
-        WHEN 8 THEN ec.hole8
-        WHEN 9 THEN ec.hole9
-        WHEN 10 THEN ec.hole10
-        WHEN 11 THEN ec.hole11
-        WHEN 12 THEN ec.hole12
-        WHEN 13 THEN ec.hole13
-        WHEN 14 THEN ec.hole14
-        WHEN 15 THEN ec.hole15
-        WHEN 16 THEN ec.hole16
-        WHEN 17 THEN ec.hole17
-        WHEN 18 THEN ec.hole18
-      END
-    )
-      INTO v_minscore
-      FROM eventCard ec
-     WHERE ec.event_id = v_eventid
-       AND ec.member_id IN (
-         SELECT rml.member_id
-           FROM rosterMemberLink rml
-          WHERE rml.roster_id = v_rosterid
-       )
-       AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2;
+    /* v_winnercount tracks total skin rows inserted (used to split the pot equally). */
+    SET v_winnercount = 0;
+    SET v_hole = 1;
 
-    IF v_minscore IS NULL THEN
-      ITERATE flight_loop;
-    END IF;
+    hole_loop: LOOP
+      IF v_hole > 9 THEN
+        LEAVE hole_loop;
+      END IF;
 
-    /* Count all distinct members tied at the low score (ALL ties win). */
-    SELECT COUNT(DISTINCT ec.member_id)
-      INTO v_winnercount
-      FROM eventCard ec
-     WHERE ec.event_id = v_eventid
-       AND ec.member_id IN (
-         SELECT rml.member_id
-           FROM rosterMemberLink rml
-          WHERE rml.roster_id = v_rosterid
-       )
-       AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
-       AND (
-         CASE v_drawnhole
-           WHEN 1 THEN ec.hole1
-           WHEN 2 THEN ec.hole2
-           WHEN 3 THEN ec.hole3
-           WHEN 4 THEN ec.hole4
-           WHEN 5 THEN ec.hole5
-           WHEN 6 THEN ec.hole6
-           WHEN 7 THEN ec.hole7
-           WHEN 8 THEN ec.hole8
-           WHEN 9 THEN ec.hole9
-           WHEN 10 THEN ec.hole10
-           WHEN 11 THEN ec.hole11
-           WHEN 12 THEN ec.hole12
-           WHEN 13 THEN ec.hole13
-           WHEN 14 THEN ec.hole14
-           WHEN 15 THEN ec.hole15
-           WHEN 16 THEN ec.hole16
-           WHEN 17 THEN ec.hole17
-           WHEN 18 THEN ec.hole18
-         END
-       ) = v_minscore;
-
-    IF v_winnercount = 0 THEN
-      ITERATE flight_loop;
-    END IF;
-
-    /* Pot = amount_per_player * players in flight. Each winner gets equal share. */
-    SET v_perskin = (v_skinamount * v_playercount) / v_winnercount;
-
-    /* Insert one row per distinct winning member (use their first card if multiple). */
-    INSERT INTO eventSkin (event_id, member_id, subevent_id, flight_id, hole, score, amount, card_id)
-    SELECT
-      v_eventid,
-      ec.member_id,
-      p_subeventid,
-      v_flightid,
-      v_drawnhole,
-      v_minscore,
-      v_perskin,
-      MIN(ec.card_id)
-    FROM eventCard ec
-    WHERE ec.event_id = v_eventid
-      AND ec.member_id IN (
-        SELECT rml.member_id
-          FROM rosterMemberLink rml
-         WHERE rml.roster_id = v_rosterid
-      )
-      AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
-      AND (
-        CASE v_drawnhole
+      /* Find lowest score on current hole for eligible cards in this flight. */
+      SELECT MIN(
+        CASE v_hole
           WHEN 1 THEN ec.hole1
           WHEN 2 THEN ec.hole2
           WHEN 3 THEN ec.hole3
@@ -199,19 +98,102 @@ BEGIN
           WHEN 7 THEN ec.hole7
           WHEN 8 THEN ec.hole8
           WHEN 9 THEN ec.hole9
-          WHEN 10 THEN ec.hole10
-          WHEN 11 THEN ec.hole11
-          WHEN 12 THEN ec.hole12
-          WHEN 13 THEN ec.hole13
-          WHEN 14 THEN ec.hole14
-          WHEN 15 THEN ec.hole15
-          WHEN 16 THEN ec.hole16
-          WHEN 17 THEN ec.hole17
-          WHEN 18 THEN ec.hole18
         END
-      ) = v_minscore
-    GROUP BY ec.member_id;
+      )
+        INTO v_minscore
+        FROM eventCard ec
+       WHERE ec.event_id = v_eventid
+         AND ec.member_id IN (
+           SELECT rml.member_id
+             FROM rosterMemberLink rml
+            WHERE rml.roster_id = v_rosterid
+         )
+         AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2;
 
+      /* If no scores for this hole/flight, move on. */
+      IF v_minscore IS NOT NULL THEN
+        /* Count distinct members tied at the low score. */
+        SELECT COUNT(DISTINCT ec.member_id)
+          INTO v_tiecount
+          FROM eventCard ec
+         WHERE ec.event_id = v_eventid
+           AND ec.member_id IN (
+             SELECT rml.member_id
+               FROM rosterMemberLink rml
+              WHERE rml.roster_id = v_rosterid
+           )
+           AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
+           AND (
+             CASE v_hole
+               WHEN 1 THEN ec.hole1
+               WHEN 2 THEN ec.hole2
+               WHEN 3 THEN ec.hole3
+               WHEN 4 THEN ec.hole4
+               WHEN 5 THEN ec.hole5
+               WHEN 6 THEN ec.hole6
+               WHEN 7 THEN ec.hole7
+               WHEN 8 THEN ec.hole8
+               WHEN 9 THEN ec.hole9
+             END
+           ) = v_minscore;
+
+        /* All tied players win — insert one row per distinct winning member. */
+        IF v_tiecount >= 1 THEN
+          INSERT INTO eventSkin
+            (event_id, member_id, subevent_id, flight_id, hole, score, amount, card_id)
+          SELECT
+            v_eventid,
+            ec.member_id,
+            p_subeventid,
+            v_flightid,
+            v_hole,
+            v_minscore,
+            0,
+            MIN(ec.card_id)
+          FROM eventCard ec
+          WHERE ec.event_id = v_eventid
+            AND ec.member_id IN (
+              SELECT rml.member_id
+                FROM rosterMemberLink rml
+               WHERE rml.roster_id = v_rosterid
+            )
+            AND ec.handicap BETWEEN v_hdcp1 AND v_hdcp2
+            AND (
+              CASE v_hole
+                WHEN 1 THEN ec.hole1
+                WHEN 2 THEN ec.hole2
+                WHEN 3 THEN ec.hole3
+                WHEN 4 THEN ec.hole4
+                WHEN 5 THEN ec.hole5
+                WHEN 6 THEN ec.hole6
+                WHEN 7 THEN ec.hole7
+                WHEN 8 THEN ec.hole8
+                WHEN 9 THEN ec.hole9
+              END
+            ) = v_minscore
+          GROUP BY ec.member_id;
+
+          /* Accumulate total skin rows so the pot splits evenly across all wins. */
+          SET v_winnercount = v_winnercount + v_tiecount;
+        END IF;
+      END IF;
+
+      SET v_hole = v_hole + 1;
+    END LOOP;
+
+    /*
+      Apply payout per skin within this flight.
+      pot = amount_per_player * player_count
+      per-skin amount = pot / total_skin_rows
+    */
+    IF v_winnercount > 0 AND v_playercount > 0 AND v_skinamount IS NOT NULL THEN
+      SET v_perskin = (v_skinamount * v_playercount) / v_winnercount;
+      UPDATE eventSkin
+         SET amount = v_perskin
+       WHERE subevent_id = p_subeventid
+         AND event_id = v_eventid
+         AND flight_id = v_flightid;
+    END IF;
   END LOOP;
 
   CLOSE flight_cur;
