@@ -6,7 +6,7 @@ BEGIN
     Purpose:
     1) Read subevent context from subEventMain (subevent_id -> event_id, roster_id, amount).
     2) Iterate every flight in that roster.
-    3) For each flight, evaluate skins hole-by-hole (1..9) using eventCard scores.
+    3) For each flight, evaluate skins hole-by-hole (1..numholes) using eventCard scores.
     4) Flight eligibility is based on eventCard.handicap BETWEEN flight hdcp1 and hdcp2.
     5) Only single-winner holes get a skin (ties do not win a skin).
     6) Total skin pot per flight = amount_per_player * number_of_players_in_flight.
@@ -16,6 +16,7 @@ BEGIN
   DECLARE v_eventid INT;
   DECLARE v_rosterid INT;
   DECLARE v_skinamount DECIMAL(12,2);
+  DECLARE v_numholes INT DEFAULT 9;
 
   DECLARE v_flightid INT;
   DECLARE v_hdcp1 DECIMAL(12,2);
@@ -53,6 +54,17 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spSkinCodeX: subevent/event/roster not found';
   END IF;
 
+  /* Determine hole count from courseNine (9 or 18). */
+  SELECT cn.numholes
+    INTO v_numholes
+    FROM eventMain em
+    JOIN courseNine cn ON em.nine_id = cn.nine_id
+   WHERE em.event_id = v_eventid;
+
+  IF v_numholes IS NULL THEN
+    SET v_numholes = 9;
+  END IF;
+
   /* Rebuild skins for this subevent from scratch. */
   DELETE FROM eventSkin WHERE subevent_id = p_subeventid;
 
@@ -83,7 +95,7 @@ BEGIN
     SET v_hole = 1;
 
     hole_loop: LOOP
-      IF v_hole > 9 THEN
+      IF v_hole > v_numholes THEN
         LEAVE hole_loop;
       END IF;
 
@@ -102,6 +114,15 @@ BEGIN
           WHEN 7 THEN ec.hole7
           WHEN 8 THEN ec.hole8
           WHEN 9 THEN ec.hole9
+          WHEN 10 THEN ec.hole10
+          WHEN 11 THEN ec.hole11
+          WHEN 12 THEN ec.hole12
+          WHEN 13 THEN ec.hole13
+          WHEN 14 THEN ec.hole14
+          WHEN 15 THEN ec.hole15
+          WHEN 16 THEN ec.hole16
+          WHEN 17 THEN ec.hole17
+          WHEN 18 THEN ec.hole18
         END
       )
         INTO v_minscore
@@ -138,6 +159,15 @@ BEGIN
                WHEN 7 THEN ec.hole7
                WHEN 8 THEN ec.hole8
                WHEN 9 THEN ec.hole9
+               WHEN 10 THEN ec.hole10
+               WHEN 11 THEN ec.hole11
+               WHEN 12 THEN ec.hole12
+               WHEN 13 THEN ec.hole13
+               WHEN 14 THEN ec.hole14
+               WHEN 15 THEN ec.hole15
+               WHEN 16 THEN ec.hole16
+               WHEN 17 THEN ec.hole17
+               WHEN 18 THEN ec.hole18
              END
            ) = v_minscore;
 
@@ -164,6 +194,15 @@ BEGIN
                  WHEN 7 THEN ec.hole7
                  WHEN 8 THEN ec.hole8
                  WHEN 9 THEN ec.hole9
+                 WHEN 10 THEN ec.hole10
+                 WHEN 11 THEN ec.hole11
+                 WHEN 12 THEN ec.hole12
+                 WHEN 13 THEN ec.hole13
+                 WHEN 14 THEN ec.hole14
+                 WHEN 15 THEN ec.hole15
+                 WHEN 16 THEN ec.hole16
+                 WHEN 17 THEN ec.hole17
+                 WHEN 18 THEN ec.hole18
                END
              ) = v_minscore
            ORDER BY ec.card_id

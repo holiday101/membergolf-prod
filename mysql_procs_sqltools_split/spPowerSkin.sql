@@ -5,7 +5,7 @@ BEGIN
     -----------
     Purpose:
     1) Read subevent context from subEventMain (event_id, roster_id, amount, drawn_hole).
-    2) drawn_hole is 1-9: one hole is drawn for the entire event.
+    2) drawn_hole is 1-18: one hole is drawn for the entire event.
     3) Iterate every flight in that roster.
     4) For each flight, find the lowest score on drawn_hole among eligible cards.
     5) ALL players tied at that low score win (ties ARE winners, unlike regular skins).
@@ -18,6 +18,7 @@ BEGIN
   DECLARE v_rosterid INT;
   DECLARE v_skinamount DECIMAL(12,2);
   DECLARE v_drawnhole INT;
+  DECLARE v_numholes INT DEFAULT 9;
 
   DECLARE v_flightid INT;
   DECLARE v_hdcp1 DECIMAL(12,2);
@@ -49,8 +50,19 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spPowerSkin: subevent/event/roster not found';
   END IF;
 
-  IF v_drawnhole IS NULL OR v_drawnhole < 1 OR v_drawnhole > 9 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spPowerSkin: drawn_hole must be set (1-9)';
+  /* Determine hole count from courseNine (9 or 18). */
+  SELECT cn.numholes
+    INTO v_numholes
+    FROM eventMain em
+    JOIN courseNine cn ON em.nine_id = cn.nine_id
+   WHERE em.event_id = v_eventid;
+
+  IF v_numholes IS NULL THEN
+    SET v_numholes = 9;
+  END IF;
+
+  IF v_drawnhole IS NULL OR v_drawnhole < 1 OR v_drawnhole > v_numholes THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'spPowerSkin: drawn_hole must be set (1-numholes)';
   END IF;
 
   /* Clear any existing results for this subevent. */
@@ -92,6 +104,15 @@ BEGIN
         WHEN 7 THEN ec.hole7
         WHEN 8 THEN ec.hole8
         WHEN 9 THEN ec.hole9
+        WHEN 10 THEN ec.hole10
+        WHEN 11 THEN ec.hole11
+        WHEN 12 THEN ec.hole12
+        WHEN 13 THEN ec.hole13
+        WHEN 14 THEN ec.hole14
+        WHEN 15 THEN ec.hole15
+        WHEN 16 THEN ec.hole16
+        WHEN 17 THEN ec.hole17
+        WHEN 18 THEN ec.hole18
       END
     )
       INTO v_minscore
@@ -130,6 +151,15 @@ BEGIN
            WHEN 7 THEN ec.hole7
            WHEN 8 THEN ec.hole8
            WHEN 9 THEN ec.hole9
+           WHEN 10 THEN ec.hole10
+           WHEN 11 THEN ec.hole11
+           WHEN 12 THEN ec.hole12
+           WHEN 13 THEN ec.hole13
+           WHEN 14 THEN ec.hole14
+           WHEN 15 THEN ec.hole15
+           WHEN 16 THEN ec.hole16
+           WHEN 17 THEN ec.hole17
+           WHEN 18 THEN ec.hole18
          END
        ) = v_minscore;
 
@@ -170,6 +200,15 @@ BEGIN
           WHEN 7 THEN ec.hole7
           WHEN 8 THEN ec.hole8
           WHEN 9 THEN ec.hole9
+          WHEN 10 THEN ec.hole10
+          WHEN 11 THEN ec.hole11
+          WHEN 12 THEN ec.hole12
+          WHEN 13 THEN ec.hole13
+          WHEN 14 THEN ec.hole14
+          WHEN 15 THEN ec.hole15
+          WHEN 16 THEN ec.hole16
+          WHEN 17 THEN ec.hole17
+          WHEN 18 THEN ec.hole18
         END
       ) = v_minscore
     GROUP BY ec.member_id;
