@@ -2159,16 +2159,13 @@ app.post("/subevents/:id/powerskin/post", authMiddleware, async (req, res) => {
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id, drawn_hole FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      "SELECT subevent_id, course_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
       [subeventId]
     );
     const sub = subRows?.[0];
     if (!sub) return res.status(404).json({ error: "Not found" });
     if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
       return res.status(403).json({ error: "Forbidden" });
-    }
-    if (!sub.drawn_hole) {
-      return res.status(400).json({ error: "Drawn hole must be set before posting Power Skin" });
     }
 
     await pool.query("CALL spPowerSkin(?)", [subeventId]);
