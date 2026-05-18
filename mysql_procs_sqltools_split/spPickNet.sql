@@ -28,7 +28,7 @@ BEGIN
     JOIN courseMain cm ON em.course_id = cm.course_id
    WHERE em.event_id = v_eventid;
 
-  CALL spHandicap(v_eventid);
+  CALL spHandicap(v_eventid, NULL);
 
   SELECT decimalhandicap_yn INTO v_decimalhandicapyn
     FROM courseMain WHERE course_id = v_courseid;

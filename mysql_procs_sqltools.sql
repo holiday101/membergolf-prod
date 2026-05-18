@@ -1739,7 +1739,7 @@ BEGIN
     SELECT flight_id, hdcp1, hdcp2 FROM rosterFlight WHERE roster_id = v_rosterid;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = 1;
 
-  CALL spHandicap(p_eventid);
+  CALL spHandicap(p_eventid, NULL);
 
   SELECT amount, roster_id
     INTO v_skinamount, v_rosterid
@@ -2532,7 +2532,7 @@ BEGIN
     JOIN courseMain cm ON em.course_id = cm.course_id
    WHERE em.event_id = v_eventid;
 
-  CALL spHandicap(v_eventid);
+  CALL spHandicap(v_eventid, NULL);
 
   SELECT decimalhandicap_yn INTO v_decimalhandicapyn
     FROM courseMain WHERE course_id = v_courseid;
@@ -2623,7 +2623,7 @@ BEGIN
     JOIN courseMain cm ON em.course_id = cm.course_id
    WHERE em.event_id = v_eventid;
 
-  CALL spHandicap(v_eventid);
+  CALL spHandicap(v_eventid, NULL);
 
   SELECT decimalhandicap_yn INTO v_decimalhandicapyn
     FROM courseMain WHERE course_id = v_courseid;
@@ -2709,7 +2709,7 @@ BEGIN
     FROM subEventMain
    WHERE subevent_id = p_subeventid;
 
-  CALL spHandicap(v_eventid);
+  CALL spHandicap(v_eventid, NULL);
 
   SELECT amount, roster_id
     INTO v_skinamount, v_rosterid
