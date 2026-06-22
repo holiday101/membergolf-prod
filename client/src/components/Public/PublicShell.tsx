@@ -259,7 +259,7 @@ export default function PublicShell() {
         * { box-sizing: border-box; }
         body { margin: 0; }
         body.public-calendar-full { overflow: hidden; }
-        .app { min-height: 100vh; background: var(--bg); color: var(--text); }
+        .app { height: 100vh; background: var(--bg); color: var(--text); }
         .app {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
           display: grid;
