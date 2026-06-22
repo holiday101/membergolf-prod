@@ -257,9 +257,9 @@ export default function PublicShell() {
         }
 
         * { box-sizing: border-box; }
-        body { margin: 0; }
+        html, body { margin: 0; padding: 0; height: 100%; display: block; overflow: hidden; }
         body.public-calendar-full { overflow: hidden; }
-        .app { height: 100vh; background: var(--bg); color: var(--text); }
+        .app { height: 100vh; width: 100%; background: var(--bg); color: var(--text); }
         .app {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
           display: grid;
