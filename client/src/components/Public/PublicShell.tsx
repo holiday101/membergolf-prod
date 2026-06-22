@@ -357,6 +357,9 @@ export default function PublicShell() {
           padding: 8px 8px 12px;
           display: grid;
           gap: 6px;
+          overflow-y: auto;
+          flex: 1;
+          min-height: 0;
         }
         .navLink {
           text-decoration: none;
