@@ -98,6 +98,17 @@ export default function PublicShell() {
     };
   }, [isCalendarRoute]);
 
+  useEffect(() => {
+    const topbar = document.querySelector(".topbar") as HTMLElement | null;
+    if (!topbar) return;
+    const update = () =>
+      document.documentElement.style.setProperty("--topbar-h", topbar.offsetHeight + "px");
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(topbar);
+    return () => ro.disconnect();
+  }, []);
+
   function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" }) {
     switch (name) {
       case "calendar":
@@ -335,7 +346,7 @@ export default function PublicShell() {
           overflow: hidden;
         }
         .drawer.open { transform: translateX(0); }
-        .drawer.desktop { position: sticky; top: 0; height: calc(100vh - 0px); }
+        .drawer.desktop { position: sticky; top: 0; height: calc(100vh - var(--topbar-h, 72px)); }
         .drawerHeader {
           padding: 8px 10px;
           display: flex; align-items: center; justify-content: space-between;
@@ -434,7 +445,7 @@ export default function PublicShell() {
           .drawer {
             position: sticky;
             top: 0;
-            height: calc(100vh - 0px);
+            height: calc(100vh - var(--topbar-h, 72px));
             transform: none;
             box-shadow: none;
             z-index: 10;
