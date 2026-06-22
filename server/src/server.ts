@@ -1486,7 +1486,7 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
   if (!isGlobal(payload)) return res.status(403).json({ error: "Forbidden" });
 
   const schema = z.object({
-    coursename: z.string().min(1).max(200),
+    coursename: z.string().min(1).max(1000),
     leagueinfo: z.string().max(20000).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),
@@ -1533,7 +1533,7 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
   if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
 
   const schema = z.object({
-    coursename: z.string().min(1).max(200).optional(),
+    coursename: z.string().min(1).max(1000).optional(),
     leagueinfo: z.string().max(20000).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),
