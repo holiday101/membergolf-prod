@@ -466,7 +466,7 @@ export default function RosterListPage() {
         @media (max-width: 900px) {
           .grid { grid-template-columns: 1fr; }
           .rosterList, .addRoster, .rightPlaceholder,
-          .editRoster, .rosterFlights, .addFlight { grid-column: 1; }
+          .editRoster, .rosterFlights, .addFlight { grid-column: 1; grid-row: auto; }
         }
       `}</style>
     </div>
