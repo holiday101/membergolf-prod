@@ -560,7 +560,8 @@ export default function AppShell() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          overflow: hidden;
+          flex: 1;
+          overflow-y: auto;
         }
 
         .navLink {
