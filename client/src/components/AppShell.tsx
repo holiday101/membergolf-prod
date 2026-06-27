@@ -135,7 +135,7 @@ export default function AppShell() {
     return <div style={{ padding: "24px" }}>Loading…</div>;
   }
   if (isGlobalUser) {
-    const blockedPrefixes = ["/calendar", "/events", "/members", "/rosters", "/subevents"];
+    const blockedPrefixes = ["/calendar", "/events", "/members", "/subevents"];
     if (blockedPrefixes.some((p) => location.pathname === p || location.pathname.startsWith(`${p}/`))) {
       return <Navigate to="/users" replace />;
     }
