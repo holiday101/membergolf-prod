@@ -4801,7 +4801,6 @@ app.get("/rosters", authMiddleware, async (req, res) => {
 
 app.post("/rosters", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
 
   const schema = z.object({
     rostername: z.string().min(1).max(50),
@@ -4814,7 +4813,7 @@ app.post("/rosters", authMiddleware, async (req, res) => {
   try {
     const [result] = await pool.execute<mysql.ResultSetHeader>(
       "INSERT INTO rosterMain (rostername, course_id, active_yn, holes) VALUES (?, ?, ?, ?)",
-      [parsed.data.rostername.trim(), payload.courseId, parsed.data.active_yn ?? 1, parsed.data.holes ?? 9]
+      [parsed.data.rostername.trim(), payload.courseId ?? null, parsed.data.active_yn ?? 1, parsed.data.holes ?? 9]
     );
     res.status(201).json({ id: result.insertId });
   } catch {
@@ -4824,7 +4823,7 @@ app.post("/rosters", authMiddleware, async (req, res) => {
 
 app.put("/rosters/:id", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
 
@@ -4842,7 +4841,7 @@ app.put("/rosters/:id", authMiddleware, async (req, res) => {
   );
   const roster = rows?.[0];
   if (!roster) return res.status(404).json({ error: "Not found" });
-  if (roster.course_id !== payload.courseId) {
+  if (!global && roster.course_id !== payload.courseId) {
     return res.status(403).json({ error: "Forbidden" });
   }
 
@@ -4879,7 +4878,7 @@ app.put("/rosters/:id", authMiddleware, async (req, res) => {
 
 app.delete("/rosters/:id", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
 
@@ -4895,7 +4894,7 @@ app.delete("/rosters/:id", authMiddleware, async (req, res) => {
       await conn.rollback();
       return res.status(404).json({ error: "Not found" });
     }
-    if (roster.course_id !== payload.courseId) {
+    if (!global && roster.course_id !== payload.courseId) {
       await conn.rollback();
       return res.status(403).json({ error: "Forbidden" });
     }
@@ -4916,12 +4915,14 @@ app.delete("/rosters/:id", authMiddleware, async (req, res) => {
 
 app.get("/rosters/:id", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const [rows] = await pool.query<any[]>(
-    "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
-    [id, payload.courseId]
+    global
+      ? "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? LIMIT 1"
+      : "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
+    global ? [id] : [id, payload.courseId]
   );
   const roster = rows?.[0];
   if (!roster) return res.status(404).json({ error: "Not found" });
@@ -4929,8 +4930,6 @@ app.get("/rosters/:id", authMiddleware, async (req, res) => {
 });
 
 app.get("/rosters/:id/flights", authMiddleware, async (req, res) => {
-  const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const [rows] = await pool.query<any[]>(
@@ -4941,8 +4940,6 @@ app.get("/rosters/:id/flights", authMiddleware, async (req, res) => {
 });
 
 app.post("/rosters/:id/flights", authMiddleware, async (req, res) => {
-  const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
 
@@ -4967,7 +4964,7 @@ app.post("/rosters/:id/flights", authMiddleware, async (req, res) => {
 
 app.delete("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
   const rosterId = Number(req.params.id);
   const flightId = Number(req.params.flightId);
   if (!Number.isFinite(rosterId) || !Number.isFinite(flightId)) {
@@ -4976,14 +4973,10 @@ app.delete("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) =>
 
   try {
     const [rows] = await pool.query<any[]>(
-      `
-        SELECT f.flight_id
-        FROM rosterFlight f
-        JOIN rosterMain r ON r.roster_id = f.roster_id
-        WHERE f.flight_id = ? AND f.roster_id = ? AND r.course_id = ?
-        LIMIT 1
-      `,
-      [flightId, rosterId, payload.courseId]
+      global
+        ? `SELECT f.flight_id FROM rosterFlight f WHERE f.flight_id = ? AND f.roster_id = ? LIMIT 1`
+        : `SELECT f.flight_id FROM rosterFlight f JOIN rosterMain r ON r.roster_id = f.roster_id WHERE f.flight_id = ? AND f.roster_id = ? AND r.course_id = ? LIMIT 1`,
+      global ? [flightId, rosterId] : [flightId, rosterId, payload.courseId]
     );
     if (!rows.length) return res.status(404).json({ error: "Not found" });
 
@@ -5001,7 +4994,7 @@ app.delete("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) =>
 
 app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
 
   const rosterId = Number(req.params.id);
   if (!Number.isFinite(rosterId)) return res.status(400).json({ error: "Invalid id" });
@@ -5013,7 +5006,9 @@ app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
     );
     const roster = rosterRows?.[0];
     if (!roster) return res.status(404).json({ error: "Not found" });
-    if (roster.course_id !== payload.courseId) return res.status(403).json({ error: "Forbidden" });
+    if (!global && roster.course_id !== payload.courseId) return res.status(403).json({ error: "Forbidden" });
+
+    const courseId = payload.courseId ?? roster.course_id;
 
     const [onRoster] = await pool.query<any[]>(
       `
@@ -5031,7 +5026,7 @@ app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
           )
         ORDER BY m.lastname ASC, m.firstname ASC
       `,
-      [payload.courseId, rosterId]
+      [courseId, rosterId]
     );
 
     const [notOnRoster] = await pool.query<any[]>(
@@ -5050,7 +5045,7 @@ app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
           )
         ORDER BY m.lastname ASC, m.firstname ASC
       `,
-      [payload.courseId, rosterId]
+      [courseId, rosterId]
     );
 
     res.json({
@@ -5068,7 +5063,7 @@ app.get("/rosters/:id/members", authMiddleware, async (req, res) => {
 
 app.post("/rosters/:id/members", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
 
   const rosterId = Number(req.params.id);
   if (!Number.isFinite(rosterId)) return res.status(400).json({ error: "Invalid id" });
@@ -5093,17 +5088,18 @@ app.post("/rosters/:id/members", authMiddleware, async (req, res) => {
       await conn.rollback();
       return res.status(404).json({ error: "Not found" });
     }
-    if (roster.course_id !== payload.courseId) {
+    if (!global && roster.course_id !== payload.courseId) {
       await conn.rollback();
       return res.status(403).json({ error: "Forbidden" });
     }
 
+    const courseId = payload.courseId ?? roster.course_id;
     const [memberRows] = await conn.query<any[]>(
       "SELECT member_id, course_id, rhandicap FROM memberMain WHERE member_id = ? LIMIT 1",
       [memberId]
     );
     const member = memberRows?.[0];
-    if (!member || member.course_id !== payload.courseId) {
+    if (!member || (courseId != null && member.course_id !== courseId)) {
       await conn.rollback();
       return res.status(404).json({ error: "Member not found" });
     }
@@ -5132,7 +5128,7 @@ app.post("/rosters/:id/members", authMiddleware, async (req, res) => {
 
 app.delete("/rosters/:id/members/:memberId", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
-  if (!payload?.courseId) return res.status(403).json({ error: "Forbidden" });
+  const global = isGlobal(payload);
 
   const rosterId = Number(req.params.id);
   const memberId = Number(req.params.memberId);
@@ -5153,7 +5149,7 @@ app.delete("/rosters/:id/members/:memberId", authMiddleware, async (req, res) =>
       await conn.rollback();
       return res.status(404).json({ error: "Not found" });
     }
-    if (roster.course_id !== payload.courseId) {
+    if (!global && roster.course_id !== payload.courseId) {
       await conn.rollback();
       return res.status(403).json({ error: "Forbidden" });
     }
