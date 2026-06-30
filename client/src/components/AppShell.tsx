@@ -437,12 +437,15 @@ export default function AppShell() {
             );
           })}
 
-        </nav>
-        <div className="drawerFooter">
-          <button type="button" className="logoutBtn" onClick={logout}>
+          <button type="button" className="navLink navLogoutItem" onClick={logout}>
+            <span className="navIcon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zm4-9h-8v2h8v14h-8v2h10V4z" fill="currentColor"/>
+              </svg>
+            </span>
             Log out
           </button>
-        </div>
+        </nav>
       </aside>
 
       {/* Content */}
@@ -641,21 +644,12 @@ export default function AppShell() {
           font-weight: 700;
         }
 
-        .logoutBtn {
-          width: 100%;
-          padding: 10px 12px;
-          border-radius: 12px;
-          border: 1px solid var(--border);
-          background: #fff;
+        .navLogoutItem {
+          background: transparent;
           cursor: pointer;
-          font-weight: 700;
-          color: #444;
-        }
-        .logoutBtn:hover { background: #f7f8fb; }
-        .drawerFooter {
-          padding: 12px 8px;
           border-top: 1px solid var(--border);
-          flex-shrink: 0;
+          margin-top: 4px;
+          padding-top: 10px;
         }
 .content { padding: 16px; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
