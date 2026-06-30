@@ -437,7 +437,6 @@ export default function AppShell() {
             );
           })}
 
-          <div className="navSpacer" aria-hidden="true" />
           <button type="button" className="logoutBtn navLogout" onClick={logout}>
             Log out
           </button>
@@ -656,8 +655,7 @@ export default function AppShell() {
           border-top: 1px solid var(--border);
           padding-top: 12px;
         }
-        .navSpacer { height: 88px; flex: 0 0 auto; }
-        .content { padding: 16px; overflow: auto; }
+.content { padding: 16px; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
         .content.calendar-full {
           padding: 16px 0;
