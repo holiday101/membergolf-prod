@@ -13,6 +13,7 @@ export default function PublicShell() {
   const [isDesktop, setIsDesktop] = useState(desktopInit);
   const [userToggled, setUserToggled] = useState(false);
   const [leagueInfo, setLeagueInfo] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [titleSponsorUrl, setTitleSponsorUrl] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export default function PublicShell() {
       try {
         const course = await publicFetch<{
           leagueinfo: string | null;
+          notice?: string | null;
           coursename?: string | null;
           logo_url?: string | null;
           titlesponsor_url?: string | null;
@@ -69,6 +71,7 @@ export default function PublicShell() {
           `/public/${courseId}/course`
         );
         setLeagueInfo(course?.leagueinfo ?? null);
+        setNotice(course?.notice ?? null);
         setCourseName(course?.coursename ?? null);
         setLogoUrl(course?.logo_url ?? null);
         setTitleSponsorUrl(course?.titlesponsor_url ?? null);
@@ -76,6 +79,7 @@ export default function PublicShell() {
         setTitleSponsorLink(course?.titlesponsor_link ?? null);
       } catch {
         setLeagueInfo(null);
+        setNotice(null);
         setCourseName(null);
         setLogoUrl(null);
         setTitleSponsorUrl(null);
@@ -194,6 +198,7 @@ export default function PublicShell() {
             ) : null}
           </div>
         </div>
+        {notice ? <div className="noticeBar">{notice}</div> : null}
       </header>
 
       {!isDesktop && drawerOpen && (
@@ -326,6 +331,16 @@ export default function PublicShell() {
           border: none;
           background: transparent;
           padding: 0;
+        }
+
+        .noticeBar {
+          border-top: 1px solid var(--border);
+          background: #eef2f7;
+          color: #374151;
+          text-align: center;
+          font-size: 13px;
+          line-height: 1.4;
+          padding: 6px 16px;
         }
 
         .overlay {
@@ -465,6 +480,7 @@ export default function PublicShell() {
           .brandTitle { font-size: 12px; line-height: 1.2; }
           .brandImage { height: 36px; max-width: 120px; }
           .sponsorImage { height: 36px; max-width: 120px; }
+          .noticeBar { font-size: 12px; padding: 5px 10px; }
         }
 
 
