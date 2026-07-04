@@ -102,16 +102,6 @@ export default function PublicShell() {
     };
   }, [isCalendarRoute]);
 
-  useEffect(() => {
-    const topbar = document.querySelector(".topbar") as HTMLElement | null;
-    if (!topbar) return;
-    const update = () =>
-      document.documentElement.style.setProperty("--topbar-h", topbar.offsetHeight + "px");
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(topbar);
-    return () => ro.disconnect();
-  }, []);
 
   function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" }) {
     switch (name) {
@@ -198,8 +188,13 @@ export default function PublicShell() {
             ) : null}
           </div>
         </div>
-        {notice ? <div className="noticeBar">{notice}</div> : null}
       </header>
+
+      {notice ? (
+        <div className="noticeBar">
+          <div className="noticeBar-inner">{notice}</div>
+        </div>
+      ) : null}
 
       {!isDesktop && drawerOpen && (
         <div
@@ -280,11 +275,12 @@ export default function PublicShell() {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
           display: grid;
           grid-template-columns: 300px 1fr;
-          grid-template-rows: auto 1fr;
+          grid-template-rows: auto auto 1fr;
         }
 
         .topbar {
           grid-column: 1 / -1;
+          grid-row: 1;
           position: sticky; top: 0; z-index: 20;
           background: rgba(255, 255, 255, 0.85);
           border-bottom: 1px solid var(--border);
@@ -334,13 +330,20 @@ export default function PublicShell() {
         }
 
         .noticeBar {
+          grid-column: 1 / -1;
+          grid-row: 2;
           border-top: 1px solid var(--border);
+          border-bottom: 1px solid var(--border);
           background: #eef2f7;
           color: #374151;
+        }
+        .noticeBar-inner {
+          max-width: 1100px;
+          margin: 0 auto;
+          padding: 6px 16px;
           text-align: center;
           font-size: 13px;
           line-height: 1.4;
-          padding: 6px 16px;
         }
 
         .overlay {
@@ -361,7 +364,7 @@ export default function PublicShell() {
           overflow: hidden;
         }
         .drawer.open { transform: translateX(0); }
-        .drawer.desktop { position: sticky; top: 0; height: calc(100vh - var(--topbar-h, 72px)); }
+        .drawer.desktop { position: sticky; top: 0; height: 100%; grid-row: 3; grid-column: 1; }
         .drawerHeader {
           padding: 8px 10px;
           display: flex; align-items: center; justify-content: space-between;
@@ -440,7 +443,7 @@ export default function PublicShell() {
           line-height: 1.35;
         }
 
-        .content { padding: 16px; grid-column: 2; overflow: auto; }
+        .content { padding: 16px; grid-column: 2; grid-row: 3; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
         .content.calendar-full {
           padding: 16px 0;
@@ -454,19 +457,21 @@ export default function PublicShell() {
         }
         @media (min-width: 900px) {
           .overlay { display: none; }
-          .app { grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; }
+          .app { grid-template-columns: 300px 1fr; grid-template-rows: auto auto 1fr; }
           .app.drawer-closed { grid-template-columns: 1fr; }
           .topbar { grid-column: 1 / -1; }
           .drawer {
             position: sticky;
             top: 0;
-            height: calc(100vh - var(--topbar-h, 72px));
+            height: 100%;
+            grid-row: 3;
+            grid-column: 1;
             transform: none;
             box-shadow: none;
             z-index: 10;
           }
           .drawer:not(.open) { display: none; }
-          .content { grid-column: 2; }
+          .content { grid-column: 2; grid-row: 3; }
           .app.drawer-closed .content { grid-column: 1 / -1; }
         }
         @media (max-width: 899px) {
