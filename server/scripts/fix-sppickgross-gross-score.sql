@@ -1,3 +1,12 @@
+-- Fixes spPickGross: it was inserting the `net` score into subEventPayGross.score
+-- for both branches, so "Stroke Play Gross" sub-events were ranked/paid by net
+-- score instead of gross. Compare spPick, which correctly uses `gross` for
+-- subEventPayGross and `net` for subEventPayNet.
+
+DROP PROCEDURE IF EXISTS spPickGross;
+
+DELIMITER $$
+
 CREATE PROCEDURE spPickGross(IN p_subeventid INT)
 BEGIN
   DECLARE v_rosterid INT;
@@ -95,4 +104,6 @@ BEGIN
   CLOSE flight_cur;
 
   UPDATE subEventPayGross SET amount = NULL WHERE amount IS NULL OR amount = 0;
-END
+END $$
+
+DELIMITER ;
