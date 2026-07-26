@@ -60,12 +60,13 @@ BEGIN
       SET v_placeamount = 0;
 
       IF v_ties = 0 THEN
-        SELECT amount
-          INTO v_placeamount
-          FROM subEventPayOut
-         WHERE place = v_place - 1
-           AND subevent_id = p_subeventid
-           AND flight_id = p_flightid;
+        SET v_placeamount = (
+          SELECT amount
+            FROM subEventPayOut
+           WHERE place = v_place - 1
+             AND subevent_id = p_subeventid
+             AND flight_id = p_flightid
+        );
 
         UPDATE subEventPayGross
            SET amount = v_placeamount, place = v_place - 1

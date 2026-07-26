@@ -1863,6 +1863,7 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.amount,
         s.addedmoney,
         s.drawn_hole,
+        s.gross_flights,
         c.autoflight_yn,
         COALESCE(n.startinghole, 1) AS startinghole,
         n.numholes AS numholes
@@ -3841,9 +3842,10 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
 
     const [subRows] = await pool.query<any[]>(
       `
-      SELECT subevent_id, course_id, eventtype_id
-      FROM subEventMain
-      WHERE subevent_id = ?
+      SELECT s.subevent_id, s.course_id, s.eventtype_id, t.eventtypename
+      FROM subEventMain s
+      LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      WHERE s.subevent_id = ?
       LIMIT 1
       `,
       [subeventId]
@@ -3854,13 +3856,18 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    let mode: "net" | "gross" | "gross_net" = "gross_net";
+    const isGrossNetSplitType = (sub.eventtypename ?? "").toLowerCase().includes("gross/net split");
+
+    let mode: "net" | "gross" | "gross_net" | "gross_net_split" = "gross_net";
     if (sub.eventtype_id === 5) {
       await pool.query("CALL spPickNet(?)", [subeventId]);
       mode = "net";
     } else if (sub.eventtype_id === 6) {
       await pool.query("CALL spPickGross(?)", [subeventId]);
       mode = "gross";
+    } else if (isGrossNetSplitType) {
+      await pool.query("CALL spPickGrossNetSplit(?)", [subeventId]);
+      mode = "gross_net_split";
     } else {
       await pool.query("CALL spPick(?)", [subeventId]);
       mode = "gross_net";
@@ -4112,6 +4119,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
       amount: z.number().optional().nullable(),
       addedmoney: z.number().optional().nullable(),
       drawn_hole: z.number().int().min(1).max(18).optional().nullable(),
+      gross_flights: z.number().int().min(0).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -4128,7 +4136,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
 
     await pool.execute(
       `UPDATE subEventMain
-       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?, drawn_hole = ?
+       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?, drawn_hole = ?, gross_flights = ?
        WHERE subevent_id = ?`,
       [
         parsed.data.eventtype_id ?? null,
@@ -4137,6 +4145,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
         parsed.data.amount ?? null,
         parsed.data.addedmoney ?? null,
         parsed.data.drawn_hole ?? null,
+        parsed.data.gross_flights ?? null,
         subeventId,
       ]
     );

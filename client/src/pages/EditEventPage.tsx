@@ -79,6 +79,7 @@ function subEventRoute(
   if (eventTypeId === 1 || eventTypeId === 6) return `/subevents/${subeventId}/stroke`;
   if (eventTypeId === 2 || eventTypeId === 10) return `/subevents/${subeventId}/bestball`;
   if (eventTypeId === 4 || eventTypeId === 9) return `/subevents/${subeventId}/chicago`;
+  if ((eventTypeName ?? "").toLowerCase().includes("gross/net split")) return `/subevents/${subeventId}/stroke`;
   if (isStrokeNetType(eventTypeName)) return `/subevents/${subeventId}/stroke-net`;
   if (isStrokeType(eventTypeName)) return `/subevents/${subeventId}/stroke`;
   if (isBestBallType(eventTypeName)) return `/subevents/${subeventId}/bestball`;

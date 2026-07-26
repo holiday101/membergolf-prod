@@ -12,6 +12,7 @@ type SubEventDetail = {
   roster_id: number | null;
   amount: number | null;
   addedmoney: number | null;
+  gross_flights: number | null;
   autoflight_yn?: number | null;
 };
 
@@ -58,7 +59,12 @@ type Me = {
 };
 
 function isStrokeType(name: string | null | undefined) {
-  return (name ?? "").toLowerCase().includes("stroke");
+  const n = (name ?? "").toLowerCase();
+  return n.includes("stroke") || n.includes("gross/net split");
+}
+
+function isGrossNetSplitType(name: string | null | undefined) {
+  return (name ?? "").toLowerCase().includes("gross/net split");
 }
 
 function hasWinningAmount(amount: number | string | null | undefined) {
@@ -98,6 +104,7 @@ export default function SubEventStrokePage() {
     roster_id: "",
     amount: "",
     addedmoney: "",
+    gross_flights: "",
   });
 
   const flightComparisons = useMemo(() => {
@@ -316,6 +323,7 @@ export default function SubEventStrokePage() {
           roster_id: detail.roster_id ? String(detail.roster_id) : "",
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
+          gross_flights: detail.gross_flights != null ? String(detail.gross_flights) : "",
         });
       } catch (e: any) {
         setError(e.message ?? "Failed to load subevent");
@@ -369,6 +377,7 @@ export default function SubEventStrokePage() {
           roster_id: form.roster_id ? Number(form.roster_id) : null,
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
+          gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -409,6 +418,7 @@ export default function SubEventStrokePage() {
           roster_id: form.roster_id ? Number(form.roster_id) : null,
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
+          gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
         }),
       });
       if (!saveRes.ok) throw new Error(await saveRes.text());
@@ -621,6 +631,17 @@ export default function SubEventStrokePage() {
                 onChange={(e) => setForm((p) => ({ ...p, addedmoney: e.target.value }))}
               />
             </div>
+            {isGrossNetSplitType(data.eventtypename) ? (
+              <div className="row">
+                <div className="label">Gross Flights</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.gross_flights}
+                  onChange={(e) => setForm((p) => ({ ...p, gross_flights: e.target.value }))}
+                />
+              </div>
+            ) : null}
             <div className="actionsRow">
               <div className="actionsLeft">
                 <button className="btn" onClick={unpostStroke} disabled={strokeBusy}>

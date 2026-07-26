@@ -25,6 +25,7 @@ function subEventRoute(
   if (eventTypeId === 4 || eventTypeId === 9) return `/subevents/${subeventId}/chicago`;
 
   const normalized = (eventTypeName ?? "").toLowerCase();
+  if (normalized.includes("gross/net split")) return `/subevents/${subeventId}/stroke`;
   if (normalized.includes("stroke") && normalized.includes("net")) return `/subevents/${subeventId}/stroke-net`;
   if (normalized.includes("stroke")) return `/subevents/${subeventId}/stroke`;
   if (normalized.includes("best ball") || normalized.includes("bestball")) return `/subevents/${subeventId}/bestball`;
