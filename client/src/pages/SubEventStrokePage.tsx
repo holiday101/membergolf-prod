@@ -24,6 +24,7 @@ type GrossRow = {
   lastname: string | null;
   flight_id: number | null;
   flightname: string | null;
+  flight_hdcp1: number | null;
   score: number | null;
   place: number | null;
   amount: number | null;
@@ -39,6 +40,7 @@ type NetRow = {
   lastname: string | null;
   flight_id: number | null;
   flightname: string | null;
+  flight_hdcp1: number | null;
   score: number | null;
   place: number | null;
   amount: number | null;
@@ -113,6 +115,7 @@ export default function SubEventStrokePage() {
     const flights = new Map<string, {
       flight_id: number | null;
       flightname: string | null;
+      flight_hdcp1: number | null;
       gross: GrossRow[];
       net: NetRow[];
     }>();
@@ -121,7 +124,7 @@ export default function SubEventStrokePage() {
       const key = String(row.flight_id ?? "na");
       const current =
         flights.get(key) ??
-        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, flight_hdcp1: row.flight_hdcp1 ?? null, gross: [], net: [] };
       current.gross.push(row);
       flights.set(key, current);
     }
@@ -130,7 +133,7 @@ export default function SubEventStrokePage() {
       const key = String(row.flight_id ?? "na");
       const current =
         flights.get(key) ??
-        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, flight_hdcp1: row.flight_hdcp1 ?? null, gross: [], net: [] };
       current.net.push(row);
       flights.set(key, current);
     }
@@ -139,6 +142,9 @@ export default function SubEventStrokePage() {
       .sort((a, b) => {
         if (a.flight_id == null && b.flight_id != null) return 1;
         if (a.flight_id != null && b.flight_id == null) return -1;
+        const hdcpA = typeof a.flight_hdcp1 === "number" ? a.flight_hdcp1 : Number.MAX_SAFE_INTEGER;
+        const hdcpB = typeof b.flight_hdcp1 === "number" ? b.flight_hdcp1 : Number.MAX_SAFE_INTEGER;
+        if (hdcpA !== hdcpB) return hdcpA - hdcpB;
         const nameA = (a.flightname ?? "").toLowerCase();
         const nameB = (b.flightname ?? "").toLowerCase();
         if (nameA !== nameB) return nameA.localeCompare(nameB);
@@ -231,6 +237,11 @@ export default function SubEventStrokePage() {
         return { ...flight, rows };
       });
   }, [gross, net]);
+
+  const totalPlayers = useMemo(
+    () => flightComparisons.reduce((sum, flight) => sum + flight.rows.length, 0),
+    [flightComparisons]
+  );
 
   const payoutFlightNameById = useMemo(() => {
     const map = new Map<number, string>();
@@ -668,6 +679,7 @@ export default function SubEventStrokePage() {
             <div className="card wideCard">
               <div className="titleRow">
                 <div className="title">Stroke Play Payouts</div>
+                <div className="playersTotal">Players ({totalPlayers})</div>
               </div>
 
               {strokeLoading ? <div className="muted">Loading payouts…</div> : null}
@@ -678,7 +690,10 @@ export default function SubEventStrokePage() {
                     
                     {flightComparisons.map((flight) => (
                       <div key={`flight-compare-${flight.flight_id ?? "na"}`} className="compareFlight">
-                        <div className="compareFlightTitle">{flight.flightname ?? `Flight ${flight.flight_id ?? "Unassigned"}`}</div>
+                        <div className="compareFlightTitle">
+                          <span>{flight.flightname ?? `Flight ${flight.flight_id ?? "Unassigned"}`}</span>
+                          <span className="playersTotal">Players ({flight.rows.length})</span>
+                        </div>
                         <div className="compareHead">
                           <div className="compareColHead">
                             <span>Member</span>
@@ -856,7 +871,8 @@ export default function SubEventStrokePage() {
         .tablesWrap { display: grid; gap: 14px; }
         .tableSection { display: grid; gap: 6px; }
         .compareFlight { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
-        .compareFlightTitle { font-size: 12px; font-weight: 800; color: #1f2937; }
+        .compareFlightTitle { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; font-weight: 800; color: #1f2937; }
+        .playersTotal { font-size: 11px; font-weight: 600; color: #6b7280; text-transform: none; letter-spacing: normal; }
         .compareHead { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
         .compareColHead {
           display: grid;

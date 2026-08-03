@@ -3773,6 +3773,7 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
         m.lastname,
         g.flight_id,
         rf.flightname,
+        rf.hdcp1 AS flight_hdcp1,
         g.score,
         g.place,
         g.amount,
@@ -3783,7 +3784,7 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
       LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
       LEFT JOIN eventCard c ON c.card_id = g.card_id
       WHERE g.subevent_id = ?
-      ORDER BY (g.flight_id IS NULL), rf.flightname ASC, g.place ASC, g.score ASC, m.lastname ASC, m.firstname ASC
+      ORDER BY (g.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, g.place ASC, g.score ASC, m.lastname ASC, m.firstname ASC
       `,
       [subeventId]
     );
@@ -3798,6 +3799,7 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
         m.lastname,
         n.flight_id,
         rf.flightname,
+        rf.hdcp1 AS flight_hdcp1,
         n.score,
         n.place,
         n.amount,
@@ -3808,7 +3810,7 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
       LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
       LEFT JOIN eventCard c ON c.card_id = n.card_id
       WHERE n.subevent_id = ?
-      ORDER BY (n.flight_id IS NULL), rf.flightname ASC, n.place ASC, n.score ASC, m.lastname ASC, m.firstname ASC
+      ORDER BY (n.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, n.place ASC, n.score ASC, m.lastname ASC, m.firstname ASC
       `,
       [subeventId]
     );
