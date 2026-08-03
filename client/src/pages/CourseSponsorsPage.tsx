@@ -13,7 +13,6 @@ type Course = {
 type Sponsor = {
   sponsor_id: number;
   course_id: number;
-  name: string | null;
   website: string | null;
   logo: string | null;
   logo_url?: string | null;
@@ -34,10 +33,8 @@ export default function CourseSponsorsPage() {
   const [titleSponsorLink, setTitleSponsorLink] = useState("");
 
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-  const [newName, setNewName] = useState("");
-  const [newWebsite, setNewWebsite] = useState("");
   const [adding, setAdding] = useState(false);
-  const [edits, setEdits] = useState<Record<number, { name: string; website: string }>>({});
+  const [edits, setEdits] = useState<Record<number, { website: string }>>({});
 
   const successTimer = useRef<number | null>(null);
 
@@ -82,9 +79,9 @@ export default function CourseSponsorsPage() {
 
       const sponsorRows: Sponsor[] = await sponsorsRes.json();
       setSponsors(sponsorRows);
-      const nextEdits: Record<number, { name: string; website: string }> = {};
+      const nextEdits: Record<number, { website: string }> = {};
       for (const s of sponsorRows) {
-        nextEdits[s.sponsor_id] = { name: s.name ?? "", website: s.website ?? "" };
+        nextEdits[s.sponsor_id] = { website: s.website ?? "" };
       }
       setEdits(nextEdits);
     } catch (err: any) {
@@ -178,23 +175,14 @@ export default function CourseSponsorsPage() {
 
   async function addSponsor() {
     if (!courseIdNum) return;
-    if (!newName.trim() && !newWebsite.trim()) {
-      setError("Enter a sponsor name or website.");
-      return;
-    }
     setAdding(true);
     setError("");
     try {
       const res = await apiFetch(`/courses/manage/${courseIdNum}/sponsors`, {
         method: "POST",
-        body: JSON.stringify({
-          name: newName.trim() || null,
-          website: newWebsite.trim() || null,
-        }),
+        body: JSON.stringify({ website: null }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setNewName("");
-      setNewWebsite("");
       await loadData();
       flashSuccess("Sponsor added.");
     } catch (err: any) {
@@ -213,10 +201,7 @@ export default function CourseSponsorsPage() {
     try {
       const res = await apiFetch(`/courses/manage/${courseIdNum}/sponsors/${sponsorId}`, {
         method: "PUT",
-        body: JSON.stringify({
-          name: edit.name.trim() || null,
-          website: edit.website.trim() || null,
-        }),
+        body: JSON.stringify({ website: edit.website.trim() || null }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadData();
@@ -381,89 +366,69 @@ export default function CourseSponsorsPage() {
           <section className="card">
             <div className="cardHeader">Other Sponsors</div>
 
-            <div className="addRow">
-              <input
-                placeholder="Sponsor name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-              />
-              <input
-                placeholder="Website"
-                value={newWebsite}
-                onChange={(e) => setNewWebsite(e.target.value)}
-              />
-              <button className="btn primary" onClick={addSponsor} disabled={adding}>
-                {adding ? "Adding…" : "Add Sponsor"}
-              </button>
-            </div>
-
             {sponsors.length === 0 ? (
               <div className="muted">No sponsors added yet.</div>
             ) : (
               <div className="sponsorList">
                 {sponsors.map((s) => {
-                  const edit = edits[s.sponsor_id] ?? { name: "", website: "" };
+                  const edit = edits[s.sponsor_id] ?? { website: "" };
                   return (
-                    <div key={s.sponsor_id} className="sponsorRow">
-                      <input
-                        value={edit.name}
-                        placeholder="Sponsor name"
-                        onChange={(e) =>
-                          setEdits((prev) => ({
-                            ...prev,
-                            [s.sponsor_id]: { ...edit, name: e.target.value },
-                          }))
-                        }
-                      />
-                      <input
-                        value={edit.website}
-                        placeholder="Website"
-                        onChange={(e) =>
-                          setEdits((prev) => ({
-                            ...prev,
-                            [s.sponsor_id]: { ...edit, website: e.target.value },
-                          }))
-                        }
-                      />
+                    <div key={s.sponsor_id} className="sponsorCard">
+                      <div className="logoRow">
+                        <label className="formLabel wideField">
+                          Sponsor Website
+                          <input
+                            value={edit.website}
+                            onChange={(e) =>
+                              setEdits((prev) => ({
+                                ...prev,
+                                [s.sponsor_id]: { website: e.target.value },
+                              }))
+                            }
+                          />
+                        </label>
 
-                      <div className="uploadRow">
-                        {s.logo_url ? (
-                          <div className="assetPreviewRow">
-                            <img src={s.logo_url} alt={`${s.name ?? "Sponsor"} logo`} className="assetPreview" />
-                            <button
-                              type="button"
-                              className="iconBtn iconBtn-sm"
-                              onClick={() => deleteSponsorLogo(s.sponsor_id)}
-                              disabled={uploading}
-                              aria-label="Delete sponsor logo"
-                            >
-                              🗑
-                            </button>
+                        <div className="assetBlock compactAsset">
+                          <div className="assetTitle">Sponsor Logo</div>
+                          <div className="uploadRow">
+                            {s.logo_url ? (
+                              <div className="assetPreviewRow">
+                                <img src={s.logo_url} alt="Sponsor logo preview" className="assetPreview" />
+                                <button
+                                  type="button"
+                                  className="iconBtn iconBtn-sm"
+                                  onClick={() => deleteSponsorLogo(s.sponsor_id)}
+                                  disabled={uploading}
+                                  aria-label="Delete sponsor logo"
+                                >
+                                  🗑
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="fileBtn">
+                                Upload Logo
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) uploadSponsorLogo(s.sponsor_id, file);
+                                    e.currentTarget.value = "";
+                                  }}
+                                  disabled={uploading}
+                                />
+                              </label>
+                            )}
                           </div>
-                        ) : (
-                          <label className="fileBtn">
-                            Upload Logo
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) uploadSponsorLogo(s.sponsor_id, file);
-                                e.currentTarget.value = "";
-                              }}
-                              disabled={uploading}
-                            />
-                          </label>
-                        )}
+                        </div>
                       </div>
-
-                      <div className="sponsorRowActions">
-                        <button className="btn small" onClick={() => saveSponsor(s.sponsor_id)} disabled={busy}>
-                          Save
+                      <div className="actions">
+                        <button className="btn primary" onClick={() => saveSponsor(s.sponsor_id)} disabled={busy}>
+                          {busy ? "Saving…" : "Save"}
                         </button>
                         <button
                           type="button"
-                          className="iconDanger iconDanger-sm"
+                          className="iconDanger"
                           onClick={() => deleteSponsor(s.sponsor_id)}
                           disabled={busy}
                           aria-label="Delete sponsor"
@@ -477,6 +442,10 @@ export default function CourseSponsorsPage() {
                 })}
               </div>
             )}
+
+            <button className="btn primary addSponsorBtn" onClick={addSponsor} disabled={adding}>
+              {adding ? "Adding…" : "+ Add Sponsor"}
+            </button>
           </section>
         </div>
       )}
@@ -553,26 +522,19 @@ export default function CourseSponsorsPage() {
         }
         .iconBtn-sm { width: 20px; height: 20px; font-size: 11px; }
         .iconBtn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .actions { display: flex; justify-content: flex-end; }
+        .actions { display: flex; justify-content: flex-end; gap: 8px; }
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; text-decoration: none; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
         .btn.small { padding: 5px 8px; font-size: 11px; }
-        .addRow {
+        .sponsorList { display: grid; gap: 14px; }
+        .sponsorCard {
           display: grid;
-          grid-template-columns: minmax(140px, 1fr) minmax(160px, 1fr) auto;
-          gap: 8px;
-          align-items: center;
-        }
-        .sponsorList { display: grid; gap: 10px; }
-        .sponsorRow {
-          display: grid;
-          grid-template-columns: minmax(120px, 1fr) minmax(140px, 1fr) auto auto;
-          gap: 8px;
-          align-items: center;
-          padding-top: 10px;
+          gap: 10px;
+          padding-top: 12px;
           border-top: 1px solid #f3f4f6;
         }
-        .sponsorRowActions { display: inline-flex; gap: 6px; align-items: center; }
+        .sponsorList .sponsorCard:first-child { padding-top: 0; border-top: 0; }
+        .addSponsorBtn { justify-self: start; }
         .iconDanger {
           width: 30px;
           height: 30px;
@@ -593,8 +555,6 @@ export default function CourseSponsorsPage() {
         .muted { color: #6b7280; font-size: 12px; }
         @media (max-width: 700px) {
           .logoRow { grid-template-columns: 1fr; }
-          .addRow { grid-template-columns: 1fr; }
-          .sponsorRow { grid-template-columns: 1fr; }
         }
       `}</style>
     </div>
