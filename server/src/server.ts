@@ -4945,7 +4945,7 @@ app.get("/rosters/:id/flights", authMiddleware, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const [rows] = await pool.query<any[]>(
-    "SELECT flight_id, roster_id, flightname, hdcp1, hdcp2 FROM rosterFlight WHERE roster_id = ? ORDER BY flightname ASC",
+    "SELECT flight_id, roster_id, flightname, hdcp1, hdcp2 FROM rosterFlight WHERE roster_id = ? ORDER BY hdcp1 ASC",
     [id]
   );
   res.json(rows);
