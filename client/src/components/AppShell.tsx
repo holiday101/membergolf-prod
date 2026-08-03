@@ -199,6 +199,11 @@ export default function AppShell() {
           icon: "list",
         },
         {
+          to: "/sponsors",
+          label: "Sponsors",
+          icon: "list",
+        },
+        {
           to: "/rosters",
           label: "Rosters",
           icon: "list",
@@ -231,6 +236,11 @@ export default function AppShell() {
     navItems.push({
       to: "/courses",
       label: me?.user.courseId ? "Course Info" : "Courses",
+      icon: "list",
+    });
+    navItems.push({
+      to: "/sponsors",
+      label: "Sponsors",
       icon: "list",
     });
   }

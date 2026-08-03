@@ -1753,6 +1753,182 @@ app.delete("/courses/manage/:id/assets/:field", authMiddleware, async (req, res)
   }
 });
 
+app.get("/courses/manage/:id/sponsors", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const [rows] = await pool.query<any[]>(
+    "SELECT sponsor_id, course_id, name, website, logo FROM courseSponsor WHERE course_id = ? ORDER BY sponsor_id ASC",
+    [id]
+  );
+  const withUrls = await Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      logo_url: row.logo ? await presignGet(row.logo) : null,
+    }))
+  );
+  res.json(withUrls);
+});
+
+app.post("/courses/manage/:id/sponsors", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const schema = z.object({
+    name: z.string().max(255).optional().nullable(),
+    website: z.string().max(512).optional().nullable(),
+    logo: z.string().max(512).optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    "INSERT INTO courseSponsor (course_id, name, website, logo) VALUES (?, ?, ?, ?)",
+    [
+      id,
+      parsed.data.name?.trim() || null,
+      parsed.data.website?.trim() || null,
+      parsed.data.logo || null,
+    ]
+  );
+  res.status(201).json({ sponsor_id: result.insertId, course_id: id });
+});
+
+app.put("/courses/manage/:id/sponsors/:sponsorId", authMiddleware, requireAdmin, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const id = Number(req.params.id);
+  const sponsorId = Number(req.params.sponsorId);
+  if (!Number.isFinite(id) || !Number.isFinite(sponsorId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+  if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+  const schema = z.object({
+    name: z.string().max(255).optional().nullable(),
+    website: z.string().max(512).optional().nullable(),
+    logo: z.string().max(512).optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const key of Object.keys(parsed.data) as Array<keyof typeof parsed.data>) {
+    fields.push(`${key} = ?`);
+    values.push((parsed.data as any)[key]);
+  }
+  if (!fields.length) return res.status(400).json({ error: "No fields to update" });
+
+  values.push(sponsorId, id);
+  const [result] = await pool.execute<mysql.ResultSetHeader>(
+    `UPDATE courseSponsor SET ${fields.join(", ")} WHERE sponsor_id = ? AND course_id = ?`,
+    values
+  );
+  if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+  res.json({ sponsor_id: sponsorId, course_id: id });
+});
+
+app.delete("/courses/manage/:id/sponsors/:sponsorId", authMiddleware, requireAdmin, async (req, res) => {
+  try {
+    const payload = (req as any).user as JwtPayload;
+    const id = Number(req.params.id);
+    const sponsorId = Number(req.params.sponsorId);
+    if (!Number.isFinite(id) || !Number.isFinite(sponsorId)) {
+      return res.status(400).json({ error: "Invalid id" });
+    }
+    if (!isGlobal(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+    const [rows] = await pool.query<any[]>(
+      "SELECT logo FROM courseSponsor WHERE sponsor_id = ? AND course_id = ? LIMIT 1",
+      [sponsorId, id]
+    );
+    const row = rows?.[0];
+    if (!row) return res.status(404).json({ error: "Not found" });
+    if (row.logo) {
+      await deleteObject(row.logo);
+    }
+
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      "DELETE FROM courseSponsor WHERE sponsor_id = ? AND course_id = ?",
+      [sponsorId, id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.status(204).send();
+  } catch (err: any) {
+    console.error("sponsor delete error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.post(
+  "/courses/manage/:id/sponsors/:sponsorId/assets/presign",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const payload = (req as any).user as JwtPayload;
+      const id = Number(req.params.id);
+      const sponsorId = Number(req.params.sponsorId);
+      if (!Number.isFinite(id) || !Number.isFinite(sponsorId)) {
+        return res.status(400).json({ error: "Invalid id" });
+      }
+      if (!isAdmin(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+      const schema = z.object({
+        filename: z.string().min(1).max(255),
+        contentType: z.string().optional().nullable(),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+      const ext = path.extname(parsed.data.filename || "").slice(0, 10);
+      const key = `courses/${id}/sponsors/${sponsorId}/logo-${randomUUID()}${ext}`;
+      const uploadUrl = await presignPut(key);
+      res.json({ uploadUrl, fileKey: key });
+    } catch (err) {
+      console.error("sponsor asset presign error", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+app.delete(
+  "/courses/manage/:id/sponsors/:sponsorId/assets/logo",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const payload = (req as any).user as JwtPayload;
+      const id = Number(req.params.id);
+      const sponsorId = Number(req.params.sponsorId);
+      if (!Number.isFinite(id) || !Number.isFinite(sponsorId)) {
+        return res.status(400).json({ error: "Invalid id" });
+      }
+      if (!isAdmin(payload) && payload.courseId !== id) return res.status(403).json({ error: "Forbidden" });
+
+      const [rows] = await pool.query<any[]>(
+        "SELECT logo FROM courseSponsor WHERE sponsor_id = ? AND course_id = ? LIMIT 1",
+        [sponsorId, id]
+      );
+      const row = rows?.[0];
+      if (!row) return res.status(404).json({ error: "Not found" });
+      if (row.logo) {
+        await deleteObject(row.logo);
+      }
+      await pool.execute(
+        "UPDATE courseSponsor SET logo = NULL WHERE sponsor_id = ? AND course_id = ?",
+        [sponsorId, id]
+      );
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("sponsor asset delete error", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
 app.get("/courses", authMiddleware, requireAdmin, async (_req, res) => {
   const [rows] = await pool.query<any[]>(
     "SELECT course_id, coursename FROM courseMain ORDER BY coursename ASC"

@@ -7,7 +7,6 @@ type Course = {
   coursename: string | null;
   leagueinfo: string | null;
   website: string | null;
-  titlesponsor_link: string | null;
   payout: number | null;
   cardsused: number | null;
   cardsmax: number | null;
@@ -16,9 +15,7 @@ type Course = {
   autoflight_yn: number | null;
   active_yn: number | null;
   logo: string | null;
-  titlesponsor: string | null;
   logo_url?: string | null;
-  titlesponsor_url?: string | null;
 };
 
 type NineRow = {
@@ -69,7 +66,6 @@ type FormState = {
   coursename: string;
   leagueinfo: string;
   website: string;
-  titlesponsor_link: string;
   payout: string;
   cardsused: string;
   cardsmax: string;
@@ -78,14 +74,12 @@ type FormState = {
   autoflight_yn: string;
   active_yn: string;
   logo: string;
-  titlesponsor: string;
 };
 
 const emptyForm: FormState = {
   coursename: "",
   leagueinfo: "",
   website: "",
-  titlesponsor_link: "",
   payout: "0.3",
   cardsused: "6",
   cardsmax: "12",
@@ -94,7 +88,6 @@ const emptyForm: FormState = {
   autoflight_yn: "1",
   active_yn: "1",
   logo: "",
-  titlesponsor: "",
 };
 
 export default function CourseEditorPage() {
@@ -128,7 +121,6 @@ export default function CourseEditorPage() {
       coursename: course.coursename ?? "",
       leagueinfo: course.leagueinfo ?? "",
       website: course.website ?? "",
-      titlesponsor_link: course.titlesponsor_link ?? "",
       payout: course.payout != null ? String(course.payout) : "",
       cardsused: course.cardsused != null ? String(course.cardsused) : "",
       cardsmax: course.cardsmax != null ? String(course.cardsmax) : "",
@@ -137,7 +129,6 @@ export default function CourseEditorPage() {
       autoflight_yn: course.autoflight_yn != null ? String(course.autoflight_yn) : "1",
       active_yn: course.active_yn != null ? String(course.active_yn) : "1",
       logo: course.logo ?? "",
-      titlesponsor: course.titlesponsor ?? "",
     });
   }
 
@@ -226,7 +217,6 @@ export default function CourseEditorPage() {
         coursename: form.coursename.trim(),
         leagueinfo: form.leagueinfo.trim() || null,
         website: form.website.trim() || null,
-        titlesponsor_link: form.titlesponsor_link.trim() || null,
         payout: form.payout ? Number(form.payout) : null,
         cardsused: form.cardsused ? Number(form.cardsused) : null,
         cardsmax: form.cardsmax ? Number(form.cardsmax) : null,
@@ -235,7 +225,6 @@ export default function CourseEditorPage() {
         autoflight_yn: form.autoflight_yn ? Number(form.autoflight_yn) : null,
         active_yn: form.active_yn ? Number(form.active_yn) : null,
         logo: form.logo || null,
-        titlesponsor: form.titlesponsor || null,
       };
 
       if (isCreate) {
@@ -282,7 +271,7 @@ export default function CourseEditorPage() {
     }
   }
 
-  async function uploadAsset(field: "logo" | "titlesponsor", file: File) {
+  async function uploadAsset(field: "logo", file: File) {
     if (!editingId) return;
     setUploading(true);
     setError("");
@@ -323,7 +312,7 @@ export default function CourseEditorPage() {
     }
   }
 
-  async function deleteAsset(field: "logo" | "titlesponsor") {
+  async function deleteAsset(field: "logo") {
     if (!editingId) return;
     setUploading(true);
     setError("");
@@ -377,6 +366,11 @@ export default function CourseEditorPage() {
         <Link className="backLink" to="/courses">
           ← Back to Courses
         </Link>
+        {!isCreate && editingId ? (
+          <Link className="btn" to={`/courses/${editingId}/sponsors`}>
+            Manage Sponsors
+          </Link>
+        ) : null}
       </div>
 
       {error && (
@@ -540,54 +534,6 @@ export default function CourseEditorPage() {
                         <span className="checkboxLabel">Active Y/N</span>
                       </label>
                     ) : null}
-                  </div>
-                </div>
-
-                <div className="logoRow">
-                  <label className="formLabel wideField">
-                    Title Sponsor Website
-                    <input
-                      value={form.titlesponsor_link}
-                      onChange={(e) => setField("titlesponsor_link", e.target.value)}
-                    />
-                  </label>
-
-                  <div className="assetBlock compactAsset">
-                    <div className="assetTitle">Title Sponsor</div>
-                    <div className="uploadRow">
-                      {activeCourse?.titlesponsor_url ? (
-                        <div className="assetPreviewRow">
-                          <img
-                            src={activeCourse.titlesponsor_url || ""}
-                            alt="Title sponsor preview"
-                            className="assetPreview"
-                          />
-                          <button
-                            type="button"
-                            className="iconBtn iconBtn-sm"
-                            onClick={() => deleteAsset("titlesponsor")}
-                            disabled={uploading}
-                            aria-label="Delete title sponsor"
-                          >
-                            🗑
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="fileBtn">
-                          Upload Sponsor
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) uploadAsset("titlesponsor", file);
-                              e.currentTarget.value = "";
-                            }}
-                            disabled={!editingId || uploading}
-                          />
-                        </label>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>

@@ -26,6 +26,8 @@ import CourseListPage from "./pages/CourseListPage";
 import CourseEditorPage from "./pages/CourseEditorPage";
 import CourseNineCreatePage from "./pages/CourseNineCreatePage";
 import CourseNineEditPage from "./pages/CourseNineEditPage";
+import SponsorsListPage from "./pages/SponsorsListPage";
+import CourseSponsorsPage from "./pages/CourseSponsorsPage";
 import PublicShell from "./components/Public/PublicShell";
 import PublicCalendarPage from "./pages/PublicCalendarPage";
 import PublicEventListPage from "./pages/PublicEventListPage";
@@ -92,6 +94,8 @@ export default function App() {
         <Route path="/courses/:courseId/edit" element={<CourseEditorPage />} />
         <Route path="/courses/:courseId/nines/new" element={<CourseNineCreatePage />} />
         <Route path="/courses/:courseId/nines/:nineId/edit" element={<CourseNineEditPage />} />
+        <Route path="/sponsors" element={<SponsorsListPage />} />
+        <Route path="/courses/:courseId/sponsors" element={<CourseSponsorsPage />} />
         <Route path="/users" element={<UserListPage />} />
         <Route path="/users/new" element={<UserEditorPage />} />
         <Route path="/users/:userId/edit" element={<UserEditorPage />} />
