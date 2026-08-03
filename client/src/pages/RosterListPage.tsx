@@ -280,7 +280,16 @@ export default function RosterListPage() {
                       navigate(`/rosters/${r.roster_id}/members`);
                     }}
                   >
-                    View Members
+                    Members
+                  </button>
+                  <button
+                    className="btn editRosterBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      selectRoster(r);
+                    }}
+                  >
+                    Edit
                   </button>
                   <button
                     className="iconBtn"
@@ -434,6 +443,7 @@ export default function RosterListPage() {
         .btn { border: 1px solid #d1d5db; background: #fff; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 12px; }
         .btn.primary { background: #2563eb; color: #fff; border-color: #2563eb; }
         .viewMembersBtn:hover { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+        .editRosterBtn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
         .list { display: grid; gap: 2px; }
         .row { display: flex; justify-content: space-between; padding: 2px 6px; line-height: 1.2; color: #6b7280; }
         .row:nth-child(even) { background: #f0f7ff; }
@@ -441,7 +451,7 @@ export default function RosterListPage() {
         .row.clickable { cursor: pointer; }
         .row.clickable:hover { background: #e0f2fe; }
         .row.selected { background: #dbeafe; }
-        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 150px; align-items: center; }
+        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 190px; align-items: center; }
         .holesCol { font-size: 11px; text-align: center; }
         .flightsRow { display: grid; grid-template-columns: 1fr 90px 34px; align-items: center; }
         .name { font-weight: 600; font-size: 12px; }

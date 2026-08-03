@@ -1,5 +1,6 @@
 node_modules
 .env
+.claude/settings.local.json
 dist
 .env.production
 server/.env.production
