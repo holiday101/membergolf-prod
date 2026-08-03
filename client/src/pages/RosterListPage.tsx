@@ -33,6 +33,11 @@ export default function RosterListPage() {
   const [hdcp2, setHdcp2] = useState("");
   const [flightBusy, setFlightBusy] = useState(false);
   const [deleteFlightId, setDeleteFlightId] = useState<number | null>(null);
+  const [editFlightId, setEditFlightId] = useState<number | null>(null);
+  const [editFlightName, setEditFlightName] = useState("");
+  const [editFlightHdcp1, setEditFlightHdcp1] = useState("");
+  const [editFlightHdcp2, setEditFlightHdcp2] = useState("");
+  const [flightEditBusy, setFlightEditBusy] = useState(false);
   const [deleteRosterId, setDeleteRosterId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editActiveYn, setEditActiveYn] = useState(true);
@@ -132,6 +137,50 @@ export default function RosterListPage() {
       setError(e.message ?? "Failed to add flight");
     } finally {
       setFlightBusy(false);
+    }
+  };
+
+  const startEditFlight = (f: Flight) => {
+    setEditFlightId(f.flight_id);
+    setEditFlightName(f.flightname ?? "");
+    setEditFlightHdcp1(f.hdcp1 != null ? String(f.hdcp1) : "");
+    setEditFlightHdcp2(f.hdcp2 != null ? String(f.hdcp2) : "");
+  };
+
+  const cancelEditFlight = () => {
+    setEditFlightId(null);
+    setEditFlightName("");
+    setEditFlightHdcp1("");
+    setEditFlightHdcp2("");
+  };
+
+  const saveEditFlight = async () => {
+    if (!selectedRoster || editFlightId == null) return;
+    if (!editFlightName.trim()) {
+      setError("Flight name is required.");
+      return;
+    }
+    setFlightEditBusy(true);
+    setError("");
+    try {
+      const res = await apiFetch(
+        `/rosters/${selectedRoster.roster_id}/flights/${editFlightId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            flightname: editFlightName.trim(),
+            hdcp1: editFlightHdcp1 ? Number(editFlightHdcp1) : null,
+            hdcp2: editFlightHdcp2 ? Number(editFlightHdcp2) : null,
+          }),
+        }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      cancelEditFlight();
+      await loadFlights(selectedRoster.roster_id);
+    } catch (e: any) {
+      setError(e.message ?? "Failed to update flight");
+    } finally {
+      setFlightEditBusy(false);
     }
   };
 
@@ -361,24 +410,72 @@ export default function RosterListPage() {
                   <div className="status">Hdcp</div>
                   <div className="actionsCol"></div>
                 </div>
-                {flights.map((f) => (
-                  <div key={f.flight_id} className="row flightsRow">
-                    <div className="name">{f.flightname ?? "---"}</div>
-                    <div className="status">
-                      {(f.hdcp1 ?? "---")} / {(f.hdcp2 ?? "---")}
+                {flights.map((f) =>
+                  editFlightId === f.flight_id ? (
+                    <div key={f.flight_id} className="row flightsRow editing">
+                      <input
+                        className="flightEditInput"
+                        value={editFlightName}
+                        onChange={(e) => setEditFlightName(e.target.value)}
+                        placeholder="Flight name"
+                      />
+                      <input
+                        className="flightEditInput hdcpInput"
+                        value={editFlightHdcp1}
+                        onChange={(e) => setEditFlightHdcp1(e.target.value)}
+                        placeholder="Hdcp 1"
+                      />
+                      <input
+                        className="flightEditInput hdcpInput"
+                        value={editFlightHdcp2}
+                        onChange={(e) => setEditFlightHdcp2(e.target.value)}
+                        placeholder="Hdcp 2"
+                      />
+                      <div className="actionsCol">
+                        <button
+                          className="iconBtn saveBtn"
+                          onClick={saveEditFlight}
+                          disabled={flightEditBusy}
+                          aria-label="Save flight"
+                        >
+                          ✓
+                        </button>
+                        <button
+                          className="iconBtn"
+                          onClick={cancelEditFlight}
+                          disabled={flightEditBusy}
+                          aria-label="Cancel edit"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     </div>
-                    <div className="actionsCol">
-                      <button
-                        className="iconBtn"
-                        onClick={() => deleteFlight(f.flight_id)}
-                        disabled={deleteFlightId === f.flight_id}
-                        aria-label="Delete flight"
-                      >
-                        🗑
-                      </button>
+                  ) : (
+                    <div key={f.flight_id} className="row flightsRow">
+                      <div className="name">{f.flightname ?? "---"}</div>
+                      <div className="status">
+                        {(f.hdcp1 ?? "---")} / {(f.hdcp2 ?? "---")}
+                      </div>
+                      <div className="actionsCol">
+                        <button
+                          className="iconBtn"
+                          onClick={() => startEditFlight(f)}
+                          aria-label="Edit flight"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="iconBtn"
+                          onClick={() => deleteFlight(f.flight_id)}
+                          disabled={deleteFlightId === f.flight_id}
+                          aria-label="Delete flight"
+                        >
+                          🗑
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                )}
                 {flights.length === 0 && (
                   <div className="muted" style={{ padding: "6px" }}>No flights yet.</div>
                 )}
@@ -453,7 +550,11 @@ export default function RosterListPage() {
         .row.selected { background: #dbeafe; }
         .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 190px; align-items: center; }
         .holesCol { font-size: 11px; text-align: center; }
-        .flightsRow { display: grid; grid-template-columns: 1fr 90px 34px; align-items: center; }
+        .flightsRow { display: grid; grid-template-columns: 1fr 90px 60px; align-items: center; }
+        .flightsRow.editing { grid-template-columns: 1fr 70px 70px 60px; gap: 4px; }
+        .flightEditInput { padding: 4px 6px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 11px; width: 100%; box-sizing: border-box; }
+        .flightEditInput.hdcpInput { text-align: center; }
+        .saveBtn:hover { background: #f0fdf4; border-color: #86efac; color: #15803d; }
         .name { font-weight: 600; font-size: 12px; }
         .status { font-size: 11px; }
         .error { color: #a00; font-size: 12px; }

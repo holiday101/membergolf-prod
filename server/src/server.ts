@@ -4974,6 +4974,43 @@ app.post("/rosters/:id/flights", authMiddleware, async (req, res) => {
   }
 });
 
+app.put("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) => {
+  const payload = (req as any).user as JwtPayload;
+  const global = isGlobal(payload);
+  const rosterId = Number(req.params.id);
+  const flightId = Number(req.params.flightId);
+  if (!Number.isFinite(rosterId) || !Number.isFinite(flightId)) {
+    return res.status(400).json({ error: "Invalid id" });
+  }
+
+  const schema = z.object({
+    flightname: z.string().min(1).max(50),
+    hdcp1: z.number().optional().nullable(),
+    hdcp2: z.number().optional().nullable(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json(parsed.error.flatten());
+
+  try {
+    const [rows] = await pool.query<any[]>(
+      global
+        ? `SELECT f.flight_id FROM rosterFlight f WHERE f.flight_id = ? AND f.roster_id = ? LIMIT 1`
+        : `SELECT f.flight_id FROM rosterFlight f JOIN rosterMain r ON r.roster_id = f.roster_id WHERE f.flight_id = ? AND f.roster_id = ? AND r.course_id = ? LIMIT 1`,
+      global ? [flightId, rosterId] : [flightId, rosterId, payload.courseId]
+    );
+    if (!rows.length) return res.status(404).json({ error: "Not found" });
+
+    const [result] = await pool.execute<mysql.ResultSetHeader>(
+      "UPDATE rosterFlight SET flightname = ?, hdcp1 = ?, hdcp2 = ? WHERE flight_id = ?",
+      [parsed.data.flightname.trim(), parsed.data.hdcp1 ?? null, parsed.data.hdcp2 ?? null, flightId]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ error: "Not found" });
+    res.status(204).send();
+  } catch {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.delete("/rosters/:id/flights/:flightId", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
   const global = isGlobal(payload);
