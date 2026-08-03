@@ -28,6 +28,7 @@ type GrossRow = {
   place: number | null;
   amount: number | null;
   used_yn: number | null;
+  handicap: number | null;
 };
 
 type NetRow = {
@@ -42,6 +43,7 @@ type NetRow = {
   place: number | null;
   amount: number | null;
   used_yn: number | null;
+  handicap: number | null;
 };
 
 type PayoutRow = {
@@ -680,12 +682,14 @@ export default function SubEventStrokePage() {
                         <div className="compareHead">
                           <div className="compareColHead">
                             <span>Member</span>
+                            <span>Hcp</span>
                             <span>Gross</span>
                             <span>Place</span>
                             <span>Amount</span>
                           </div>
                           <div className="compareColHead">
                             <span>Member</span>
+                            <span>Hcp</span>
                             <span>Net</span>
                             <span>Place</span>
                             <span>Amount</span>
@@ -697,6 +701,7 @@ export default function SubEventStrokePage() {
                               {pair.gross ? (
                                 <>
                                   <div className="cellMember">{(pair.gross.lastname || "").trim()}, {(pair.gross.firstname || "").trim()}</div>
+                                  <div className="cellValue">{pair.gross.handicap ?? "—"}</div>
                                   <div className="cellValue">{pair.gross.score ?? "—"}</div>
                                   <div className="cellAmount">
                                     <input
@@ -729,6 +734,7 @@ export default function SubEventStrokePage() {
                                   <div className="entryEmpty">—</div>
                                   <div className="entryEmpty">—</div>
                                   <div className="entryEmpty">—</div>
+                                  <div className="entryEmpty">—</div>
                                 </>
                               )}
                             </div>
@@ -736,6 +742,7 @@ export default function SubEventStrokePage() {
                               {pair.net ? (
                                 <>
                                   <div className="cellMember">{(pair.net.lastname || "").trim()}, {(pair.net.firstname || "").trim()}</div>
+                                  <div className="cellValue">{pair.net.handicap ?? "—"}</div>
                                   <div className="cellValue">{pair.net.score ?? "—"}</div>
                                   <div className="cellAmount">
                                     <input
@@ -764,6 +771,7 @@ export default function SubEventStrokePage() {
                                 </>
                               ) : (
                                 <>
+                                  <div className="entryEmpty">—</div>
                                   <div className="entryEmpty">—</div>
                                   <div className="entryEmpty">—</div>
                                   <div className="entryEmpty">—</div>
@@ -852,7 +860,7 @@ export default function SubEventStrokePage() {
         .compareHead { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
         .compareColHead {
           display: grid;
-          grid-template-columns: minmax(130px, 1fr) 56px 56px minmax(120px, 140px);
+          grid-template-columns: minmax(130px, 1fr) 44px 56px 56px minmax(120px, 140px);
           gap: 8px;
           font-size: 10px;
           font-weight: 700;
@@ -864,7 +872,7 @@ export default function SubEventStrokePage() {
         .compareRow:last-child { border-bottom: 0; }
         .compareCol {
           display: grid;
-          grid-template-columns: minmax(130px, 1fr) 56px 56px minmax(120px, 140px);
+          grid-template-columns: minmax(130px, 1fr) 44px 56px 56px minmax(120px, 140px);
           gap: 8px;
           align-items: center;
           padding: 0;
@@ -891,7 +899,7 @@ export default function SubEventStrokePage() {
         @media (max-width: 760px) {
           .compareHead { display: none; }
           .compareRow { grid-template-columns: 1fr; }
-          .compareCol { grid-template-columns: 1fr 56px 56px 1fr; gap: 6px; }
+          .compareCol { grid-template-columns: 1fr 44px 56px 56px 1fr; gap: 6px; }
           .cellAmount { grid-template-columns: 1fr auto; }
           .cellMember { white-space: normal; }
         }

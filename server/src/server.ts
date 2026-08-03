@@ -3776,10 +3776,12 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
         g.score,
         g.place,
         g.amount,
-        g.used_yn
+        g.used_yn,
+        c.handicap
       FROM subEventPayGross g
       LEFT JOIN memberMain m ON m.member_id = g.member_id
       LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
+      LEFT JOIN eventCard c ON c.card_id = g.card_id
       WHERE g.subevent_id = ?
       ORDER BY (g.flight_id IS NULL), rf.flightname ASC, g.place ASC, g.score ASC, m.lastname ASC, m.firstname ASC
       `,
@@ -3799,10 +3801,12 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
         n.score,
         n.place,
         n.amount,
-        n.used_yn
+        n.used_yn,
+        c.handicap
       FROM subEventPayNet n
       LEFT JOIN memberMain m ON m.member_id = n.member_id
       LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
+      LEFT JOIN eventCard c ON c.card_id = n.card_id
       WHERE n.subevent_id = ?
       ORDER BY (n.flight_id IS NULL), rf.flightname ASC, n.place ASC, n.score ASC, m.lastname ASC, m.firstname ASC
       `,
