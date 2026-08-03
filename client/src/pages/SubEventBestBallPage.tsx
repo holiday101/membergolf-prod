@@ -45,6 +45,7 @@ type GrossRow = {
   bestball_id: number | null;
   flight_id: number | null;
   flightname: string | null;
+  flight_hdcp1: number | null;
   member1_firstname: string | null;
   member1_lastname: string | null;
   member2_firstname: string | null;
@@ -59,6 +60,7 @@ type NetRow = {
   bestball_id: number | null;
   flight_id: number | null;
   flightname: string | null;
+  flight_hdcp1: number | null;
   member1_firstname: string | null;
   member1_lastname: string | null;
   member2_firstname: string | null;
@@ -363,6 +365,7 @@ export default function SubEventBestBallPage() {
     const flights = new Map<string, {
       flight_id: number | null;
       flightname: string | null;
+      flight_hdcp1: number | null;
       gross: GrossRow[];
       net: NetRow[];
     }>();
@@ -371,7 +374,7 @@ export default function SubEventBestBallPage() {
       const key = String(row.flight_id ?? "na");
       const current =
         flights.get(key) ??
-        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, flight_hdcp1: row.flight_hdcp1 ?? null, gross: [], net: [] };
       current.gross.push(row);
       flights.set(key, current);
     }
@@ -380,7 +383,7 @@ export default function SubEventBestBallPage() {
       const key = String(row.flight_id ?? "na");
       const current =
         flights.get(key) ??
-        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, gross: [], net: [] };
+        { flight_id: row.flight_id ?? null, flightname: row.flightname ?? null, flight_hdcp1: row.flight_hdcp1 ?? null, gross: [], net: [] };
       current.net.push(row);
       flights.set(key, current);
     }
@@ -389,6 +392,9 @@ export default function SubEventBestBallPage() {
       .sort((a, b) => {
         if (a.flight_id == null && b.flight_id != null) return 1;
         if (a.flight_id != null && b.flight_id == null) return -1;
+        const hdcpA = typeof a.flight_hdcp1 === "number" ? a.flight_hdcp1 : Number.MAX_SAFE_INTEGER;
+        const hdcpB = typeof b.flight_hdcp1 === "number" ? b.flight_hdcp1 : Number.MAX_SAFE_INTEGER;
+        if (hdcpA !== hdcpB) return hdcpA - hdcpB;
         const nameA = (a.flightname ?? "").toLowerCase();
         const nameB = (b.flightname ?? "").toLowerCase();
         if (nameA !== nameB) return nameA.localeCompare(nameB);

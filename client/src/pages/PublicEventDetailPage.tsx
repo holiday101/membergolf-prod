@@ -21,6 +21,7 @@ type WinningsRow = {
   amount: number;
   flight_id: number | null;
   flight_name: string | null;
+  flight_hdcp1: number | null;
   place: number | null;
   description: string | null;
   payout_type: string | null;
@@ -53,6 +54,7 @@ type ScoreCard = {
 type FlightGroup = {
   flightKey: string;
   flightLabel: string;
+  flightHdcp1: number | null;
   gross: WinningsRow[];
   net: WinningsRow[];
   skinGroups: { type: string; label: string; rows: WinningsRow[] }[];
@@ -224,6 +226,7 @@ export default function PublicEventDetailPage() {
         map.set(key, {
           flightKey: key,
           flightLabel: flightLabel || "Overall",
+          flightHdcp1: row.flight_hdcp1 ?? null,
           gross: [],
           net: [],
           skinGroups: [],
@@ -281,7 +284,12 @@ export default function PublicEventDetailPage() {
         .map((og) => ({ ...og, rows: [...og.rows].sort(byName) }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
     }));
-    result.sort((a, b) => a.flightLabel.localeCompare(b.flightLabel, undefined, { sensitivity: "base" }));
+    result.sort((a, b) => {
+      const hdcpA = typeof a.flightHdcp1 === "number" ? a.flightHdcp1 : Number.MAX_SAFE_INTEGER;
+      const hdcpB = typeof b.flightHdcp1 === "number" ? b.flightHdcp1 : Number.MAX_SAFE_INTEGER;
+      if (hdcpA !== hdcpB) return hdcpA - hdcpB;
+      return a.flightLabel.localeCompare(b.flightLabel, undefined, { sensitivity: "base" });
+    });
 
     const otherGroups: { type: string; label: string; rows: WinningsRow[] }[] = [];
     for (const row of noFlightOther) {

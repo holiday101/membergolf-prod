@@ -177,6 +177,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         w.amount,
         w.flight_id,
         f.flightname AS flight_name,
+        f.hdcp1 AS flight_hdcp1,
         w.place,
         w.description,
         w.payout_type,
@@ -241,6 +242,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
       WHERE m.course_id = ?
       ORDER BY
         (w.flight_id IS NULL),
+        f.hdcp1,
         f.flightname,
         w.flight_id,
         CASE WHEN w.payout_type IN ('GROSS','NET') THEN 0 ELSE 1 END,
@@ -302,7 +304,7 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       LEFT JOIN rosterFlight rf ON rf.roster_id = sx.roster_id AND c.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
-      ORDER BY (rf.flightname IS NULL), rf.flightname ASC, c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
+      ORDER BY (rf.flightname IS NULL), rf.hdcp1 ASC, rf.flightname ASC, c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
       [eventId, courseId, eventId]
     );
@@ -1935,7 +1937,7 @@ app.get("/subevents/:id/skins", authMiddleware, async (req, res) => {
         INNER JOIN memberMain m ON m.member_id = es.member_id
         INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
         WHERE es.subevent_id = ?
-        ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
+        ORDER BY rf.hdcp1 ASC, rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
         `,
         [subeventId]
       );
@@ -1963,7 +1965,7 @@ app.get("/subevents/:id/skins", authMiddleware, async (req, res) => {
         INNER JOIN memberMain m ON m.member_id = es.member_id
         INNER JOIN rosterFlight rf ON rf.flight_id = es.flight_id
         WHERE es.subevent_id = ?
-        ORDER BY rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
+        ORDER BY rf.hdcp1 ASC, rf.flightname ASC, es.hole ASC, m.lastname ASC, m.firstname ASC
         `,
         [subeventId]
       );
@@ -2026,7 +2028,7 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
       INNER JOIN rosterFlight rf ON rf.roster_id = ? AND ec.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
       WHERE ec.event_id = ?
-      ORDER BY rf.flightname ASC, m.lastname ASC, m.firstname ASC, ec.card_dt ASC, ec.card_id ASC
+      ORDER BY rf.hdcp1 ASC, rf.flightname ASC, m.lastname ASC, m.firstname ASC, ec.card_dt ASC, ec.card_id ASC
       `,
       [sub.roster_id, sub.roster_id, sub.event_id]
     );
@@ -2707,7 +2709,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
       LEFT JOIN memberMain m2 ON m2.member_id = eb.member2_id
       LEFT JOIN rosterFlight rf ON rf.roster_id = ? AND eb.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       WHERE eb.event_id = ?
-      ORDER BY rf.flightname ASC, m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
+      ORDER BY rf.hdcp1 ASC, rf.flightname ASC, m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
       `,
       [sub.roster_id ?? null, sub.event_id]
     );
@@ -2719,6 +2721,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
         g.bestball_id,
         g.flight_id,
         rf.flightname,
+        rf.hdcp1 AS flight_hdcp1,
         g.score,
         g.place,
         g.amount,
@@ -2732,7 +2735,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
       LEFT JOIN memberMain m2 ON m2.member_id = g.member2_id
       LEFT JOIN rosterFlight rf ON rf.flight_id = g.flight_id
       WHERE g.subevent_id = ?
-      ORDER BY (g.flight_id IS NULL), rf.flightname ASC, g.place ASC, g.score ASC, m1.lastname ASC, m1.firstname ASC
+      ORDER BY (g.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, g.place ASC, g.score ASC, m1.lastname ASC, m1.firstname ASC
       `,
       [subeventId]
     );
@@ -2744,6 +2747,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
         n.bestball_id,
         n.flight_id,
         rf.flightname,
+        rf.hdcp1 AS flight_hdcp1,
         n.score,
         n.place,
         n.amount,
@@ -2757,7 +2761,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
       LEFT JOIN memberMain m2 ON m2.member_id = n.member2_id
       LEFT JOIN rosterFlight rf ON rf.flight_id = n.flight_id
       WHERE n.subevent_id = ?
-      ORDER BY (n.flight_id IS NULL), rf.flightname ASC, n.place ASC, n.score ASC, m1.lastname ASC, m1.firstname ASC
+      ORDER BY (n.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, n.place ASC, n.score ASC, m1.lastname ASC, m1.firstname ASC
       `,
       [subeventId]
     );
@@ -2768,11 +2772,12 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
         p.place,
         p.amount,
         p.flight_id,
-        rf.flightname
+        rf.flightname,
+        rf.hdcp1 AS flight_hdcp1
       FROM subEventPayOut p
       LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
       WHERE p.subevent_id = ?
-      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      ORDER BY (p.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, p.place ASC
       `,
       [subeventId]
     );
@@ -3099,6 +3104,7 @@ app.get("/subevents/:id/chicago", authMiddleware, async (req, res) => {
         m.lastname,
         c.flight_id,
         rf.flightname,
+        rf.hdcp1 AS flight_hdcp1,
         c.score,
         c.place,
         c.amount,
@@ -3107,7 +3113,7 @@ app.get("/subevents/:id/chicago", authMiddleware, async (req, res) => {
       LEFT JOIN memberMain m ON m.member_id = c.member_id
       LEFT JOIN rosterFlight rf ON rf.flight_id = c.flight_id
       WHERE c.subevent_id = ?
-      ORDER BY (c.flight_id IS NULL), rf.flightname ASC, c.place ASC, c.score ASC, m.lastname ASC, m.firstname ASC
+      ORDER BY (c.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, c.place ASC, c.score ASC, m.lastname ASC, m.firstname ASC
       `,
       [subeventId]
     );
@@ -3118,11 +3124,12 @@ app.get("/subevents/:id/chicago", authMiddleware, async (req, res) => {
         p.place,
         p.amount,
         p.flight_id,
-        rf.flightname
+        rf.flightname,
+        rf.hdcp1 AS flight_hdcp1
       FROM subEventPayOut p
       LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
       WHERE p.subevent_id = ?
-      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      ORDER BY (p.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, p.place ASC
       `,
       [subeventId]
     );
@@ -3821,11 +3828,12 @@ app.get("/subevents/:id/stroke", authMiddleware, async (req, res) => {
         p.place,
         p.amount,
         p.flight_id,
-        rf.flightname
+        rf.flightname,
+        rf.hdcp1 AS flight_hdcp1
       FROM subEventPayOut p
       LEFT JOIN rosterFlight rf ON rf.flight_id = p.flight_id
       WHERE p.subevent_id = ?
-      ORDER BY (p.flight_id IS NULL), rf.flightname ASC, p.place ASC
+      ORDER BY (p.flight_id IS NULL), rf.hdcp1 ASC, rf.flightname ASC, p.place ASC
       `,
       [subeventId]
     );
