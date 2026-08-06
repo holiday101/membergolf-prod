@@ -203,11 +203,6 @@ export default function AppShell() {
           label: me?.user.courseId ? "Course Info" : "Courses",
           icon: "list",
         },
-        {
-          to: "/rosters",
-          label: "Rosters",
-          icon: "list",
-        },
       ]
     : [
         {
