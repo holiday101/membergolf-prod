@@ -13,6 +13,7 @@ export default function PublicShell() {
   const [isDesktop, setIsDesktop] = useState(desktopInit);
   const [userToggled, setUserToggled] = useState(false);
   const [leagueInfo, setLeagueInfo] = useState<string | null>(null);
+  const [leagueInfoSidebarYn, setLeagueInfoSidebarYn] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -26,13 +27,16 @@ export default function PublicShell() {
   const navItems: Array<{
     to: string;
     label: string;
-    icon: "calendar" | "list" | "users" | "money" | "trophy";
+    icon: "calendar" | "list" | "users" | "money" | "trophy" | "info";
   }> = [
     { to: `${base}`, label: "Calendar", icon: "calendar" },
     { to: `${base}/events`, label: "Event List", icon: "list" },
     { to: `${base}/members`, label: "Members", icon: "users" },
     ...(seasonPointsYn
       ? [{ to: `${base}/seasonpoints`, label: "Season Points List", icon: "trophy" as const }]
+      : []),
+    ...(leagueInfo && leagueInfo.trim()
+      ? [{ to: `${base}/league-info`, label: "League Info", icon: "info" as const }]
       : []),
   ];
 
@@ -80,6 +84,7 @@ export default function PublicShell() {
       try {
         const course = await publicFetch<{
           leagueinfo: string | null;
+          leagueinfo_sidebar_yn?: number | null;
           notice?: string | null;
           coursename?: string | null;
           logo_url?: string | null;
@@ -92,6 +97,7 @@ export default function PublicShell() {
           `/public/${courseId}/course`
         );
         setLeagueInfo(course?.leagueinfo ?? null);
+        setLeagueInfoSidebarYn(course?.leagueinfo_sidebar_yn == null || !!course.leagueinfo_sidebar_yn);
         setNotice(course?.notice ?? null);
         setCourseName(course?.coursename ?? null);
         setLogoUrl(course?.logo_url ?? null);
@@ -102,6 +108,7 @@ export default function PublicShell() {
         setSeasonPointsYn(!!course?.seasonpoints_yn);
       } catch {
         setLeagueInfo(null);
+        setLeagueInfoSidebarYn(true);
         setNotice(null);
         setCourseName(null);
         setLogoUrl(null);
@@ -145,7 +152,7 @@ export default function PublicShell() {
   }, [isCalendarRoute]);
 
 
-  function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" | "trophy" }) {
+  function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" | "trophy" | "info" }) {
     switch (name) {
       case "calendar":
         return (
@@ -188,6 +195,15 @@ export default function PublicShell() {
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M6 3h12a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v2a4 4 0 0 1-4 4h-.28A6.02 6.02 0 0 1 13 15.9V18h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.1A6.02 6.02 0 0 1 6.28 12H6a4 4 0 0 1-4-4V6a1 1 0 0 1 1-1h2V4a1 1 0 0 1 1-1Zm0 4H4v1a2 2 0 0 0 2 2c0-1.06.14-2.09.38-3H6Zm12 0h-.38c.24.91.38 1.94.38 3a2 2 0 0 0 2-2V7h-2Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "info":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm0 8a1.25 1.25 0 0 0-1.25 1.25V17a1.25 1.25 0 1 0 2.5 0v-5.75A1.25 1.25 0 0 0 12 10Zm0-4.5A1.4 1.4 0 1 0 12 8.3a1.4 1.4 0 0 0 0-2.8Z"
               fill="currentColor"
             />
           </svg>
@@ -318,7 +334,7 @@ export default function PublicShell() {
           )}
           </div>
 
-          {leagueInfo ? (
+          {leagueInfo && leagueInfoSidebarYn ? (
             <div className="leagueInfo">
               <div className="leagueInfoLabel">League Info</div>
               <div className="leagueInfoText" dangerouslySetInnerHTML={{ __html: leagueInfo }} />
@@ -558,9 +574,28 @@ export default function PublicShell() {
           font-size: 12px;
           line-height: 1.35;
           overflow-y: auto;
+          overflow-x: auto;
           flex: 1;
           min-height: 0;
         }
+        /* Neutralize fixed widths/fonts pasted in from Sheets/Word so it inherits the sidebar's look */
+        .leagueInfoText, .leagueInfoText * {
+          font-family: inherit !important;
+          font-size: inherit !important;
+          line-height: inherit !important;
+        }
+        .leagueInfoText table, .leagueInfoText col { width: auto !important; }
+        .leagueInfoText table {
+          table-layout: auto !important;
+          border-collapse: collapse !important;
+          max-width: 100%;
+        }
+        .leagueInfoText td, .leagueInfoText th {
+          border: none !important;
+          border-bottom: 1px solid #e5e7eb !important;
+          padding: 3px 4px !important;
+        }
+        .leagueInfoText img { max-width: 100%; height: auto; }
 
         .content { padding: 16px; grid-column: 2; overflow: auto; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
