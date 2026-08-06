@@ -8,6 +8,7 @@ type Roster = {
   course_id: number | null;
   active_yn?: number | null;
   holes?: number | null;
+  display_yn?: number | null;
 };
 
 type Flight = {
@@ -26,6 +27,7 @@ export default function RosterListPage() {
   const [rosterName, setRosterName] = useState("");
   const [activeYn, setActiveYn] = useState(true);
   const [holes, setHoles] = useState<number>(9);
+  const [displayYn, setDisplayYn] = useState(false);
   const [selectedRoster, setSelectedRoster] = useState<Roster | null>(null);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [flightName, setFlightName] = useState("");
@@ -42,6 +44,7 @@ export default function RosterListPage() {
   const [editName, setEditName] = useState("");
   const [editActiveYn, setEditActiveYn] = useState(true);
   const [editHoles, setEditHoles] = useState<number>(9);
+  const [editDisplayYn, setEditDisplayYn] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const navigate = useNavigate();
 
@@ -69,6 +72,7 @@ export default function RosterListPage() {
     setEditName(r.rostername ?? "");
     setEditActiveYn(r.active_yn !== 0);
     setEditHoles(r.holes ?? 9);
+    setEditDisplayYn(r.display_yn === 1);
     loadFlights(r.roster_id);
   };
 
@@ -97,12 +101,14 @@ export default function RosterListPage() {
           rostername: rosterName.trim(),
           active_yn: activeYn ? 1 : 0,
           holes,
+          display_yn: displayYn ? 1 : 0,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       setRosterName("");
       setActiveYn(true);
       setHoles(9);
+      setDisplayYn(false);
       await loadRosters();
     } catch (e: any) {
       setError(e.message ?? "Failed to add roster");
@@ -237,12 +243,21 @@ export default function RosterListPage() {
           rostername: editName.trim(),
           active_yn: editActiveYn ? 1 : 0,
           holes: editHoles,
+          display_yn: editDisplayYn ? 1 : 0,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       await loadRosters();
       setSelectedRoster((prev) =>
-        prev ? { ...prev, rostername: editName.trim(), active_yn: editActiveYn ? 1 : 0, holes: editHoles } : null
+        prev
+          ? {
+              ...prev,
+              rostername: editName.trim(),
+              active_yn: editActiveYn ? 1 : 0,
+              holes: editHoles,
+              display_yn: editDisplayYn ? 1 : 0,
+            }
+          : null
       );
     } catch (e: any) {
       setError(e.message ?? "Failed to update roster");
@@ -286,6 +301,15 @@ export default function RosterListPage() {
               Active
             </label>
 
+            <label className="formLabel checkbox">
+              <input
+                type="checkbox"
+                checked={displayYn}
+                onChange={(e) => setDisplayYn(e.target.checked)}
+              />
+              Show on Money List / Season Points List menu
+            </label>
+
             <div className="actions">
               <button className="btn primary" onClick={submit} disabled={busy}>
                 {busy ? "Saving..." : "Add roster"}
@@ -302,6 +326,7 @@ export default function RosterListPage() {
               <div className="name">Roster</div>
               <div className="holesCol">Holes</div>
               <div className="status">Active</div>
+              <div className="status">Menu</div>
               <div className="actionsCol">Actions</div>
             </div>
             {rosters.map((r) => (
@@ -321,6 +346,7 @@ export default function RosterListPage() {
                 <div className="name">{r.rostername ?? "---"}</div>
                 <div className="holesCol">{r.holes ?? 9}</div>
                 <div className="status">{r.active_yn === 0 ? "No" : "Yes"}</div>
+                <div className="status">{r.display_yn === 1 ? "Yes" : "No"}</div>
                 <div className="actionsCol">
                   <button
                     className="btn viewMembersBtn"
@@ -392,6 +418,15 @@ export default function RosterListPage() {
                     onChange={(e) => setEditActiveYn(e.target.checked)}
                   />
                   Active
+                </label>
+
+                <label className="formLabel checkbox">
+                  <input
+                    type="checkbox"
+                    checked={editDisplayYn}
+                    onChange={(e) => setEditDisplayYn(e.target.checked)}
+                  />
+                  Show on Money List / Season Points List menu
                 </label>
 
                 <div className="actions">
@@ -548,7 +583,7 @@ export default function RosterListPage() {
         .row.clickable { cursor: pointer; }
         .row.clickable:hover { background: #e0f2fe; }
         .row.selected { background: #dbeafe; }
-        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 190px; align-items: center; }
+        .rosterRow { display: grid; grid-template-columns: 1fr 50px 50px 50px 190px; align-items: center; }
         .holesCol { font-size: 11px; text-align: center; }
         .flightsRow { display: grid; grid-template-columns: 1fr 90px 60px; align-items: center; }
         .flightsRow.editing { grid-template-columns: 1fr 70px 70px 60px; gap: 4px; }

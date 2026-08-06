@@ -467,7 +467,7 @@ app.get("/api/public/:courseId/rosters", async (req, res) => {
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
 
     const [rows] = await pool.query<any[]>(
-      "SELECT roster_id, rostername FROM rosterMain WHERE course_id = ? AND active_yn = 1 ORDER BY rostername ASC",
+      "SELECT roster_id, rostername FROM rosterMain WHERE course_id = ? AND active_yn = 1 AND display_yn = 1 ORDER BY rostername ASC",
       [courseId]
     );
 
@@ -5181,8 +5181,8 @@ app.get("/rosters", authMiddleware, async (req, res) => {
   const payload = (req as any).user as JwtPayload;
   const [rows] = await pool.query<any[]>(
     payload?.courseId
-      ? "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC"
-      : "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain ORDER BY rostername ASC",
+      ? "SELECT roster_id, rostername, course_id, active_yn, holes, display_yn FROM rosterMain WHERE course_id = ? ORDER BY rostername ASC"
+      : "SELECT roster_id, rostername, course_id, active_yn, holes, display_yn FROM rosterMain ORDER BY rostername ASC",
     payload?.courseId ? [payload.courseId] : []
   );
   res.json(rows);
@@ -5195,14 +5195,15 @@ app.post("/rosters", authMiddleware, async (req, res) => {
     rostername: z.string().min(1).max(50),
     active_yn: z.number().int().optional().nullable(),
     holes: z.number().int().refine(v => v === 9 || v === 18, { message: "Must be 9 or 18" }).optional(),
+    display_yn: z.number().int().optional().nullable(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
 
   try {
     const [result] = await pool.execute<mysql.ResultSetHeader>(
-      "INSERT INTO rosterMain (rostername, course_id, active_yn, holes) VALUES (?, ?, ?, ?)",
-      [parsed.data.rostername.trim(), payload.courseId ?? null, parsed.data.active_yn ?? 1, parsed.data.holes ?? 9]
+      "INSERT INTO rosterMain (rostername, course_id, active_yn, holes, display_yn) VALUES (?, ?, ?, ?, ?)",
+      [parsed.data.rostername.trim(), payload.courseId ?? null, parsed.data.active_yn ?? 1, parsed.data.holes ?? 9, parsed.data.display_yn ?? 0]
     );
     res.status(201).json({ id: result.insertId });
   } catch {
@@ -5220,6 +5221,7 @@ app.put("/rosters/:id", authMiddleware, async (req, res) => {
     rostername: z.string().min(1).max(50).optional(),
     active_yn: z.number().int().optional().nullable(),
     holes: z.number().int().refine(v => v === 9 || v === 18, { message: "Must be 9 or 18" }).optional(),
+    display_yn: z.number().int().optional().nullable(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -5248,6 +5250,10 @@ app.put("/rosters/:id", authMiddleware, async (req, res) => {
   if (parsed.data.holes !== undefined) {
     fields.push("holes=?");
     values.push(parsed.data.holes);
+  }
+  if (parsed.data.display_yn !== undefined) {
+    fields.push("display_yn=?");
+    values.push(parsed.data.display_yn ?? 0);
   }
 
   if (!fields.length) return res.status(400).json({ error: "No fields to update" });
@@ -5309,8 +5315,8 @@ app.get("/rosters/:id", authMiddleware, async (req, res) => {
   if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
   const [rows] = await pool.query<any[]>(
     global
-      ? "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? LIMIT 1"
-      : "SELECT roster_id, rostername, course_id, active_yn, holes FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
+      ? "SELECT roster_id, rostername, course_id, active_yn, holes, display_yn FROM rosterMain WHERE roster_id = ? LIMIT 1"
+      : "SELECT roster_id, rostername, course_id, active_yn, holes, display_yn FROM rosterMain WHERE roster_id = ? AND course_id = ? LIMIT 1",
     global ? [id] : [id, payload.courseId]
   );
   const roster = rows?.[0];
