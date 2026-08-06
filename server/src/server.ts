@@ -1499,6 +1499,8 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
     handicap_yn: z.number().int().optional().nullable(),
     decimalhandicap_yn: z.number().int().optional().nullable(),
     autoflight_yn: z.number().int().optional().nullable(),
+    seasonpoints_yn: z.number().int().optional().nullable(),
+    moneylistbyroster_yn: z.number().int().optional().nullable(),
     active_yn: z.number().int().optional().nullable(),
     logo: z.string().max(512).optional().nullable(),
     titlesponsor: z.string().max(512).optional().nullable(),
@@ -1508,8 +1510,8 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
 
   const [result] = await pool.execute<mysql.ResultSetHeader>(
     `INSERT INTO courseMain
-      (coursename, leagueinfo, notice, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, autoflight_yn, active_yn, logo, titlesponsor)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (coursename, leagueinfo, notice, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn, active_yn, logo, titlesponsor)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       parsed.data.coursename.trim(),
       parsed.data.leagueinfo ?? null,
@@ -1522,6 +1524,8 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
       parsed.data.handicap_yn ?? null,
       parsed.data.decimalhandicap_yn ?? null,
       parsed.data.autoflight_yn ?? 1,
+      parsed.data.seasonpoints_yn ?? 0,
+      parsed.data.moneylistbyroster_yn ?? 0,
       parsed.data.active_yn ?? 1,
       parsed.data.logo ?? null,
       parsed.data.titlesponsor ?? null,
@@ -1548,6 +1552,8 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
     handicap_yn: z.number().int().optional().nullable(),
     decimalhandicap_yn: z.number().int().optional().nullable(),
     autoflight_yn: z.number().int().optional().nullable(),
+    seasonpoints_yn: z.number().int().optional().nullable(),
+    moneylistbyroster_yn: z.number().int().optional().nullable(),
     active_yn: z.number().int().optional().nullable(),
     logo: z.string().max(512).optional().nullable(),
     titlesponsor: z.string().max(512).optional().nullable(),

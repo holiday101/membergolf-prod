@@ -13,6 +13,8 @@ type Course = {
   handicap_yn: number | null;
   decimalhandicap_yn: number | null;
   autoflight_yn: number | null;
+  seasonpoints_yn: number | null;
+  moneylistbyroster_yn: number | null;
   active_yn: number | null;
   logo: string | null;
   logo_url?: string | null;
@@ -72,6 +74,8 @@ type FormState = {
   handicap_yn: string;
   decimalhandicap_yn: string;
   autoflight_yn: string;
+  seasonpoints_yn: string;
+  moneylistbyroster_yn: string;
   active_yn: string;
   logo: string;
 };
@@ -86,6 +90,8 @@ const emptyForm: FormState = {
   handicap_yn: "",
   decimalhandicap_yn: "",
   autoflight_yn: "1",
+  seasonpoints_yn: "0",
+  moneylistbyroster_yn: "0",
   active_yn: "1",
   logo: "",
 };
@@ -127,6 +133,9 @@ export default function CourseEditorPage() {
       handicap_yn: course.handicap_yn != null ? String(course.handicap_yn) : "",
       decimalhandicap_yn: course.decimalhandicap_yn != null ? String(course.decimalhandicap_yn) : "",
       autoflight_yn: course.autoflight_yn != null ? String(course.autoflight_yn) : "1",
+      seasonpoints_yn: course.seasonpoints_yn != null ? String(course.seasonpoints_yn) : "0",
+      moneylistbyroster_yn:
+        course.moneylistbyroster_yn != null ? String(course.moneylistbyroster_yn) : "0",
       active_yn: course.active_yn != null ? String(course.active_yn) : "1",
       logo: course.logo ?? "",
     });
@@ -223,6 +232,8 @@ export default function CourseEditorPage() {
         handicap_yn: form.handicap_yn ? Number(form.handicap_yn) : null,
         decimalhandicap_yn: form.decimalhandicap_yn ? Number(form.decimalhandicap_yn) : null,
         autoflight_yn: form.autoflight_yn ? Number(form.autoflight_yn) : null,
+        seasonpoints_yn: form.seasonpoints_yn ? Number(form.seasonpoints_yn) : 0,
+        moneylistbyroster_yn: form.moneylistbyroster_yn ? Number(form.moneylistbyroster_yn) : 0,
         active_yn: form.active_yn ? Number(form.active_yn) : null,
         logo: form.logo || null,
       };
@@ -522,6 +533,26 @@ export default function CourseEditorPage() {
                         onChange={(e) => setField("autoflight_yn", e.target.checked ? "1" : "0")}
                       />
                       <span className="checkboxLabel">Auto Flight Y/N</span>
+                    </label>
+
+                    <label className="formLabel checkbox">
+                      <input
+                        type="checkbox"
+                        checked={form.seasonpoints_yn === "1"}
+                        onChange={(e) => setField("seasonpoints_yn", e.target.checked ? "1" : "0")}
+                      />
+                      <span className="checkboxLabel">Season Points List</span>
+                    </label>
+
+                    <label className="formLabel checkbox">
+                      <input
+                        type="checkbox"
+                        checked={form.moneylistbyroster_yn === "1"}
+                        onChange={(e) =>
+                          setField("moneylistbyroster_yn", e.target.checked ? "1" : "0")
+                        }
+                      />
+                      <span className="checkboxLabel">Points and Money List by Roster</span>
                     </label>
 
                     {isGlobal ? (
