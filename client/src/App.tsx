@@ -71,6 +71,7 @@ export default function App() {
         <Route path="moneylist" element={<PublicMoneyListPage />} />
         <Route path="moneylist/roster/:rosterId" element={<PublicMoneyListPage />} />
         <Route path="seasonpoints" element={<PublicSeasonPointsPage />} />
+        <Route path="seasonpoints/roster/:rosterId" element={<PublicSeasonPointsPage />} />
         <Route path="league-info" element={<PublicLeagueInfoPage />} />
       </Route>
 

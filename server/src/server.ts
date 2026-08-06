@@ -490,6 +490,14 @@ app.get("/api/public/:courseId/seasonpoints", async (req, res) => {
     if (year !== null && !Number.isFinite(year)) {
       return res.status(400).json({ error: "Invalid year" });
     }
+    const rosterIdParam = req.query.roster_id;
+    const rosterId =
+      rosterIdParam === undefined || rosterIdParam === null || rosterIdParam === ""
+        ? null
+        : Number(rosterIdParam);
+    if (rosterId !== null && !Number.isFinite(rosterId)) {
+      return res.status(400).json({ error: "Invalid roster" });
+    }
 
     const [rows] = await pool.query<any[]>(
       `
@@ -521,9 +529,16 @@ app.get("/api/public/:courseId/seasonpoints", async (req, res) => {
       ) entries ON entries.member_id = m.member_id
       WHERE m.course_id = ?
         AND (COALESCE(entries.entries, 0) > 0 OR COALESCE(money.money_points, 0) <> 0)
+        AND (
+          ? IS NULL
+          OR EXISTS (
+            SELECT 1 FROM rosterMemberLink rml
+            WHERE rml.member_id = m.member_id AND rml.roster_id = ?
+          )
+        )
       ORDER BY total_points DESC, m.lastname ASC, m.firstname ASC
       `,
-      [courseId, year, year, courseId, year, year, courseId]
+      [courseId, year, year, courseId, year, year, courseId, rosterId, rosterId]
     );
 
     res.json(
@@ -545,6 +560,14 @@ app.get("/api/public/:courseId/seasonpoints/years", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+    const rosterIdParam = req.query.roster_id;
+    const rosterId =
+      rosterIdParam === undefined || rosterIdParam === null || rosterIdParam === ""
+        ? null
+        : Number(rosterIdParam);
+    if (rosterId !== null && !Number.isFinite(rosterId)) {
+      return res.status(400).json({ error: "Invalid roster" });
+    }
 
     const [rows] = await pool.query<any[]>(
       `
@@ -553,16 +576,30 @@ app.get("/api/public/:courseId/seasonpoints/years", async (req, res) => {
         FROM eventMoneyList ml
         JOIN memberMain mm ON mm.member_id = ml.member_id
         WHERE mm.course_id = ? AND ml.amount <> 0
+          AND (
+            ? IS NULL
+            OR EXISTS (
+              SELECT 1 FROM rosterMemberLink rml
+              WHERE rml.member_id = mm.member_id AND rml.roster_id = ?
+            )
+          )
         UNION
         SELECT YEAR(e.start_dt) AS year
         FROM eventCard ec
         JOIN eventMain e ON e.event_id = ec.event_id
         WHERE ec.course_id = ?
+          AND (
+            ? IS NULL
+            OR EXISTS (
+              SELECT 1 FROM rosterMemberLink rml
+              WHERE rml.member_id = ec.member_id AND rml.roster_id = ?
+            )
+          )
       ) years
       WHERE year IS NOT NULL
       ORDER BY year DESC
       `,
-      [courseId, courseId]
+      [courseId, rosterId, rosterId, courseId, rosterId, rosterId]
     );
 
     res.json(rows.map((r) => r.year).filter((y: any) => y));

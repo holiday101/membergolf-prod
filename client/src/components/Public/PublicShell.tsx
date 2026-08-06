@@ -32,9 +32,6 @@ export default function PublicShell() {
     { to: `${base}`, label: "Calendar", icon: "calendar" },
     { to: `${base}/events`, label: "Event List", icon: "list" },
     { to: `${base}/members`, label: "Members", icon: "users" },
-    ...(seasonPointsYn
-      ? [{ to: `${base}/seasonpoints`, label: "Season Points List", icon: "trophy" as const }]
-      : []),
   ];
 
   const moneyListItems: Array<{ to: string; label: string }> = moneyListByRoster
@@ -42,6 +39,16 @@ export default function PublicShell() {
         { to: `${base}/moneylist`, label: "Everyone" },
         ...rosters.map((r) => ({
           to: `${base}/moneylist/roster/${r.roster_id}`,
+          label: r.rostername,
+        })),
+      ]
+    : [];
+
+  const seasonPointsItems: Array<{ to: string; label: string }> = moneyListByRoster
+    ? [
+        { to: `${base}/seasonpoints`, label: "Everyone" },
+        ...rosters.map((r) => ({
+          to: `${base}/seasonpoints/roster/${r.roster_id}`,
           label: r.rostername,
         })),
       ]
@@ -297,6 +304,40 @@ export default function PublicShell() {
               {item.label}
             </NavLink>
           ))}
+
+          {seasonPointsYn ? (
+            moneyListByRoster ? (
+              <div className="navGroup">
+                <div className="navGroupLabel">
+                  <span className="navIcon" aria-hidden="true">
+                    <NavIcon name="trophy" />
+                  </span>
+                  Season Points List
+                </div>
+                {seasonPointsItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end
+                    className={({ isActive }) => `navLink navSubLink ${isActive ? "active" : ""}`}
+                  >
+                    {item.label}
+                  </NavLink>
+                ))}
+              </div>
+            ) : (
+              <NavLink
+                to={`${base}/seasonpoints`}
+                end
+                className={({ isActive }) => `navLink ${isActive ? "active" : ""}`}
+              >
+                <span className="navIcon" aria-hidden="true">
+                  <NavIcon name="trophy" />
+                </span>
+                Season Points List
+              </NavLink>
+            )
+          ) : null}
 
           {moneyListByRoster ? (
             <div className="navGroup">

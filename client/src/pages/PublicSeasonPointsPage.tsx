@@ -13,11 +13,12 @@ type PointsRow = {
 };
 
 export default function PublicSeasonPointsPage() {
-  const { courseId } = useParams();
+  const { courseId, rosterId } = useParams();
   const [rows, setRows] = useState<PointsRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [query, setQuery] = useState("");
+  const [rosterName, setRosterName] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<string>(String(currentYear));
@@ -28,10 +29,31 @@ export default function PublicSeasonPointsPage() {
   }, []);
 
   useEffect(() => {
+    if (!courseId || !rosterId) {
+      setRosterName(null);
+      return;
+    }
+    (async () => {
+      try {
+        const rosters = await publicFetch<Array<{ roster_id: number; rostername: string }>>(
+          `/public/${courseId}/rosters`
+        );
+        const match = rosters.find((r) => String(r.roster_id) === rosterId);
+        setRosterName(match?.rostername ?? null);
+      } catch {
+        setRosterName(null);
+      }
+    })();
+  }, [courseId, rosterId]);
+
+  useEffect(() => {
     const loadYears = async () => {
       if (!courseId) return;
       try {
-        const years = await publicFetch<number[]>(`/public/${courseId}/seasonpoints/years`);
+        const rosterParam = rosterId ? `?roster_id=${rosterId}` : "";
+        const years = await publicFetch<number[]>(
+          `/public/${courseId}/seasonpoints/years${rosterParam}`
+        );
         setAvailableYears(years);
         if (years.length > 0 && !years.includes(currentYear)) {
           setSelectedYear(String(years[0]));
@@ -41,16 +63,19 @@ export default function PublicSeasonPointsPage() {
       }
     };
     loadYears();
-  }, [courseId, currentYear]);
+  }, [courseId, rosterId, currentYear]);
 
   useEffect(() => {
     const run = async () => {
       setLoading(true);
       setError("");
       try {
-        const yearParam = selectedYear === "all" ? "" : `?year=${selectedYear}`;
+        const params = new URLSearchParams();
+        if (selectedYear !== "all") params.set("year", selectedYear);
+        if (rosterId) params.set("roster_id", rosterId);
+        const qs = params.toString();
         const data = await publicFetch<PointsRow[]>(
-          `/public/${courseId}/seasonpoints${yearParam}`
+          `/public/${courseId}/seasonpoints${qs ? `?${qs}` : ""}`
         );
         setRows(data);
       } catch (e: any) {
@@ -60,7 +85,7 @@ export default function PublicSeasonPointsPage() {
       }
     };
     run();
-  }, [courseId, selectedYear]);
+  }, [courseId, rosterId, selectedYear]);
 
   const filteredRows = useMemo(() => {
     if (!query.trim()) return rows;
@@ -86,6 +111,7 @@ export default function PublicSeasonPointsPage() {
 
   return (
     <div className="card">
+      {rosterId ? <h2>{rosterName ? `${rosterName} Season Points List` : "Season Points List"}</h2> : null}
       <div className="listHeader">
         <div className="controls">
           <input
