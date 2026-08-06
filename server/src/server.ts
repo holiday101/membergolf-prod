@@ -364,6 +364,14 @@ app.get("/api/public/:courseId/moneylist", async (req, res) => {
     if (year !== null && !Number.isFinite(year)) {
       return res.status(400).json({ error: "Invalid year" });
     }
+    const rosterIdParam = req.query.roster_id;
+    const rosterId =
+      rosterIdParam === undefined || rosterIdParam === null || rosterIdParam === ""
+        ? null
+        : Number(rosterIdParam);
+    if (rosterId !== null && !Number.isFinite(rosterId)) {
+      return res.status(400).json({ error: "Invalid roster" });
+    }
 
     const [rows] = await pool.query<any[]>(
       `
@@ -383,10 +391,17 @@ app.get("/api/public/:courseId/moneylist", async (req, res) => {
           ? IS NULL
           OR YEAR(ml.payout_date) = ?
         )
+        AND (
+          ? IS NULL
+          OR EXISTS (
+            SELECT 1 FROM rosterMemberLink rml
+            WHERE rml.member_id = m.member_id AND rml.roster_id = ?
+          )
+        )
       GROUP BY m.member_id, m.firstname, m.lastname
       ORDER BY total_amount DESC, lastname ASC, firstname ASC
       `,
-      [courseId, year, year]
+      [courseId, year, year, rosterId, rosterId]
     );
 
     res.json(
@@ -406,6 +421,14 @@ app.get("/api/public/:courseId/moneylist/years", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+    const rosterIdParam = req.query.roster_id;
+    const rosterId =
+      rosterIdParam === undefined || rosterIdParam === null || rosterIdParam === ""
+        ? null
+        : Number(rosterIdParam);
+    if (rosterId !== null && !Number.isFinite(rosterId)) {
+      return res.status(400).json({ error: "Invalid roster" });
+    }
 
     const [rows] = await pool.query<any[]>(
       `
@@ -419,9 +442,16 @@ app.get("/api/public/:courseId/moneylist/years", async (req, res) => {
       WHERE m.course_id = ?
         AND ml.amount <> 0
         AND YEAR(ml.payout_date) IS NOT NULL
+        AND (
+          ? IS NULL
+          OR EXISTS (
+            SELECT 1 FROM rosterMemberLink rml
+            WHERE rml.member_id = m.member_id AND rml.roster_id = ?
+          )
+        )
       ORDER BY year DESC
       `,
-      [courseId]
+      [courseId, rosterId, rosterId]
     );
 
     res.json(rows.map((r) => r.year).filter((y: any) => y));
@@ -431,12 +461,123 @@ app.get("/api/public/:courseId/moneylist/years", async (req, res) => {
   }
 });
 
+app.get("/api/public/:courseId/rosters", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+
+    const [rows] = await pool.query<any[]>(
+      "SELECT roster_id, rostername FROM rosterMain WHERE course_id = ? AND active_yn = 1 ORDER BY rostername ASC",
+      [courseId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("public rosters error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/public/:courseId/seasonpoints", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+    const yearParam = req.query.year;
+    const year =
+      yearParam === undefined || yearParam === null || yearParam === "" || yearParam === "all"
+        ? null
+        : Number(yearParam);
+    if (year !== null && !Number.isFinite(year)) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        m.member_id,
+        m.firstname,
+        m.lastname,
+        COALESCE(entries.entries, 0) AS entries,
+        COALESCE(entries.entries, 0) * 10 AS participation_points,
+        COALESCE(money.money_points, 0) AS money_points,
+        COALESCE(entries.entries, 0) * 10 + COALESCE(money.money_points, 0) AS total_points
+      FROM memberMain m
+      LEFT JOIN (
+        SELECT ml.member_id, SUM(ml.amount) AS money_points
+        FROM eventMoneyList ml
+        JOIN memberMain mm ON mm.member_id = ml.member_id
+        WHERE mm.course_id = ?
+          AND ml.amount <> 0
+          AND (? IS NULL OR YEAR(ml.payout_date) = ?)
+        GROUP BY ml.member_id
+      ) money ON money.member_id = m.member_id
+      LEFT JOIN (
+        SELECT ec.member_id, COUNT(DISTINCT ec.event_id) AS entries
+        FROM eventCard ec
+        JOIN eventMain e ON e.event_id = ec.event_id
+        WHERE ec.course_id = ?
+          AND (? IS NULL OR YEAR(e.start_dt) = ?)
+        GROUP BY ec.member_id
+      ) entries ON entries.member_id = m.member_id
+      WHERE m.course_id = ?
+        AND (COALESCE(entries.entries, 0) > 0 OR COALESCE(money.money_points, 0) <> 0)
+      ORDER BY total_points DESC, m.lastname ASC, m.firstname ASC
+      `,
+      [courseId, year, year, courseId, year, year, courseId]
+    );
+
+    res.json(
+      rows.map((row) => ({
+        ...row,
+        entries: Number(row.entries ?? 0),
+        participation_points: Number(row.participation_points ?? 0),
+        money_points: Number(row.money_points ?? 0),
+        total_points: Number(row.total_points ?? 0),
+      }))
+    );
+  } catch (err) {
+    console.error("public season points error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/public/:courseId/seasonpoints/years", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT DISTINCT year FROM (
+        SELECT YEAR(ml.payout_date) AS year
+        FROM eventMoneyList ml
+        JOIN memberMain mm ON mm.member_id = ml.member_id
+        WHERE mm.course_id = ? AND ml.amount <> 0
+        UNION
+        SELECT YEAR(e.start_dt) AS year
+        FROM eventCard ec
+        JOIN eventMain e ON e.event_id = ec.event_id
+        WHERE ec.course_id = ?
+      ) years
+      WHERE year IS NOT NULL
+      ORDER BY year DESC
+      `,
+      [courseId, courseId]
+    );
+
+    res.json(rows.map((r) => r.year).filter((y: any) => y));
+  } catch (err) {
+    console.error("public season points years error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/api/public/:courseId/course", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
     const [rows] = await pool.query<any[]>(
-      "SELECT course_id, coursename, leagueinfo, notice, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn, autoflight_yn FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT course_id, coursename, leagueinfo, notice, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn FROM courseMain WHERE course_id = ? LIMIT 1",
       [courseId]
     );
     const course = rows?.[0];

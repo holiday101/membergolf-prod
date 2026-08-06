@@ -33,6 +33,7 @@ import PublicCalendarPage from "./pages/PublicCalendarPage";
 import PublicEventListPage from "./pages/PublicEventListPage";
 import PublicMemberListPage from "./pages/PublicMemberListPage";
 import PublicMoneyListPage from "./pages/PublicMoneyListPage";
+import PublicSeasonPointsPage from "./pages/PublicSeasonPointsPage";
 import PublicMemberDetailPage from "./pages/PublicMemberDetailPage";
 import PublicEventDetailPage from "./pages/PublicEventDetailPage";
 import PublicEventScoresPage from "./pages/PublicEventScoresPage";
@@ -67,6 +68,8 @@ export default function App() {
         <Route path="members" element={<PublicMemberListPage />} />
         <Route path="members/:memberId" element={<PublicMemberDetailPage />} />
         <Route path="moneylist" element={<PublicMoneyListPage />} />
+        <Route path="moneylist/roster/:rosterId" element={<PublicMoneyListPage />} />
+        <Route path="seasonpoints" element={<PublicSeasonPointsPage />} />
       </Route>
 
       {/* Everything inside AppShell shows the global header/nav */}

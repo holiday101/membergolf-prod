@@ -19,13 +19,32 @@ export default function PublicShell() {
   const [titleSponsorUrl, setTitleSponsorUrl] = useState<string | null>(null);
   const [courseWebsite, setCourseWebsite] = useState<string | null>(null);
   const [titleSponsorLink, setTitleSponsorLink] = useState<string | null>(null);
+  const [moneyListByRoster, setMoneyListByRoster] = useState(false);
+  const [rosters, setRosters] = useState<Array<{ roster_id: number; rostername: string }>>([]);
+  const [seasonPointsYn, setSeasonPointsYn] = useState(false);
 
-    const navItems: Array<{ to: string; label: string; icon: "calendar" | "list" | "users" | "money" }> = [
+  const navItems: Array<{
+    to: string;
+    label: string;
+    icon: "calendar" | "list" | "users" | "money" | "trophy";
+  }> = [
     { to: `${base}`, label: "Calendar", icon: "calendar" },
     { to: `${base}/events`, label: "Event List", icon: "list" },
     { to: `${base}/members`, label: "Members", icon: "users" },
-    { to: `${base}/moneylist`, label: "Money List", icon: "money" },
+    ...(seasonPointsYn
+      ? [{ to: `${base}/seasonpoints`, label: "Season Points List", icon: "trophy" as const }]
+      : []),
   ];
+
+  const moneyListItems: Array<{ to: string; label: string }> = moneyListByRoster
+    ? [
+        { to: `${base}/moneylist`, label: "Everyone" },
+        ...rosters.map((r) => ({
+          to: `${base}/moneylist/roster/${r.roster_id}`,
+          label: r.rostername,
+        })),
+      ]
+    : [];
 
 
   useEffect(() => {
@@ -67,6 +86,8 @@ export default function PublicShell() {
           titlesponsor_url?: string | null;
           website?: string | null;
           titlesponsor_link?: string | null;
+          moneylistbyroster_yn?: number | null;
+          seasonpoints_yn?: number | null;
         }>(
           `/public/${courseId}/course`
         );
@@ -77,6 +98,8 @@ export default function PublicShell() {
         setTitleSponsorUrl(course?.titlesponsor_url ?? null);
         setCourseWebsite(course?.website ?? null);
         setTitleSponsorLink(course?.titlesponsor_link ?? null);
+        setMoneyListByRoster(!!course?.moneylistbyroster_yn);
+        setSeasonPointsYn(!!course?.seasonpoints_yn);
       } catch {
         setLeagueInfo(null);
         setNotice(null);
@@ -85,9 +108,28 @@ export default function PublicShell() {
         setTitleSponsorUrl(null);
         setCourseWebsite(null);
         setTitleSponsorLink(null);
+        setMoneyListByRoster(false);
+        setSeasonPointsYn(false);
       }
     })();
   }, [courseId]);
+
+  useEffect(() => {
+    if (!courseId || !moneyListByRoster) {
+      setRosters([]);
+      return;
+    }
+    (async () => {
+      try {
+        const data = await publicFetch<Array<{ roster_id: number; rostername: string }>>(
+          `/public/${courseId}/rosters`
+        );
+        setRosters(data ?? []);
+      } catch {
+        setRosters([]);
+      }
+    })();
+  }, [courseId, moneyListByRoster]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -103,7 +145,7 @@ export default function PublicShell() {
   }, [isCalendarRoute]);
 
 
-  function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" }) {
+  function NavIcon({ name }: { name: "calendar" | "list" | "users" | "money" | "trophy" }) {
     switch (name) {
       case "calendar":
         return (
@@ -137,6 +179,15 @@ export default function PublicShell() {
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20Zm1 5h-2v1.2c-1.7.2-3 1.2-3 2.8 0 1.4 1 2.2 2.6 2.6l1.4.3c1 .2 1.4.6 1.4 1.2 0 .8-.8 1.3-1.9 1.3-1.1 0-1.9-.5-2-1.4H8c.1 1.7 1.3 2.7 3 2.9V17h2v-1.2c1.8-.2 3.1-1.2 3.1-2.8 0-1.5-1.1-2.2-2.6-2.6l-1.5-.3c-.9-.2-1.3-.6-1.3-1.1 0-.7.7-1.2 1.7-1.2s1.7.4 1.9 1.1h1.4C15.8 8.2 14.6 7.2 13 7V7Z"
+              fill="currentColor"
+            />
+          </svg>
+        );
+      case "trophy":
+        return (
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M6 3h12a1 1 0 0 1 1 1v1h2a1 1 0 0 1 1 1v2a4 4 0 0 1-4 4h-.28A6.02 6.02 0 0 1 13 15.9V18h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.1A6.02 6.02 0 0 1 6.28 12H6a4 4 0 0 1-4-4V6a1 1 0 0 1 1-1h2V4a1 1 0 0 1 1-1Zm0 4H4v1a2 2 0 0 0 2 2c0-1.06.14-2.09.38-3H6Zm12 0h-.38c.24.91.38 1.94.38 3a2 2 0 0 0 2-2V7h-2Z"
               fill="currentColor"
             />
           </svg>
@@ -219,6 +270,7 @@ export default function PublicShell() {
           </button>
         </div>
         <nav className="drawerNav">
+          <div className="navLinksWrap">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -232,6 +284,39 @@ export default function PublicShell() {
               {item.label}
             </NavLink>
           ))}
+
+          {moneyListByRoster ? (
+            <div className="navGroup">
+              <div className="navGroupLabel">
+                <span className="navIcon" aria-hidden="true">
+                  <NavIcon name="money" />
+                </span>
+                Money List
+              </div>
+              {moneyListItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end
+                  className={({ isActive }) => `navLink navSubLink ${isActive ? "active" : ""}`}
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </div>
+          ) : (
+            <NavLink
+              to={`${base}/moneylist`}
+              end
+              className={({ isActive }) => `navLink ${isActive ? "active" : ""}`}
+            >
+              <span className="navIcon" aria-hidden="true">
+                <NavIcon name="money" />
+              </span>
+              Money List
+            </NavLink>
+          )}
+          </div>
 
           {leagueInfo ? (
             <div className="leagueInfo">
@@ -382,11 +467,19 @@ export default function PublicShell() {
         }
         .drawerNav {
           padding: 8px 8px 12px;
-          display: grid;
+          display: flex;
+          flex-direction: column;
           gap: 6px;
-          overflow-y: auto;
           flex: 1;
           min-height: 0;
+        }
+        .navLinksWrap {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          flex-shrink: 0;
+          overflow-y: auto;
+          max-height: 60%;
         }
         .navLink {
           text-decoration: none;
@@ -422,11 +515,35 @@ export default function PublicShell() {
         .navIcon svg { width: 13px; height: 13px; }
         .navLink.active .navIcon { color: #1d4ed8; border-color: #c7d2fe; }
 
+        .navGroup { display: flex; flex-direction: column; gap: 6px; }
+        .navGroupLabel {
+          padding: 6px 8px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 13px;
+          color: var(--text);
+        }
+        .navSubLink {
+          margin-left: 32px;
+          padding: 5px 8px;
+          font-weight: 500;
+          font-size: 12px;
+        }
+
         .leagueInfo {
-          margin-top: auto;
+          flex: 1;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          margin-top: 10px;
           border-top: 1px solid var(--border);
-          padding: 12px 12px 0;
+          padding: 12px;
           color: var(--muted);
+          background: #fff;
+          border-radius: var(--radius);
+          border: 1px solid var(--border);
         }
         .leagueInfoLabel {
           font-size: 10px;
@@ -435,10 +552,14 @@ export default function PublicShell() {
           color: #9ca3af;
           margin-bottom: 6px;
           font-weight: 600;
+          flex-shrink: 0;
         }
         .leagueInfoText {
           font-size: 12px;
           line-height: 1.35;
+          overflow-y: auto;
+          flex: 1;
+          min-height: 0;
         }
 
         .content { padding: 16px; grid-column: 2; overflow: auto; }
