@@ -577,7 +577,7 @@ app.get("/api/public/:courseId/course", async (req, res) => {
     const courseId = Number(req.params.courseId);
     if (!Number.isFinite(courseId)) return res.status(400).json({ error: "Invalid course" });
     const [rows] = await pool.query<any[]>(
-      "SELECT course_id, coursename, leagueinfo, notice, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn FROM courseMain WHERE course_id = ? LIMIT 1",
+      "SELECT course_id, coursename, leagueinfo, leagueinfo_sidebar_yn, notice, logo, titlesponsor, website, titlesponsor_link, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn FROM courseMain WHERE course_id = ? LIMIT 1",
       [courseId]
     );
     const course = rows?.[0];
@@ -1631,6 +1631,7 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
   const schema = z.object({
     coursename: z.string().min(1).max(1000),
     leagueinfo: z.string().max(20000).optional().nullable(),
+    leagueinfo_sidebar_yn: z.number().int().optional().nullable(),
     notice: z.string().max(500).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),
@@ -1651,11 +1652,12 @@ app.post("/courses/manage", authMiddleware, requireAdmin, async (req, res) => {
 
   const [result] = await pool.execute<mysql.ResultSetHeader>(
     `INSERT INTO courseMain
-      (coursename, leagueinfo, notice, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn, active_yn, logo, titlesponsor)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (coursename, leagueinfo, leagueinfo_sidebar_yn, notice, website, titlesponsor_link, payout, cardsused, cardsmax, handicap_yn, decimalhandicap_yn, autoflight_yn, seasonpoints_yn, moneylistbyroster_yn, active_yn, logo, titlesponsor)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       parsed.data.coursename.trim(),
       parsed.data.leagueinfo ?? null,
+      parsed.data.leagueinfo_sidebar_yn ?? 1,
       parsed.data.notice ?? null,
       parsed.data.website ?? null,
       parsed.data.titlesponsor_link ?? null,
@@ -1684,6 +1686,7 @@ app.put("/courses/manage/:id", authMiddleware, requireAdmin, async (req, res) =>
   const schema = z.object({
     coursename: z.string().min(1).max(1000).optional(),
     leagueinfo: z.string().max(20000).optional().nullable(),
+    leagueinfo_sidebar_yn: z.number().int().optional().nullable(),
     notice: z.string().max(500).optional().nullable(),
     website: z.string().max(250).optional().nullable(),
     titlesponsor_link: z.string().max(512).optional().nullable(),

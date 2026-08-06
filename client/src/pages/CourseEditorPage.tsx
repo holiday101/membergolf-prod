@@ -6,6 +6,7 @@ type Course = {
   course_id: number;
   coursename: string | null;
   leagueinfo: string | null;
+  leagueinfo_sidebar_yn: number | null;
   website: string | null;
   payout: number | null;
   cardsused: number | null;
@@ -67,6 +68,7 @@ type NineRow = {
 type FormState = {
   coursename: string;
   leagueinfo: string;
+  leagueinfo_sidebar_yn: string;
   website: string;
   payout: string;
   cardsused: string;
@@ -83,6 +85,7 @@ type FormState = {
 const emptyForm: FormState = {
   coursename: "",
   leagueinfo: "",
+  leagueinfo_sidebar_yn: "1",
   website: "",
   payout: "0.3",
   cardsused: "6",
@@ -126,6 +129,8 @@ export default function CourseEditorPage() {
     setForm({
       coursename: course.coursename ?? "",
       leagueinfo: course.leagueinfo ?? "",
+      leagueinfo_sidebar_yn:
+        course.leagueinfo_sidebar_yn != null ? String(course.leagueinfo_sidebar_yn) : "1",
       website: course.website ?? "",
       payout: course.payout != null ? String(course.payout) : "",
       cardsused: course.cardsused != null ? String(course.cardsused) : "",
@@ -225,6 +230,7 @@ export default function CourseEditorPage() {
       const payload: any = {
         coursename: form.coursename.trim(),
         leagueinfo: form.leagueinfo.trim() || null,
+        leagueinfo_sidebar_yn: form.leagueinfo_sidebar_yn ? Number(form.leagueinfo_sidebar_yn) : 0,
         website: form.website.trim() || null,
         payout: form.payout ? Number(form.payout) : null,
         cardsused: form.cardsused ? Number(form.cardsused) : null,
@@ -418,6 +424,24 @@ export default function CourseEditorPage() {
                       setField("leagueinfo", (e.currentTarget as HTMLDivElement).innerHTML)
                     }
                   />
+                </label>
+
+                <label className="formLabel checkbox leagueInfoSidebarToggle">
+                  <input
+                    type="checkbox"
+                    checked={form.leagueinfo_sidebar_yn === "1"}
+                    onChange={(e) =>
+                      setField("leagueinfo_sidebar_yn", e.target.checked ? "1" : "0")
+                    }
+                  />
+                  <span className="checkboxLabel">
+                    Also show a short preview of this in the sidebar
+                    <br />
+                    <span className="checkboxHint">
+                      Off leaves it reachable only from the full League Info page — good for
+                      long or table-heavy info that doesn't fit a narrow sidebar.
+                    </span>
+                  </span>
                 </label>
 
                 <div className="logoRow">
@@ -766,6 +790,23 @@ export default function CourseEditorPage() {
           line-height: 1.6;
         }
         .wysiwyg:focus { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+        /* Neutralize fixed widths/fonts pasted in from Sheets/Word so preview matches the public site */
+        .wysiwyg, .wysiwyg * {
+          font-family: inherit !important;
+          font-size: inherit !important;
+          line-height: inherit !important;
+        }
+        .wysiwyg table, .wysiwyg col { width: auto !important; }
+        .wysiwyg table { table-layout: auto !important; border-collapse: collapse !important; max-width: 100%; }
+        .wysiwyg td, .wysiwyg th {
+          border: none !important;
+          border-bottom: 1px solid #eef0f4 !important;
+          padding: 3px 4px !important;
+        }
+        .wysiwyg img { max-width: 100%; height: auto; }
+        .leagueInfoSidebarToggle { align-items: flex-start; margin-top: -4px; }
+        .leagueInfoSidebarToggle input { margin-top: 2px; }
+        .checkboxHint { display: inline-block; margin-top: 2px; font-size: 11px; font-weight: 400; color: #6b7280; }
         .settingsGrid {
           display: grid;
           gap: 12px 16px;

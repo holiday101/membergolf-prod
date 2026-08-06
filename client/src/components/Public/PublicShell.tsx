@@ -35,9 +35,6 @@ export default function PublicShell() {
     ...(seasonPointsYn
       ? [{ to: `${base}/seasonpoints`, label: "Season Points List", icon: "trophy" as const }]
       : []),
-    ...(leagueInfo && leagueInfo.trim()
-      ? [{ to: `${base}/league-info`, label: "League Info", icon: "info" as const }]
-      : []),
   ];
 
   const moneyListItems: Array<{ to: string; label: string }> = moneyListByRoster
@@ -332,6 +329,19 @@ export default function PublicShell() {
               Money List
             </NavLink>
           )}
+
+          {leagueInfo && leagueInfo.trim() ? (
+            <NavLink
+              to={`${base}/league-info`}
+              end
+              className={({ isActive }) => `navLink ${isActive ? "active" : ""}`}
+            >
+              <span className="navIcon" aria-hidden="true">
+                <NavIcon name="info" />
+              </span>
+              League Info
+            </NavLink>
+          ) : null}
           </div>
 
           {leagueInfo && leagueInfoSidebarYn ? (
