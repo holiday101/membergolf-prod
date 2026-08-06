@@ -4219,7 +4219,7 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
 
     const [subRows] = await pool.query<any[]>(
       `
-      SELECT s.subevent_id, s.course_id, s.eventtype_id, t.eventtypename
+      SELECT s.subevent_id, s.course_id, s.eventtype_id, s.amount, t.eventtypename
       FROM subEventMain s
       LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
       WHERE s.subevent_id = ?
@@ -4233,6 +4233,7 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
+    const money = Number(sub.amount ?? 0) || 0;
     const isGrossNetSplitType = (sub.eventtypename ?? "").toLowerCase().includes("gross/net split");
 
     let mode: "net" | "gross" | "gross_net" | "gross_net_split" = "gross_net";
@@ -4270,7 +4271,7 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
     const netWinners = Number(diagnostics?.net_winner_rows ?? 0);
     const payoutRows = Number(diagnostics?.payout_rows ?? 0);
 
-    if (grossWinners + netWinners === 0 && payoutRows > 0) {
+    if (money > 0 && grossWinners + netWinners === 0 && payoutRows > 0) {
       console.warn("stroke post produced no winner rows; applying legacy fallback", { subeventId, mode, diagnostics });
       await applyLegacyStrokeFallback(subeventId);
       fallbackApplied = true;
@@ -4292,7 +4293,7 @@ app.post("/subevents/:id/stroke/post", authMiddleware, async (req, res) => {
     }
 
     await syncEventMoneyListForSubevent(subeventId);
-    return res.json({ ok: true, mode, diagnostics, fallbackApplied });
+    return res.json({ ok: true, mode, diagnostics, fallbackApplied, money });
   } catch (err) {
     console.error("subevent stroke post error", err);
     res.status(500).json({ error: "Server error" });

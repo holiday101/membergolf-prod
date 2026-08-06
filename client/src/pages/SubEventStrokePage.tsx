@@ -444,7 +444,8 @@ export default function SubEventStrokePage() {
       const grossWinnerRows = Number(postResult?.diagnostics?.gross_winner_rows ?? 0);
       const netWinnerRows = Number(postResult?.diagnostics?.net_winner_rows ?? 0);
       const fallbackApplied = Boolean(postResult?.fallbackApplied);
-      if (!fallbackApplied && grossWinnerRows + netWinnerRows === 0) {
+      const postedMoney = Number(postResult?.money ?? (form.amount ? Number(form.amount) : 0)) || 0;
+      if (postedMoney > 0 && !fallbackApplied && grossWinnerRows + netWinnerRows === 0) {
         setError("Post Scores completed but returned no winners.");
       }
     } catch (e: any) {
