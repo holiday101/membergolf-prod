@@ -194,13 +194,13 @@ export default function AppShell() {
           icon: "users",
         },
         {
-          to: "/courses",
-          label: me?.user.courseId ? "Course Info" : "Courses",
+          to: "/sponsors",
+          label: "Sponsors",
           icon: "list",
         },
         {
-          to: "/sponsors",
-          label: "Sponsors",
+          to: "/courses",
+          label: me?.user.courseId ? "Course Info" : "Courses",
           icon: "list",
         },
         {
@@ -234,13 +234,13 @@ export default function AppShell() {
   }
   if (!isGlobalUser && me?.user.isAdmin) {
     navItems.push({
-      to: "/courses",
-      label: me?.user.courseId ? "Course Info" : "Courses",
+      to: "/sponsors",
+      label: "Sponsors",
       icon: "list",
     });
     navItems.push({
-      to: "/sponsors",
-      label: "Sponsors",
+      to: "/courses",
+      label: me?.user.courseId ? "Course Info" : "Courses",
       icon: "list",
     });
   }
@@ -390,6 +390,14 @@ export default function AppShell() {
                       ((preferCalendar && item.to === "/calendar") ||
                         (!preferCalendar && item.to === "/events"));
                     return `navLink ${active ? "active" : ""}`;
+                  }
+                  const isSponsorsRoute = /^\/courses\/\d+\/sponsors(\/|$)/.test(location.pathname);
+                  if (item.to === "/sponsors") {
+                    const active = location.pathname === "/sponsors" || isSponsorsRoute;
+                    return `navLink ${active ? "active" : ""}`;
+                  }
+                  if (item.to === "/courses" && isSponsorsRoute) {
+                    return "navLink";
                   }
                   return `navLink ${isActive ? "active" : ""}`;
                 }}
