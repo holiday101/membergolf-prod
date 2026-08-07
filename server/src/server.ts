@@ -281,8 +281,8 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
         c.net,
         c.adjustedscore,
         c.handicap,
-        rf.flight_id,
-        rf.flightname,
+        COALESCE(pgf.flight_id, rf.flight_id) AS flight_id,
+        COALESCE(pgf.flightname, rf.flightname) AS flightname,
         c.numholes,
         n.startinghole,
         c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
@@ -294,6 +294,14 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       FROM eventCard c
       JOIN memberMain m ON m.member_id = c.member_id
       LEFT JOIN (
+        SELECT spg.card_id, MIN(spg.flight_id) AS flight_id
+        FROM subEventPayGross spg
+        JOIN subEventMain sm ON sm.subevent_id = spg.subevent_id
+        WHERE sm.event_id = ?
+        GROUP BY spg.card_id
+      ) pg ON pg.card_id = c.card_id
+      LEFT JOIN rosterFlight pgf ON pgf.flight_id = pg.flight_id
+      LEFT JOIN (
         SELECT se.event_id, se.roster_id
         FROM subEventMain se
         JOIN subEventType st ON st.eventtype_id = se.eventtype_id
@@ -304,9 +312,13 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       LEFT JOIN rosterFlight rf ON rf.roster_id = sx.roster_id AND c.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
-      ORDER BY (rf.flightname IS NULL), rf.hdcp1 ASC, rf.flightname ASC, c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
+      ORDER BY
+        (COALESCE(pgf.flightname, rf.flightname) IS NULL),
+        COALESCE(pgf.hdcp1, rf.hdcp1) ASC,
+        COALESCE(pgf.flightname, rf.flightname) ASC,
+        c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
-      [eventId, courseId, eventId]
+      [eventId, eventId, courseId, eventId]
     );
 
     res.json(rows);
