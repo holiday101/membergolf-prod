@@ -64,6 +64,8 @@ type ScoreRow = {
 
 type PairingRow = {
   bestball_id: number;
+  card1_id: number;
+  card2_id: number;
   member1_id: number;
   member1_firstname: string | null;
   member1_lastname: string | null;
@@ -75,6 +77,9 @@ type PairingRow = {
   flight_id: number | null;
   flightname: string | null;
   flight_hdcp1: number | null;
+  numholes: number | null;
+  startinghole: number | null;
+  [key: string]: any; // p1_hole1-9, p2_hole1-9, team_gross_hole1-9, team_net_hole1-9, par1-9
 };
 
 type SortField = "gross" | "name" | "net" | "handicap";
@@ -209,6 +214,62 @@ export default function PublicEventScoresPage() {
     }));
   }, [scores, sortField]);
 
+  const scoresByCardId = useMemo(() => new Map(scores.map((s) => [s.card_id, s])), [scores]);
+
+  const renderScoreRow = (row: ScoreRow, labels: number[]) => (
+    <div key={row.card_id} className="detailRow">
+      <div className="detailMeta">
+        <Link className="memberTag" to={`/public/${courseId}/members/${row.member_id}`}>
+          {memberName(row)}
+        </Link>
+      </div>
+      <div className="dateCell">{new Date(row.card_dt).toLocaleDateString()}</div>
+      <div className="statCell">{typeof row.handicap === "number" ? row.handicap : "-"}</div>
+      <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(26px, 1fr))` }}>
+        {labels.map((h) => {
+          const storage = storageHoleNumber(h, row.numholes, row.startinghole);
+          const score = (row as any)[`hole${storage}`] as number | null | undefined;
+          const par = (row as any)[`par${storage}`] as number | null | undefined;
+          const meta = getScoreMeta(score, par);
+          return (
+            <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
+              {typeof score === "number" ? score : "-"}
+            </div>
+          );
+        })}
+      </div>
+      <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
+      <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
+    </div>
+  );
+
+  const renderTeamRow = (pairing: PairingRow, labels: number[]) => (
+    <div key={`team-${pairing.bestball_id}`} className="detailRow teamRow">
+      <div className="detailMeta">
+        <div className="teamTag">{pairingName(pairing)}</div>
+      </div>
+      <div className="dateCell">Team</div>
+      <div className="statCell">-</div>
+      <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${labels.length}, minmax(26px, 1fr))` }}>
+        {labels.map((h) => {
+          const storage = storageHoleNumber(h, pairing.numholes, pairing.startinghole);
+          const gross = pairing[`team_gross_hole${storage}`] as number | null | undefined;
+          const net = pairing[`team_net_hole${storage}`] as number | null | undefined;
+          const par = pairing[`par${storage}`] as number | null | undefined;
+          const meta = getScoreMeta(typeof gross === "number" ? gross : null, par);
+          return (
+            <div key={`${pairing.bestball_id}-${h}`} className={`${meta.className} teamHoleCell`} style={meta.style}>
+              <span className="thGross">{typeof gross === "number" ? gross : "-"}</span>
+              <span className="thNet">{typeof net === "number" ? net : "-"}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="statCell">{typeof pairing.gross === "number" ? pairing.gross : "-"}</div>
+      <div className="statCell">{typeof pairing.net === "number" ? pairing.net : "-"}</div>
+    </div>
+  );
+
   return (
     <div className="page">
       <Link className="backLink" to={`/public/${courseId}/events/${eventId}`}>
@@ -243,67 +304,39 @@ export default function PublicEventScoresPage() {
 
               <div className="detailsList">
                 {groupedByFlight.map((group, idx) => {
-                  const flightPairings = pairingsByFlight.get(group.flightName);
+                  const flightPairings = pairingsByFlight.get(group.flightName) ?? [];
+                  const pairedCardIds = new Set(flightPairings.flatMap((p) => [p.card1_id, p.card2_id]));
+                  const soloRows = group.rows.filter((row) => !pairedCardIds.has(row.card_id));
                   return (
-                  <div key={`${group.flightName}-${idx}`} className="flightSection">
-                    <div className="flightHeader">{group.flightName}</div>
-
-                    {flightPairings && flightPairings.length > 0 ? (
-                      <div className="pairingsBlock">
-                        <div className="pairingHeadRow">
-                          <span>Pairing</span>
-                          <span>Gross</span>
-                          <span>Net</span>
+                    <div key={`${group.flightName}-${idx}`} className="flightSection">
+                      <div className="flightHeader">{group.flightName}</div>
+                      <div className="detailHeadRow">
+                        <span>Name</span>
+                        <span>Card Date</span>
+                        <span>Hdcp</span>
+                        <div className="holesHeadGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
+                          {group.labels.map((h) => (
+                            <span key={`head-${idx}-${h}`}>{h}</span>
+                          ))}
                         </div>
-                        {flightPairings.map((row) => (
-                          <div key={row.bestball_id} className="pairingRow">
-                            <div className="pairingName">{pairingName(row)}</div>
-                            <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
-                            <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
+                        <span>Gross</span>
+                        <span>Net</span>
+                      </div>
+
+                      {flightPairings.map((pairing) => {
+                        const s1 = scoresByCardId.get(pairing.card1_id);
+                        const s2 = scoresByCardId.get(pairing.card2_id);
+                        return (
+                          <div key={pairing.bestball_id} className="pairGroup">
+                            {s1 ? renderScoreRow(s1, group.labels) : null}
+                            {s2 ? renderScoreRow(s2, group.labels) : null}
+                            {renderTeamRow(pairing, group.labels)}
                           </div>
-                        ))}
-                      </div>
-                    ) : null}
+                        );
+                      })}
 
-                    <div className="detailHeadRow">
-                      <span>Name</span>
-                      <span>Card Date</span>
-                      <span>Hdcp</span>
-                      <div className="holesHeadGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
-                        {group.labels.map((h) => (
-                          <span key={`head-${idx}-${h}`}>{h}</span>
-                        ))}
-                      </div>
-                      <span>Gross</span>
-                      <span>Net</span>
+                      {soloRows.map((row) => renderScoreRow(row, group.labels))}
                     </div>
-                    {group.rows.map((row) => (
-                      <div key={row.card_id} className="detailRow">
-                        <div className="detailMeta">
-                          <Link className="memberTag" to={`/public/${courseId}/members/${row.member_id}`}>
-                            {memberName(row)}
-                          </Link>
-                        </div>
-                        <div className="dateCell">{new Date(row.card_dt).toLocaleDateString()}</div>
-                        <div className="statCell">{typeof row.handicap === "number" ? row.handicap : "-"}</div>
-                        <div className="scoreGrid" style={{ gridTemplateColumns: `repeat(${group.labels.length}, minmax(26px, 1fr))` }}>
-                          {group.labels.map((h) => {
-                            const storage = storageHoleNumber(h, row.numholes, row.startinghole);
-                            const score = (row as any)[`hole${storage}`] as number | null | undefined;
-                            const par = (row as any)[`par${storage}`] as number | null | undefined;
-                            const meta = getScoreMeta(score, par);
-                            return (
-                              <div key={`${row.card_id}-${h}`} className={meta.className} style={meta.style}>
-                                {typeof score === "number" ? score : "-"}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
-                        <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
-                      </div>
-                    ))}
-                  </div>
                   );
                 })}
               </div>
@@ -344,28 +377,13 @@ export default function PublicEventScoresPage() {
         .detailsList { display: grid; gap: 8px; margin-top: 10px; }
         .flightSection { display: grid; gap: 2px; }
         .flightHeader { font-size: 12px; font-weight: 800; color: #1e3a8a; padding: 2px 0 4px; border-bottom: 1px solid #dbeafe; }
-        .pairingsBlock { display: grid; gap: 2px; margin: 4px 0 10px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
-        .pairingHeadRow {
-          display: grid;
-          grid-template-columns: 1fr 52px 52px;
-          gap: 6px;
-          color: #6b7280;
-          font-size: 10px;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          padding: 2px 0;
-        }
-        .pairingRow {
-          display: grid;
-          grid-template-columns: 1fr 52px 52px;
-          gap: 6px;
-          align-items: center;
-          padding: 3px 0;
-          border-bottom: 1px solid #e5e7eb;
-        }
-        .pairingRow:last-child { border-bottom: 0; }
-        .pairingName { font-size: 12px; font-weight: 700; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pairGroup { border: 1px solid #e5e7eb; border-radius: 8px; margin: 6px 0; padding: 0 6px; background: #fff; }
+        .pairGroup .detailRow:first-child { border-top: 0; }
+        .teamRow { background: #eff6ff; border-radius: 6px; }
+        .teamTag { font-size: 11px; font-weight: 800; color: #1e3a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .teamHoleCell { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 0; line-height: 1.1; padding: 2px 0 !important; }
+        .thGross { font-size: 11px; font-weight: 800; color: #111827; }
+        .thNet { font-size: 9px; font-weight: 700; color: #2563eb; }
         .detailHeadRow {
           display: grid;
           grid-template-columns: minmax(160px, 220px) minmax(86px, 96px) 52px 1fr 52px 52px;
@@ -420,7 +438,6 @@ export default function PublicEventScoresPage() {
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
         @media (max-width: 900px) {
-          .pairingHeadRow { display: none; }
           .detailHeadRow { display: none; }
           .detailRow { grid-template-columns: 1fr; align-items: start; }
           .scoreGrid { grid-template-columns: repeat(9, minmax(24px, 1fr)) !important; }

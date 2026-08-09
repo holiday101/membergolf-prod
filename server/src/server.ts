@@ -416,10 +416,42 @@ app.get("/api/public/:courseId/events/:eventId/bestball", async (req, res) => {
       return res.status(400).json({ error: "Invalid event" });
     }
 
+    // Per-hole net = each player's gross stroke count for that hole minus their
+    // handicap strokes for it (1 stroke on their hardest holes if handicap<=9,
+    // else 2 on their hardest (handicap-9) holes and 1 on the rest), then the
+    // lower of the two players' adjusted values - mirrors BBCalculate/
+    // recalculateBestBallGross exactly so the per-hole numbers foot to the
+    // same gross/net totals already shown elsewhere.
+    const netHoleExpr = (card: "c1" | "c2", hcp: "eb.handicap1" | "eb.handicap2", hole: number) => `
+      (${card}.hole${hole} - CASE
+        WHEN ${hcp} <= 9 THEN CASE WHEN ${hcp} >= cn.handicaphole${hole} THEN 1 ELSE 0 END
+        ELSE CASE WHEN (${hcp} - 9) >= cn.handicaphole${hole} THEN 2 ELSE 1 END
+      END)
+    `;
+    // {alias, expr} per hole column - built as structured data (not string-
+    // sliced) so the inner derived-table SELECT (full expr) and the outer
+    // SELECT (plain w.<alias> reference) can be generated from the same
+    // source without parsing SQL text (LEAST(a, b) has commas of its own).
+    const holeColumns: { alias: string; expr: string }[] = [];
+    for (let h = 1; h <= 9; h++) {
+      holeColumns.push({ alias: `p1_hole${h}`, expr: `c1.hole${h}` });
+      holeColumns.push({ alias: `p2_hole${h}`, expr: `c2.hole${h}` });
+      holeColumns.push({ alias: `team_gross_hole${h}`, expr: `LEAST(c1.hole${h}, c2.hole${h})` });
+      holeColumns.push({
+        alias: `team_net_hole${h}`,
+        expr: `LEAST(${netHoleExpr("c1", "eb.handicap1", h)}, ${netHoleExpr("c2", "eb.handicap2", h)})`,
+      });
+      holeColumns.push({ alias: `par${h}`, expr: `cn.hole${h}` });
+    }
+    const innerHoleColsSql = holeColumns.map((c) => `${c.expr} AS ${c.alias}`).join(",\n          ");
+    const outerHoleColsSql = holeColumns.map((c) => `w.${c.alias}`).join(",\n        ");
+
     const [rows] = await pool.query<any[]>(
       `
       SELECT
         w.bestball_id,
+        w.card1_id,
+        w.card2_id,
         w.member1_id,
         w.member1_firstname,
         w.member1_lastname,
@@ -429,11 +461,16 @@ app.get("/api/public/:courseId/events/:eventId/bestball", async (req, res) => {
         w.gross,
         w.net,
         w.flight_id,
+        w.numholes,
+        w.startinghole,
         rf.flightname,
-        rf.hdcp1 AS flight_hdcp1
+        rf.hdcp1 AS flight_hdcp1,
+        ${outerHoleColsSql}
       FROM (
         SELECT
           eb.bestball_id,
+          eb.card1_id,
+          eb.card2_id,
           eb.member1_id,
           m1.firstname AS member1_firstname,
           m1.lastname AS member1_lastname,
@@ -442,13 +479,20 @@ app.get("/api/public/:courseId/events/:eventId/bestball", async (req, res) => {
           m2.lastname AS member2_lastname,
           eb.gross,
           eb.net,
+          cn.numholes,
+          cn.startinghole,
           COALESCE(
             (SELECT g.flight_id FROM subEventBBPayGross g WHERE g.bestball_id = eb.bestball_id AND g.event_id = eb.event_id ORDER BY g.gross_id DESC LIMIT 1),
             (SELECT n.flight_id FROM subEventBBPayNet n WHERE n.bestball_id = eb.bestball_id AND n.event_id = eb.event_id ORDER BY n.net_id DESC LIMIT 1)
-          ) AS flight_id
+          ) AS flight_id,
+          ${innerHoleColsSql}
         FROM eventBestBall eb
         JOIN memberMain m1 ON m1.member_id = eb.member1_id
         JOIN memberMain m2 ON m2.member_id = eb.member2_id
+        JOIN eventCard c1 ON c1.card_id = eb.card1_id
+        JOIN eventCard c2 ON c2.card_id = eb.card2_id
+        JOIN eventMain em ON em.event_id = eb.event_id
+        JOIN courseNine cn ON cn.nine_id = em.nine_id
         WHERE eb.event_id = ? AND m1.course_id = ?
       ) w
       LEFT JOIN rosterFlight rf ON rf.flight_id = w.flight_id
