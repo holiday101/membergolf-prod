@@ -130,7 +130,7 @@ BEGIN
             GROUP BY x.rnk
           ) paid ON paid.rnk = r.rnk
           SET g.place = r.rnk,
-              g.amount = paid.grp_amount / r.grp_size,
+              g.amount = ROUND(paid.grp_amount / r.grp_size, 2),
               g.used_yn = 1
           WHERE g.subevent_id = p_subeventid AND g.flight_id = v_flightid AND g.used_yn = 0;
         END IF;
@@ -188,7 +188,7 @@ BEGIN
             GROUP BY x.rnk
           ) paid ON paid.rnk = r.rnk
           SET g.place = r.rnk,
-              g.amount = paid.grp_amount / r.grp_size,
+              g.amount = ROUND(paid.grp_amount / r.grp_size, 2),
               g.used_yn = 1
           WHERE g.subevent_id = p_subeventid AND g.flight_id = v_flightid AND g.used_yn = 0;
         END IF;
