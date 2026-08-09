@@ -20,8 +20,15 @@ type ScoreRow = {
   net: number | null;
   adjustedscore: number | null;
   handicap: number | null;
-  flight_id?: number | null;
-  flightname?: string | null;
+  stroke_flight_id?: number | null;
+  stroke_flightname?: string | null;
+  stroke_hdcp1?: number | null;
+  bestball_flight_id?: number | null;
+  bestball_flightname?: string | null;
+  bestball_hdcp1?: number | null;
+  skins_flight_id?: number | null;
+  skins_flightname?: string | null;
+  skins_hdcp1?: number | null;
   numholes: number | null;
   startinghole: number | null;
   hole1?: number | null;
@@ -154,11 +161,24 @@ function compareScoreRows(a: ScoreRow, b: ScoreRow, sortField: SortField) {
   return memberName(a).localeCompare(memberName(b), undefined, { sensitivity: "base" });
 }
 
+// Which per-card flight fields a given toggle category reads. Stroke play,
+// best ball, and skins each compute their own flight assignment
+// independently (separate competitions posted separately, even when they
+// share the same roster), so a player can legitimately sit in a different
+// flight under each tab.
+function flightFieldsFor(category: string | null) {
+  if (category === "Best Ball") return { id: "bestball_flight_id", name: "bestball_flightname", hdcp1: "bestball_hdcp1" } as const;
+  if (category === "Skins") return { id: "skins_flight_id", name: "skins_flightname", hdcp1: "skins_hdcp1" } as const;
+  return { id: "stroke_flight_id", name: "stroke_flightname", hdcp1: "stroke_hdcp1" } as const;
+}
+
 export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("gross");
@@ -169,14 +189,18 @@ export default function PublicEventScoresPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, scoresRes, pairingsRes] = await Promise.all([
+        const [eventRes, scoresRes, pairingsRes, categoriesRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
           publicFetch<ScoreRow[]>(`/public/${courseId}/events/${eventId}/scores`),
           publicFetch<PairingRow[]>(`/public/${courseId}/events/${eventId}/bestball`).catch(() => []),
+          publicFetch<string[]>(`/public/${courseId}/events/${eventId}/subevent-categories`).catch(() => [] as string[]),
         ]);
         setEvent(eventRes);
         setScores(scoresRes ?? []);
         setPairings(pairingsRes ?? []);
+        const cats = categoriesRes ?? [];
+        setCategories(cats);
+        setActiveCategory((prev) => (prev && cats.includes(prev) ? prev : cats[0] ?? null));
       } catch (e: any) {
         setError(e.message ?? "Failed to load scores");
       } finally {
@@ -198,10 +222,12 @@ export default function PublicEventScoresPage() {
     return map;
   }, [pairings]);
 
+  const flightFields = flightFieldsFor(activeCategory);
+
   const groupedByFlight = useMemo(() => {
     const map = new Map<string, { flightName: string; labels: number[]; rows: ScoreRow[] }>();
     for (const row of scores) {
-      const name = row.flightname?.trim() || "All Players";
+      const name = ((row as any)[flightFields.name] as string | null)?.trim() || "All Players";
       const key = `${name}::${row.numholes ?? 9}::${row.startinghole ?? 1}`;
       const labels = getHoleLabels(row.numholes, row.startinghole);
       const current = map.get(key);
@@ -212,7 +238,7 @@ export default function PublicEventScoresPage() {
       ...group,
       rows: [...group.rows].sort((a, b) => compareScoreRows(a, b, sortField)),
     }));
-  }, [scores, sortField]);
+  }, [scores, sortField, flightFields.name]);
 
   const scoresByCardId = useMemo(() => new Map(scores.map((s) => [s.card_id, s])), [scores]);
 
@@ -290,6 +316,20 @@ export default function PublicEventScoresPage() {
             <div className="empty">Scores are not yet available for this event.</div>
           ) : (
             <>
+              {categories.length > 1 ? (
+                <div className="categoryTabs">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      className={`categoryTab${cat === activeCategory ? " active" : ""}`}
+                      onClick={() => setActiveCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="sortBar">
                 <label className="sortLabel">
                   Sort By
@@ -304,7 +344,8 @@ export default function PublicEventScoresPage() {
 
               <div className="detailsList">
                 {groupedByFlight.map((group, idx) => {
-                  const flightPairings = pairingsByFlight.get(group.flightName) ?? [];
+                  const showPairings = activeCategory === "Best Ball";
+                  const flightPairings = showPairings ? pairingsByFlight.get(group.flightName) ?? [] : [];
                   const pairedCardIds = new Set(flightPairings.flatMap((p) => [p.card1_id, p.card2_id]));
                   const soloRows = group.rows.filter((row) => !pairedCardIds.has(row.card_id));
                   return (
@@ -364,6 +405,18 @@ export default function PublicEventScoresPage() {
         .wideCard { max-width: 100%; }
         .title { font-size: 16px; font-weight: 700; color: #111827; }
         .meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+        .categoryTabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+        .categoryTab {
+          border: 1px solid #d1d5db;
+          background: #fff;
+          color: #374151;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 14px;
+          border-radius: 999px;
+          cursor: pointer;
+        }
+        .categoryTab.active { background: #1e3a8a; border-color: #1e3a8a; color: #fff; }
         .sortBar { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
         .sortLabel { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; color: #6b7280; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
         .sortLabel select {

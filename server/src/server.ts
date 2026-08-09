@@ -342,8 +342,15 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
         c.net,
         c.adjustedscore,
         c.handicap,
-        COALESCE(pgf.flight_id, bbrf.flight_id, rf.flight_id) AS flight_id,
-        COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) AS flightname,
+        pgf.flight_id AS stroke_flight_id,
+        pgf.flightname AS stroke_flightname,
+        pgf.hdcp1 AS stroke_hdcp1,
+        bbrf.flight_id AS bestball_flight_id,
+        bbrf.flightname AS bestball_flightname,
+        bbrf.hdcp1 AS bestball_hdcp1,
+        rf.flight_id AS skins_flight_id,
+        rf.flightname AS skins_flightname,
+        rf.hdcp1 AS skins_hdcp1,
         c.numholes,
         n.startinghole,
         c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
@@ -355,11 +362,20 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       FROM eventCard c
       JOIN memberMain m ON m.member_id = c.member_id
       LEFT JOIN (
-        SELECT spg.card_id, MIN(spg.flight_id) AS flight_id
-        FROM subEventPayGross spg
-        JOIN subEventMain sm ON sm.subevent_id = spg.subevent_id
-        WHERE sm.event_id = ?
-        GROUP BY spg.card_id
+        SELECT card_id, MIN(flight_id) AS flight_id
+        FROM (
+          SELECT spg.card_id, spg.flight_id
+          FROM subEventPayGross spg
+          JOIN subEventMain sm ON sm.subevent_id = spg.subevent_id
+          WHERE sm.event_id = ?
+          UNION ALL
+          SELECT spn.card_id, spn.flight_id
+          FROM subEventPayNet spn
+          JOIN subEventMain sm ON sm.subevent_id = spn.subevent_id
+          WHERE sm.event_id = ?
+        ) stroke_both
+        WHERE card_id IS NOT NULL
+        GROUP BY card_id
       ) pg ON pg.card_id = c.card_id
       LEFT JOIN rosterFlight pgf ON pgf.flight_id = pg.flight_id
       LEFT JOIN (
@@ -392,11 +408,7 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       LEFT JOIN rosterFlight rf ON rf.roster_id = sx.roster_id AND c.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
-      ORDER BY
-        (COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) IS NULL),
-        COALESCE(pgf.hdcp1, bbrf.hdcp1, rf.hdcp1) ASC,
-        COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) ASC,
-        c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
+      ORDER BY c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
       [eventId, eventId, eventId, eventId, courseId, eventId]
     );
@@ -404,6 +416,54 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error("public event scores error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.get("/api/public/:courseId/events/:eventId/subevent-categories", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+
+    // Maps the admin's differentiated type names (e.g. "Stroke Play Gross",
+    // "2 Man Best Ball Auto Flight", "Gross/Net Split") down to the handful
+    // of real, player-facing category names the public toggle uses.
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT DISTINCT
+        CASE
+          WHEN LOWER(t.eventtypename) LIKE '%best ball%' THEN 'Best Ball'
+          WHEN LOWER(t.eventtypename) LIKE '%skin%' THEN 'Skins'
+          WHEN LOWER(t.eventtypename) LIKE '%chicago%' THEN 'Chicago'
+          WHEN LOWER(t.eventtypename) LIKE '%stroke%' OR LOWER(t.eventtypename) LIKE '%gross/net split%' THEN 'Stroke Play'
+          ELSE t.eventtypename
+        END AS category
+      FROM subEventMain s
+      JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      WHERE s.event_id = ? AND s.course_id = ?
+      `,
+      [eventId, courseId]
+    );
+
+    const order = ["Stroke Play", "Best Ball", "Skins", "Chicago"];
+    const categories = rows
+      .map((r) => r.category as string)
+      .filter(Boolean)
+      .sort((a, b) => {
+        const ai = order.indexOf(a);
+        const bi = order.indexOf(b);
+        if (ai === -1 && bi === -1) return a.localeCompare(b);
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+
+    res.json(categories);
+  } catch (err) {
+    console.error("public event subevent-categories error", err);
     res.status(500).json({ error: "Server error" });
   }
 });
