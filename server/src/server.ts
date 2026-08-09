@@ -342,8 +342,8 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
         c.net,
         c.adjustedscore,
         c.handicap,
-        COALESCE(pgf.flight_id, rf.flight_id) AS flight_id,
-        COALESCE(pgf.flightname, rf.flightname) AS flightname,
+        COALESCE(pgf.flight_id, bbrf.flight_id, rf.flight_id) AS flight_id,
+        COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) AS flightname,
         c.numholes,
         n.startinghole,
         c.hole1, c.hole2, c.hole3, c.hole4, c.hole5, c.hole6, c.hole7, c.hole8, c.hole9,
@@ -363,6 +363,25 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       ) pg ON pg.card_id = c.card_id
       LEFT JOIN rosterFlight pgf ON pgf.flight_id = pg.flight_id
       LEFT JOIN (
+        SELECT card_id, MIN(flight_id) AS flight_id
+        FROM (
+          SELECT eb.card1_id AS card_id, COALESCE(g.flight_id, n2.flight_id) AS flight_id
+          FROM eventBestBall eb
+          LEFT JOIN subEventBBPayGross g ON g.bestball_id = eb.bestball_id AND g.event_id = eb.event_id
+          LEFT JOIN subEventBBPayNet n2 ON n2.bestball_id = eb.bestball_id AND n2.event_id = eb.event_id
+          WHERE eb.event_id = ?
+          UNION ALL
+          SELECT eb.card2_id AS card_id, COALESCE(g.flight_id, n2.flight_id) AS flight_id
+          FROM eventBestBall eb
+          LEFT JOIN subEventBBPayGross g ON g.bestball_id = eb.bestball_id AND g.event_id = eb.event_id
+          LEFT JOIN subEventBBPayNet n2 ON n2.bestball_id = eb.bestball_id AND n2.event_id = eb.event_id
+          WHERE eb.event_id = ?
+        ) both_cards
+        WHERE card_id IS NOT NULL
+        GROUP BY card_id
+      ) bb ON bb.card_id = c.card_id
+      LEFT JOIN rosterFlight bbrf ON bbrf.flight_id = bb.flight_id
+      LEFT JOIN (
         SELECT se.event_id, se.roster_id
         FROM subEventMain se
         JOIN subEventType st ON st.eventtype_id = se.eventtype_id
@@ -374,12 +393,12 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       LEFT JOIN courseNine n ON n.nine_id = c.nine_id
       WHERE c.course_id = ? AND c.event_id = ?
       ORDER BY
-        (COALESCE(pgf.flightname, rf.flightname) IS NULL),
-        COALESCE(pgf.hdcp1, rf.hdcp1) ASC,
-        COALESCE(pgf.flightname, rf.flightname) ASC,
+        (COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) IS NULL),
+        COALESCE(pgf.hdcp1, bbrf.hdcp1, rf.hdcp1) ASC,
+        COALESCE(pgf.flightname, bbrf.flightname, rf.flightname) ASC,
         c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
-      [eventId, eventId, courseId, eventId]
+      [eventId, eventId, eventId, eventId, courseId, eventId]
     );
 
     res.json(rows);
