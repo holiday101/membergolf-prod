@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 
 type EventRow = {
@@ -174,11 +174,15 @@ function flightFieldsFor(category: string | null) {
 
 export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
+  const [searchParams] = useSearchParams();
+  // Arriving from the event page's own toggle with a category already
+  // chosen - honor it and skip showing a second toggle here.
+  const lockedCategory = searchParams.get("category");
   const [event, setEvent] = useState<EventRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(lockedCategory);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("gross");
@@ -200,7 +204,11 @@ export default function PublicEventScoresPage() {
         setPairings(pairingsRes ?? []);
         const cats = categoriesRes ?? [];
         setCategories(cats);
-        setActiveCategory((prev) => (prev && cats.includes(prev) ? prev : cats[0] ?? null));
+        if (lockedCategory && cats.includes(lockedCategory)) {
+          setActiveCategory(lockedCategory);
+        } else {
+          setActiveCategory((prev) => (prev && cats.includes(prev) ? prev : cats[0] ?? null));
+        }
       } catch (e: any) {
         setError(e.message ?? "Failed to load scores");
       } finally {
@@ -208,7 +216,7 @@ export default function PublicEventScoresPage() {
       }
     };
     run();
-  }, [courseId, eventId]);
+  }, [courseId, eventId, lockedCategory]);
 
   const pairingsByFlight = useMemo(() => {
     const map = new Map<string, PairingRow[]>();
@@ -316,7 +324,7 @@ export default function PublicEventScoresPage() {
             <div className="empty">Scores are not yet available for this event.</div>
           ) : (
             <>
-              {categories.length > 1 ? (
+              {!lockedCategory && categories.length > 1 ? (
                 <div className="categoryTabs">
                   {categories.map((cat) => (
                     <button

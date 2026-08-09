@@ -422,7 +422,10 @@ export default function PublicEventDetailPage() {
             </div>
             <div className="headBtns">
               {scoresCount > 0 ? (
-                <Link className="scoresBtn" to={`/public/${courseId}/events/${eventId}/scores`}>
+                <Link
+                  className="scoresBtn"
+                  to={`/public/${courseId}/events/${eventId}/scores${activeCategory ? `?category=${encodeURIComponent(activeCategory)}` : ""}`}
+                >
                   View Scores
                 </Link>
               ) : null}
