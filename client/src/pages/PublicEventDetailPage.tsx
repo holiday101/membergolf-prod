@@ -113,6 +113,17 @@ function cleanText(value: string | null | undefined) {
 const SKIN_TYPES = new Set(["SKINS", "SKIN", "POWER_SKIN"]);
 const STROKE_TYPES = new Set(["GROSS", "NET"]);
 
+// Mirrors the server's /subevent-categories mapping so the toggle here and
+// on the scores page use the same real, player-facing names.
+function categoryOfPayoutType(payoutType: string | null): string | null {
+  const t = (payoutType || "").toUpperCase();
+  if (t.startsWith("BB_")) return "Best Ball";
+  if (SKIN_TYPES.has(t)) return "Skins";
+  if (t === "CHICAGO") return "Chicago";
+  if (STROKE_TYPES.has(t)) return "Stroke Play";
+  return null; // misc/other payouts aren't tied to a competition type
+}
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(amount ?? 0);
 }
@@ -139,6 +150,8 @@ export default function PublicEventDetailPage() {
   const [files, setFiles] = useState<EventFile[]>([]);
   const [winnings, setWinnings] = useState<WinningsRow[]>([]);
   const [scoresCount, setScoresCount] = useState(0);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
@@ -155,16 +168,20 @@ export default function PublicEventDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, filesRes, winningsRes, scoresRes] = await Promise.all([
+        const [eventRes, filesRes, winningsRes, scoresRes, categoriesRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
           publicFetch<EventFile[]>(`/public/${courseId}/events/${eventId}/files`),
           publicFetch<WinningsRow[]>(`/public/${courseId}/events/${eventId}/winnings`),
           publicFetch<{ count: number }>(`/public/${courseId}/events/${eventId}/scores/exists`),
+          publicFetch<string[]>(`/public/${courseId}/events/${eventId}/subevent-categories`).catch(() => [] as string[]),
         ]);
         setEvent(eventRes);
         setFiles(filesRes);
         setWinnings(winningsRes);
         setScoresCount(scoresRes?.count ?? 0);
+        const cats = categoriesRes ?? [];
+        setCategories(cats);
+        setActiveCategory((prev) => (prev && cats.includes(prev) ? prev : cats[0] ?? null));
       } catch (e: any) {
         setError(e.message ?? "Failed to load event");
       } finally {
@@ -205,12 +222,22 @@ export default function PublicEventDetailPage() {
     setExpandedCardId(cardId);
   }, [expandedCardId, allScores, scoresLoading, courseId, eventId]);
 
+  // Winnings for the active category tab - misc/other payouts (not tied to
+  // a specific competition type) always stay visible regardless of tab.
+  const displayWinnings = useMemo(() => {
+    if (!activeCategory) return winnings;
+    return winnings.filter((w) => {
+      const cat = categoryOfPayoutType(w.payout_type);
+      return cat === null || cat === activeCategory;
+    });
+  }, [winnings, activeCategory]);
+
   // Group all winnings by flight, then by payout type within each flight
   const flightGroups = useMemo(() => {
     const map = new Map<string, FlightGroup>();
     const noFlightOther: WinningsRow[] = [];
 
-    for (const row of winnings) {
+    for (const row of displayWinnings) {
       const type = (row.payout_type || "OTHER").toUpperCase();
       const flightLabel = row.flight_name
         ? `${row.flight_name.trim()} Flight`
@@ -311,7 +338,7 @@ export default function PublicEventDetailPage() {
         .map((og) => ({ ...og, rows: [...og.rows].sort(byName) }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
     };
-  }, [winnings]);
+  }, [displayWinnings]);
 
   // Find the specific card by card_id
   const modalCard = useMemo(() => {
@@ -406,6 +433,20 @@ export default function PublicEventDetailPage() {
           </div>
 
           {cleanText(event.eventdescription) ? <div className="desc">{cleanText(event.eventdescription)}</div> : null}
+
+          {categories.length > 1 ? (
+            <div className="categoryTabs">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`categoryTab${cat === activeCategory ? " active" : ""}`}
+                  onClick={() => setActiveCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {/* Flight-based sections */}
           {flightGroups.flights.map((flight) => {
@@ -613,6 +654,18 @@ export default function PublicEventDetailPage() {
         }
         .printBtn:hover { background: #e5e7eb; }
         .desc { font-size: 13px; color: #374151; margin-top: 8px; }
+        .categoryTabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+        .categoryTab {
+          border: 1px solid #d1d5db;
+          background: #fff;
+          color: #374151;
+          font-size: 12px;
+          font-weight: 700;
+          padding: 6px 14px;
+          border-radius: 999px;
+          cursor: pointer;
+        }
+        .categoryTab.active { background: #1e3a8a; border-color: #1e3a8a; color: #fff; }
 
         /* Flight sections */
         .flightSection { margin-top: 20px; }
