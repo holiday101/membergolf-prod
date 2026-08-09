@@ -410,7 +410,7 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
       WHERE c.course_id = ? AND c.event_id = ?
       ORDER BY c.gross ASC, c.net ASC, c.card_dt ASC, c.card_id ASC
       `,
-      [eventId, eventId, eventId, eventId, courseId, eventId]
+      [eventId, eventId, eventId, eventId, eventId, courseId, eventId]
     );
 
     res.json(rows);
