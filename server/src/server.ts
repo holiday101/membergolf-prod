@@ -3296,7 +3296,13 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id, event_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      `
+      SELECT s.subevent_id, s.course_id, s.event_id, t.eventtypename
+      FROM subEventMain s
+      LEFT JOIN subEventType t ON t.eventtype_id = s.eventtype_id
+      WHERE s.subevent_id = ?
+      LIMIT 1
+      `,
       [subeventId]
     );
     const sub = subRows?.[0];
@@ -3306,10 +3312,15 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
     }
 
     const bestBallNetTable = await resolveBestBallNetTableName();
+    const isBBGrossNetSplitType = (sub.eventtypename ?? "").toLowerCase().includes("gross/net split");
 
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
     await recalculateBestBallGross(sub.event_id);
-    await pool.query("CALL spBBFlightPick(?)", [subeventId]);
+    if (isBBGrossNetSplitType) {
+      await pool.query("CALL spBBPickGrossNetSplit(?)", [subeventId]);
+    } else {
+      await pool.query("CALL spBBFlightPick(?)", [subeventId]);
+    }
     await syncEventMoneyListForSubevent(subeventId);
 
     const [diagRows] = await pool.query<any[]>(

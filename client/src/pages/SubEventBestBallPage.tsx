@@ -12,6 +12,7 @@ type SubEventDetail = {
   roster_id: number | null;
   amount: number | null;
   addedmoney: number | null;
+  gross_flights: number | null;
 };
 
 type PairingOption = {
@@ -82,6 +83,10 @@ function isBestBallType(name: string | null | undefined) {
   return normalized.includes("best ball") || normalized.includes("bestball");
 }
 
+function isGrossNetSplitType(name: string | null | undefined) {
+  return (name ?? "").toLowerCase().includes("gross/net split");
+}
+
 function hasWinningAmount(amount: number | string | null | undefined) {
   const n = typeof amount === "number" ? amount : Number(amount ?? 0);
   return Number.isFinite(n) && n > 0;
@@ -117,7 +122,7 @@ export default function SubEventBestBallPage() {
   const [data, setData] = useState<SubEventDetail | null>(null);
   const [types, setTypes] = useState<Array<{ eventtype_id: number; eventtypename: string | null }>>([]);
   const [rosters, setRosters] = useState<Array<{ roster_id: number; rostername: string | null }>>([]);
-  const [form, setForm] = useState({ eventtype_id: "", roster_id: "", amount: "", addedmoney: "" });
+  const [form, setForm] = useState({ eventtype_id: "", roster_id: "", amount: "", addedmoney: "", gross_flights: "" });
 
   const [cards, setCards] = useState<PairingOption[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
@@ -186,6 +191,7 @@ export default function SubEventBestBallPage() {
           roster_id: detail.roster_id ? String(detail.roster_id) : "",
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
+          gross_flights: detail.gross_flights != null ? String(detail.gross_flights) : "",
         });
       } catch (e: any) {
         setError(e.message ?? "Failed to load subevent");
@@ -213,6 +219,7 @@ export default function SubEventBestBallPage() {
           roster_id: form.roster_id ? Number(form.roster_id) : null,
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
+          gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -282,6 +289,19 @@ export default function SubEventBestBallPage() {
     setBusy(true);
     setError("");
     try {
+      // Ensure calculation uses the latest on-screen subevent values (e.g. gross flights).
+      const saveRes = await apiFetch(`/subevents/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          eventtype_id: form.eventtype_id ? Number(form.eventtype_id) : null,
+          roster_id: form.roster_id ? Number(form.roster_id) : null,
+          amount: form.amount ? Number(form.amount) : null,
+          addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
+          gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
+        }),
+      });
+      if (!saveRes.ok) throw new Error(await saveRes.text());
+
       const res = await apiFetch(`/subevents/${id}/bestball/post`, { method: "POST" });
       if (!res.ok) throw new Error(await res.text());
       const postResult = await res.json().catch(() => null);
@@ -497,6 +517,17 @@ export default function SubEventBestBallPage() {
             <div className="row"><div className="label">Roster</div><select value={form.roster_id} onChange={(e) => setForm((p) => ({ ...p, roster_id: e.target.value }))}><option value="">Select roster</option>{rosters.map((r) => <option key={r.roster_id} value={String(r.roster_id)}>{r.rostername ?? `Roster ${r.roster_id}`}</option>)}</select></div>
             <div className="row"><div className="label">Amount per Player</div><input value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} /></div>
             <div className="row"><div className="label">Added Money</div><input value={form.addedmoney} onChange={(e) => setForm((p) => ({ ...p, addedmoney: e.target.value }))} /></div>
+            {isGrossNetSplitType(data.eventtypename) ? (
+              <div className="row">
+                <div className="label">Gross Flights</div>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.gross_flights}
+                  onChange={(e) => setForm((p) => ({ ...p, gross_flights: e.target.value }))}
+                />
+              </div>
+            ) : null}
             <div className="actionsRow">
               <div className="actionsLeft"><button className="btn" onClick={unpostBestBall} disabled={busy}>{busy ? "Working..." : "Un-Post Scores"}</button><button className="btn primary" onClick={postBestBall} disabled={busy}>{busy ? "Working..." : "Post Scores"}</button></div>
               <div className="actionsRight"><button className="btn primary" onClick={save} disabled={busy}>{busy ? "Saving..." : "Save"}</button><button className="btn danger" onClick={deleteSubEvent} disabled={busy}>Delete</button></div>
