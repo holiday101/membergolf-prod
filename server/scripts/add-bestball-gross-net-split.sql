@@ -99,7 +99,40 @@ BEGIN
               FROM eventPayOut
              WHERE placespaid = v_placespaid;
 
-          CALL spBBPayGross(p_subeventid, v_flightid);
+          -- Rank teams by score within this flight (competition ranking: ties
+          -- share the lower place, the next distinct score skips ahead by the
+          -- tie count) and split the pooled payout for the occupied place
+          -- slots evenly across the tied teams. Deliberately not reusing
+          -- spBBPayGross here: it relies on used_yn=1 rows already existing
+          -- from a prior pass to avoid a latent NOT FOUND handler bug, which
+          -- a flight that is purely gross (no gross/net arbitration) never
+          -- produces, so it silently ranks nothing on a cold call.
+          UPDATE subEventBBPayGross g
+          JOIN (
+            SELECT
+              gross_id,
+              RANK() OVER (ORDER BY score ASC) AS rnk,
+              COUNT(*) OVER (PARTITION BY score) AS grp_size
+            FROM subEventBBPayGross
+            WHERE subevent_id = p_subeventid AND flight_id = v_flightid AND used_yn = 0
+          ) r ON r.gross_id = g.gross_id
+          JOIN (
+            SELECT x.rnk, SUM(po.amount) AS grp_amount
+            FROM (
+              SELECT
+                RANK() OVER (ORDER BY score ASC) AS rnk,
+                ROW_NUMBER() OVER (ORDER BY score ASC, gross_id ASC) AS rn
+              FROM subEventBBPayGross
+              WHERE subevent_id = p_subeventid AND flight_id = v_flightid AND used_yn = 0
+            ) x
+            LEFT JOIN subEventPayOut po
+              ON po.subevent_id = p_subeventid AND po.flight_id = v_flightid AND po.place = x.rn
+            GROUP BY x.rnk
+          ) paid ON paid.rnk = r.rnk
+          SET g.place = r.rnk,
+              g.amount = paid.grp_amount / r.grp_size,
+              g.used_yn = 1
+          WHERE g.subevent_id = p_subeventid AND g.flight_id = v_flightid AND g.used_yn = 0;
         END IF;
       ELSE
 
@@ -132,7 +165,32 @@ BEGIN
               FROM eventPayOut
              WHERE placespaid = v_placespaid;
 
-          CALL spBBPayNet(p_subeventid, v_flightid);
+          UPDATE subEventBBPayNet g
+          JOIN (
+            SELECT
+              net_id,
+              RANK() OVER (ORDER BY score ASC) AS rnk,
+              COUNT(*) OVER (PARTITION BY score) AS grp_size
+            FROM subEventBBPayNet
+            WHERE subevent_id = p_subeventid AND flight_id = v_flightid AND used_yn = 0
+          ) r ON r.net_id = g.net_id
+          JOIN (
+            SELECT x.rnk, SUM(po.amount) AS grp_amount
+            FROM (
+              SELECT
+                RANK() OVER (ORDER BY score ASC) AS rnk,
+                ROW_NUMBER() OVER (ORDER BY score ASC, net_id ASC) AS rn
+              FROM subEventBBPayNet
+              WHERE subevent_id = p_subeventid AND flight_id = v_flightid AND used_yn = 0
+            ) x
+            LEFT JOIN subEventPayOut po
+              ON po.subevent_id = p_subeventid AND po.flight_id = v_flightid AND po.place = x.rn
+            GROUP BY x.rnk
+          ) paid ON paid.rnk = r.rnk
+          SET g.place = r.rnk,
+              g.amount = paid.grp_amount / r.grp_size,
+              g.used_yn = 1
+          WHERE g.subevent_id = p_subeventid AND g.flight_id = v_flightid AND g.used_yn = 0;
         END IF;
       END IF;
     END WHILE;
