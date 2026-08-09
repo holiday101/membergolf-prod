@@ -389,6 +389,66 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
   }
 });
 
+app.get("/api/public/:courseId/events/:eventId/bestball", async (req, res) => {
+  try {
+    const courseId = Number(req.params.courseId);
+    const eventId = Number(req.params.eventId);
+    if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
+      return res.status(400).json({ error: "Invalid event" });
+    }
+
+    const [rows] = await pool.query<any[]>(
+      `
+      SELECT
+        w.bestball_id,
+        w.member1_id,
+        w.member1_firstname,
+        w.member1_lastname,
+        w.member2_id,
+        w.member2_firstname,
+        w.member2_lastname,
+        w.gross,
+        w.net,
+        w.flight_id,
+        rf.flightname,
+        rf.hdcp1 AS flight_hdcp1
+      FROM (
+        SELECT
+          eb.bestball_id,
+          eb.member1_id,
+          m1.firstname AS member1_firstname,
+          m1.lastname AS member1_lastname,
+          eb.member2_id,
+          m2.firstname AS member2_firstname,
+          m2.lastname AS member2_lastname,
+          eb.gross,
+          eb.net,
+          COALESCE(
+            (SELECT g.flight_id FROM subEventBBPayGross g WHERE g.bestball_id = eb.bestball_id AND g.event_id = eb.event_id ORDER BY g.gross_id DESC LIMIT 1),
+            (SELECT n.flight_id FROM subEventBBPayNet n WHERE n.bestball_id = eb.bestball_id AND n.event_id = eb.event_id ORDER BY n.net_id DESC LIMIT 1)
+          ) AS flight_id
+        FROM eventBestBall eb
+        JOIN memberMain m1 ON m1.member_id = eb.member1_id
+        JOIN memberMain m2 ON m2.member_id = eb.member2_id
+        WHERE eb.event_id = ? AND m1.course_id = ?
+      ) w
+      LEFT JOIN rosterFlight rf ON rf.flight_id = w.flight_id
+      ORDER BY
+        (w.flight_id IS NULL),
+        rf.hdcp1 ASC,
+        rf.flightname ASC,
+        w.gross ASC
+      `,
+      [eventId, courseId]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("public event bestball error", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/api/public/:courseId/events/:eventId/scores/exists", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);

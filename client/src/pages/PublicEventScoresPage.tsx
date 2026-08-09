@@ -62,7 +62,34 @@ type ScoreRow = {
   par18?: number | null;
 };
 
+type PairingRow = {
+  bestball_id: number;
+  member1_id: number;
+  member1_firstname: string | null;
+  member1_lastname: string | null;
+  member2_id: number;
+  member2_firstname: string | null;
+  member2_lastname: string | null;
+  gross: number | null;
+  net: number | null;
+  flight_id: number | null;
+  flightname: string | null;
+  flight_hdcp1: number | null;
+};
+
 type SortField = "gross" | "name" | "net" | "handicap";
+
+function pairingName(row: PairingRow) {
+  const p1 = `${(row.member1_lastname || "").trim()}, ${(row.member1_firstname || "").trim()}`;
+  const p2 = `${(row.member2_lastname || "").trim()}, ${(row.member2_firstname || "").trim()}`;
+  return `${p1} / ${p2}`;
+}
+
+function comparePairingRows(a: PairingRow, b: PairingRow) {
+  const diff = compareNullableNumber(a.gross, b.gross);
+  if (diff !== 0) return diff;
+  return pairingName(a).localeCompare(pairingName(b), undefined, { sensitivity: "base" });
+}
 
 function getHoleLabels(numholes: number | null, startinghole: number | null) {
   if (numholes === 9) return startinghole === 10 ? [10, 11, 12, 13, 14, 15, 16, 17, 18] : [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -126,6 +153,7 @@ export default function PublicEventScoresPage() {
   const { courseId, eventId } = useParams();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [scores, setScores] = useState<ScoreRow[]>([]);
+  const [pairings, setPairings] = useState<PairingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [sortField, setSortField] = useState<SortField>("gross");
@@ -136,12 +164,14 @@ export default function PublicEventScoresPage() {
       setLoading(true);
       setError("");
       try {
-        const [eventRes, scoresRes] = await Promise.all([
+        const [eventRes, scoresRes, pairingsRes] = await Promise.all([
           publicFetch<EventRow>(`/public/${courseId}/events/${eventId}`),
           publicFetch<ScoreRow[]>(`/public/${courseId}/events/${eventId}/scores`),
+          publicFetch<PairingRow[]>(`/public/${courseId}/events/${eventId}/bestball`).catch(() => []),
         ]);
         setEvent(eventRes);
         setScores(scoresRes ?? []);
+        setPairings(pairingsRes ?? []);
       } catch (e: any) {
         setError(e.message ?? "Failed to load scores");
       } finally {
@@ -150,6 +180,18 @@ export default function PublicEventScoresPage() {
     };
     run();
   }, [courseId, eventId]);
+
+  const pairingsByFlight = useMemo(() => {
+    const map = new Map<string, PairingRow[]>();
+    for (const row of pairings) {
+      const name = row.flightname?.trim() || "All Players";
+      const arr = map.get(name) ?? [];
+      arr.push(row);
+      map.set(name, arr);
+    }
+    for (const rows of map.values()) rows.sort(comparePairingRows);
+    return map;
+  }, [pairings]);
 
   const groupedByFlight = useMemo(() => {
     const map = new Map<string, { flightName: string; labels: number[]; rows: ScoreRow[] }>();
@@ -200,9 +242,29 @@ export default function PublicEventScoresPage() {
               </div>
 
               <div className="detailsList">
-                {groupedByFlight.map((group, idx) => (
+                {groupedByFlight.map((group, idx) => {
+                  const flightPairings = pairingsByFlight.get(group.flightName);
+                  return (
                   <div key={`${group.flightName}-${idx}`} className="flightSection">
                     <div className="flightHeader">{group.flightName}</div>
+
+                    {flightPairings && flightPairings.length > 0 ? (
+                      <div className="pairingsBlock">
+                        <div className="pairingHeadRow">
+                          <span>Pairing</span>
+                          <span>Gross</span>
+                          <span>Net</span>
+                        </div>
+                        {flightPairings.map((row) => (
+                          <div key={row.bestball_id} className="pairingRow">
+                            <div className="pairingName">{pairingName(row)}</div>
+                            <div className="statCell">{typeof row.gross === "number" ? row.gross : "-"}</div>
+                            <div className="statCell">{typeof row.net === "number" ? row.net : "-"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
                     <div className="detailHeadRow">
                       <span>Name</span>
                       <span>Card Date</span>
@@ -242,7 +304,8 @@ export default function PublicEventScoresPage() {
                       </div>
                     ))}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
@@ -281,6 +344,28 @@ export default function PublicEventScoresPage() {
         .detailsList { display: grid; gap: 8px; margin-top: 10px; }
         .flightSection { display: grid; gap: 2px; }
         .flightHeader { font-size: 12px; font-weight: 800; color: #1e3a8a; padding: 2px 0 4px; border-bottom: 1px solid #dbeafe; }
+        .pairingsBlock { display: grid; gap: 2px; margin: 4px 0 10px; padding: 6px 8px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; }
+        .pairingHeadRow {
+          display: grid;
+          grid-template-columns: 1fr 52px 52px;
+          gap: 6px;
+          color: #6b7280;
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          padding: 2px 0;
+        }
+        .pairingRow {
+          display: grid;
+          grid-template-columns: 1fr 52px 52px;
+          gap: 6px;
+          align-items: center;
+          padding: 3px 0;
+          border-bottom: 1px solid #e5e7eb;
+        }
+        .pairingRow:last-child { border-bottom: 0; }
+        .pairingName { font-size: 12px; font-weight: 700; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .detailHeadRow {
           display: grid;
           grid-template-columns: minmax(160px, 220px) minmax(86px, 96px) 52px 1fr 52px 52px;
@@ -335,6 +420,7 @@ export default function PublicEventScoresPage() {
         .muted { color: #6b7280; font-size: 12px; }
         .error { color: #a00; font-size: 12px; }
         @media (max-width: 900px) {
+          .pairingHeadRow { display: none; }
           .detailHeadRow { display: none; }
           .detailRow { grid-template-columns: 1fr; align-items: start; }
           .scoreGrid { grid-template-columns: repeat(9, minmax(24px, 1fr)) !important; }
