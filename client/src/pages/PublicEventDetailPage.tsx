@@ -14,10 +14,12 @@ type EventRow = {
 };
 
 type WinningsRow = {
-  moneylist_id: number;
+  moneylist_id: number | string;
   member_id: number;
   firstname: string | null;
   lastname: string | null;
+  partner_firstname: string | null;
+  partner_lastname: string | null;
   amount: number;
   flight_id: number | null;
   flight_name: string | null;
@@ -281,7 +283,7 @@ export default function PublicEventDetailPage() {
         }),
       })),
       other: fg.other
-        .map((og) => ({ ...og, rows: [...og.rows].sort(byName) }))
+        .map((og) => ({ ...og, rows: [...og.rows].sort(byPlace) }))
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" })),
     }));
     result.sort((a, b) => {
@@ -354,6 +356,24 @@ export default function PublicEventDetailPage() {
       <div className="wamount">{formatCurrency(row.amount)}</div>
     </div>
   );
+
+  const renderBestBallRow = (row: WinningsRow) => {
+    const player = `${(row.lastname || "").trim()}, ${(row.firstname || "").trim()}`;
+    const partnerLast = (row.partner_lastname || "").trim();
+    const partnerFirst = (row.partner_firstname || "").trim();
+    const partner = partnerLast || partnerFirst ? `${partnerLast}, ${partnerFirst}` : null;
+    return (
+      <div key={row.moneylist_id} className="winningsRow">
+        {renderClickableName(row, <>
+          {row.place ? <span className="wplace">#{row.place} </span> : null}
+          {player}
+          {partner ? <> / {partner}</> : null}
+          {row.score != null ? <span className="wscore"> ({row.score})</span> : null}
+        </>)}
+        <div className="wamount">{formatCurrency(row.amount)}</div>
+      </div>
+    );
+  };
 
   return (
     <div className="page">
@@ -428,7 +448,7 @@ export default function PublicEventDetailPage() {
                     <div key={og.type} className="typeCard">
                       <div className="typeTitle">{og.label}</div>
                       <div className="typeRows">
-                        {og.rows.map(renderStrokeRow)}
+                        {og.rows.map(og.type === "BB_GROSS" || og.type === "BB_NET" ? renderBestBallRow : renderStrokeRow)}
                       </div>
                     </div>
                   ))}

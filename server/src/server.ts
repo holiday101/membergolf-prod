@@ -174,17 +174,26 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         w.member_id,
         m.firstname,
         m.lastname,
+        pm.firstname AS partner_firstname,
+        pm.lastname AS partner_lastname,
         w.amount,
         w.flight_id,
         f.flightname AS flight_name,
         f.hdcp1 AS flight_hdcp1,
         w.place,
-        w.description,
+        CASE
+          WHEN w.payout_type = 'BB_GROSS' THEN
+            CASE WHEN f.flightname IS NOT NULL AND TRIM(f.flightname) <> '' THEN CONCAT(TRIM(f.flightname), ' Best Ball Gross') ELSE 'Best Ball Gross' END
+          WHEN w.payout_type = 'BB_NET' THEN
+            CASE WHEN f.flightname IS NOT NULL AND TRIM(f.flightname) <> '' THEN CONCAT(TRIM(f.flightname), ' Best Ball Net') ELSE 'Best Ball Net' END
+          ELSE w.description
+        END AS description,
         w.payout_type,
         CASE
           WHEN w.payout_type = 'GROSS' THEN spg.score
           WHEN w.payout_type = 'NET'   THEN spn.score
           WHEN w.payout_type IN ('SKINS','SKIN','POWER_SKIN') THEN es.score
+          WHEN w.payout_type IN ('BB_GROSS','BB_NET') THEN w.score
           ELSE NULL
         END AS score,
         CASE
@@ -197,6 +206,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         SELECT
           ml.moneylist_id,
           ml.member_id,
+          NULL AS partner_member_id,
           ml.amount,
           ml.flight_id,
           ml.place,
@@ -204,18 +214,21 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           ml.payout_type,
           ml.subevent_id,
           ml.source_table,
-          ml.source_id
+          ml.source_id,
+          NULL AS score
         FROM eventMoneyList ml
         LEFT JOIN subEventMain se ON se.subevent_id = ml.subevent_id
         WHERE (ml.event_id = ? OR se.event_id = ?)
           AND ml.amount <> 0
           AND ml.source_table != 'eventOtherPay'
+          AND ml.payout_type NOT IN ('BB_GROSS', 'BB_NET')
 
         UNION ALL
 
         SELECT
           op.eventotherpay_id AS moneylist_id,
           op.member_id,
+          NULL AS partner_member_id,
           op.amount,
           NULL AS flight_id,
           NULL AS place,
@@ -223,12 +236,60 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
           'OTHER' AS payout_type,
           NULL AS subevent_id,
           NULL AS source_table,
-          NULL AS source_id
+          NULL AS source_id,
+          NULL AS score
         FROM eventOtherPay op
         WHERE op.event_id = ?
           AND op.amount <> 0
+
+        UNION ALL
+
+        -- One row per team (not per player) so the public page can show the
+        -- pairing instead of splitting each team across two rows. Covers
+        -- both "2 Man Best Ball" and "Best Ball Gross/Net Split" - both
+        -- write into this same table.
+        SELECT
+          CONCAT('bbg-', g.gross_id) AS moneylist_id,
+          COALESCE(g.member1_id, g.member2_id) AS member_id,
+          CASE WHEN g.member1_id IS NOT NULL THEN g.member2_id ELSE NULL END AS partner_member_id,
+          g.amount,
+          g.flight_id,
+          g.place,
+          NULL AS description,
+          'BB_GROSS' AS payout_type,
+          g.subevent_id,
+          'subEventBBPayGross' AS source_table,
+          g.gross_id AS source_id,
+          g.score
+        FROM subEventBBPayGross g
+        JOIN subEventMain sm ON sm.subevent_id = g.subevent_id
+        WHERE sm.event_id = ?
+          AND COALESCE(g.amount, 0) <> 0
+          AND COALESCE(g.place, 0) > 0
+
+        UNION ALL
+
+        SELECT
+          CONCAT('bbn-', n.net_id) AS moneylist_id,
+          COALESCE(n.member1_id, n.member2_id) AS member_id,
+          CASE WHEN n.member1_id IS NOT NULL THEN n.member2_id ELSE NULL END AS partner_member_id,
+          n.amount,
+          n.flight_id,
+          n.place,
+          NULL AS description,
+          'BB_NET' AS payout_type,
+          n.subevent_id,
+          'subEventBBPayNet' AS source_table,
+          n.net_id AS source_id,
+          n.score
+        FROM subEventBBPayNet n
+        JOIN subEventMain sm2 ON sm2.subevent_id = n.subevent_id
+        WHERE sm2.event_id = ?
+          AND COALESCE(n.amount, 0) <> 0
+          AND COALESCE(n.place, 0) > 0
       ) w
       JOIN memberMain m ON m.member_id = w.member_id
+      LEFT JOIN memberMain pm ON pm.member_id = w.partner_member_id
       LEFT JOIN rosterFlight f ON f.flight_id = w.flight_id
       LEFT JOIN subEventPayGross spg ON w.payout_type = 'GROSS'
         AND w.source_table = 'subEventPayGross'
@@ -250,7 +311,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
         w.place,
         w.amount DESC
       `,
-      [eventId, eventId, eventId, courseId]
+      [eventId, eventId, eventId, eventId, eventId, courseId]
     );
 
     res.json(rows);
