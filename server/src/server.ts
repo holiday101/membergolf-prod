@@ -246,7 +246,7 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
 
         -- One row per team (not per player) so the public page can show the
         -- pairing instead of splitting each team across two rows. Covers
-        -- both "2 Man Best Ball" and "Best Ball Gross/Net Split" - both
+        -- both "2 Man Best Ball" and "2 Man Best Ball Auto Flight" - both
         -- write into this same table.
         SELECT
           CONCAT('bbg-', g.gross_id) AS moneylist_id,
@@ -2425,6 +2425,7 @@ app.get("/subevents/:id", authMiddleware, async (req, res) => {
         s.addedmoney,
         s.drawn_hole,
         s.gross_flights,
+        s.auto_flights,
         c.autoflight_yn,
         COALESCE(n.startinghole, 1) AS startinghole,
         n.numholes AS numholes
@@ -3496,12 +3497,12 @@ app.post("/subevents/:id/bestball/post", authMiddleware, async (req, res) => {
     }
 
     const bestBallNetTable = await resolveBestBallNetTableName();
-    const isBBGrossNetSplitType = (sub.eventtypename ?? "").toLowerCase().includes("gross/net split");
+    const isBBAutoFlightType = (sub.eventtypename ?? "").toLowerCase().includes("auto flight");
 
     await pool.query("CALL BBCalculate(?)", [sub.event_id]);
     await recalculateBestBallGross(sub.event_id);
-    if (isBBGrossNetSplitType) {
-      await pool.query("CALL spBBPickGrossNetSplit(?)", [subeventId]);
+    if (isBBAutoFlightType) {
+      await pool.query("CALL spBBAutoFlightPick(?)", [subeventId]);
     } else {
       await pool.query("CALL spBBFlightPick(?)", [subeventId]);
     }
@@ -4705,6 +4706,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
       addedmoney: z.number().optional().nullable(),
       drawn_hole: z.number().int().min(1).max(18).optional().nullable(),
       gross_flights: z.number().int().min(0).optional().nullable(),
+      auto_flights: z.number().int().min(1).optional().nullable(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(parsed.error.flatten());
@@ -4721,7 +4723,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
 
     await pool.execute(
       `UPDATE subEventMain
-       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?, drawn_hole = ?, gross_flights = ?
+       SET eventtype_id = ?, eventnumhole_id = ?, roster_id = ?, amount = ?, addedmoney = ?, drawn_hole = ?, gross_flights = ?, auto_flights = ?
        WHERE subevent_id = ?`,
       [
         parsed.data.eventtype_id ?? null,
@@ -4731,6 +4733,7 @@ app.put("/subevents/:id", authMiddleware, async (req, res) => {
         parsed.data.addedmoney ?? null,
         parsed.data.drawn_hole ?? null,
         parsed.data.gross_flights ?? null,
+        parsed.data.auto_flights ?? null,
         subeventId,
       ]
     );

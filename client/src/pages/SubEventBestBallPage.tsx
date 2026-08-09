@@ -13,6 +13,7 @@ type SubEventDetail = {
   amount: number | null;
   addedmoney: number | null;
   gross_flights: number | null;
+  auto_flights: number | null;
 };
 
 type PairingOption = {
@@ -83,8 +84,8 @@ function isBestBallType(name: string | null | undefined) {
   return normalized.includes("best ball") || normalized.includes("bestball");
 }
 
-function isGrossNetSplitType(name: string | null | undefined) {
-  return (name ?? "").toLowerCase().includes("gross/net split");
+function isAutoFlightType(name: string | null | undefined) {
+  return (name ?? "").toLowerCase().includes("auto flight");
 }
 
 function hasWinningAmount(amount: number | string | null | undefined) {
@@ -122,7 +123,7 @@ export default function SubEventBestBallPage() {
   const [data, setData] = useState<SubEventDetail | null>(null);
   const [types, setTypes] = useState<Array<{ eventtype_id: number; eventtypename: string | null }>>([]);
   const [rosters, setRosters] = useState<Array<{ roster_id: number; rostername: string | null }>>([]);
-  const [form, setForm] = useState({ eventtype_id: "", roster_id: "", amount: "", addedmoney: "", gross_flights: "" });
+  const [form, setForm] = useState({ eventtype_id: "", roster_id: "", amount: "", addedmoney: "", gross_flights: "", auto_flights: "" });
 
   const [cards, setCards] = useState<PairingOption[]>([]);
   const [pairings, setPairings] = useState<PairingRow[]>([]);
@@ -192,6 +193,7 @@ export default function SubEventBestBallPage() {
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
           gross_flights: detail.gross_flights != null ? String(detail.gross_flights) : "",
+          auto_flights: detail.auto_flights != null ? String(detail.auto_flights) : "",
         });
       } catch (e: any) {
         setError(e.message ?? "Failed to load subevent");
@@ -220,6 +222,7 @@ export default function SubEventBestBallPage() {
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
           gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
+          auto_flights: form.auto_flights ? Number(form.auto_flights) : null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -298,6 +301,7 @@ export default function SubEventBestBallPage() {
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
           gross_flights: form.gross_flights ? Number(form.gross_flights) : null,
+          auto_flights: form.auto_flights ? Number(form.auto_flights) : null,
         }),
       });
       if (!saveRes.ok) throw new Error(await saveRes.text());
@@ -517,14 +521,14 @@ export default function SubEventBestBallPage() {
             <div className="row"><div className="label">Roster</div><select value={form.roster_id} onChange={(e) => setForm((p) => ({ ...p, roster_id: e.target.value }))}><option value="">Select roster</option>{rosters.map((r) => <option key={r.roster_id} value={String(r.roster_id)}>{r.rostername ?? `Roster ${r.roster_id}`}</option>)}</select></div>
             <div className="row"><div className="label">Amount per Player</div><input value={form.amount} onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))} /></div>
             <div className="row"><div className="label">Added Money</div><input value={form.addedmoney} onChange={(e) => setForm((p) => ({ ...p, addedmoney: e.target.value }))} /></div>
-            {isGrossNetSplitType(data.eventtypename) ? (
+            {isAutoFlightType(data.eventtypename) ? (
               <div className="row">
-                <div className="label">Gross Flights</div>
+                <div className="label">Number of Flights</div>
                 <input
                   type="number"
-                  min={0}
-                  value={form.gross_flights}
-                  onChange={(e) => setForm((p) => ({ ...p, gross_flights: e.target.value }))}
+                  min={1}
+                  value={form.auto_flights}
+                  onChange={(e) => setForm((p) => ({ ...p, auto_flights: e.target.value }))}
                 />
               </div>
             ) : null}
