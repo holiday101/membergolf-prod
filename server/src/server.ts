@@ -4835,7 +4835,33 @@ app.delete("/subevents/:id", authMiddleware, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    await pool.execute("DELETE FROM subEventMain WHERE subevent_id = ?", [subeventId]);
+    // Delete every posted-result/payout table keyed on this subevent_id first -
+    // none of these have a real FK/cascade to subEventMain, so leaving this
+    // out orphans rows that public pages (e.g. event winnings) still pick up
+    // by event_id, showing stale payouts for a sub event that no longer exists.
+    const bestBallNetTable = await resolveBestBallNetTableName();
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query("DELETE FROM eventMoneyList WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM eventSkin WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventSkinNet WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventSkinNetResults WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventPayGross WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventPayNet WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventBBPayGross WHERE subevent_id = ?", [subeventId]);
+      await conn.query(`DELETE FROM ${bestBallNetTable} WHERE subevent_id = ?`, [subeventId]);
+      await conn.query("DELETE FROM subEventPayChicago WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventPayOut WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventFlight WHERE subevent_id = ?", [subeventId]);
+      await conn.query("DELETE FROM subEventMain WHERE subevent_id = ?", [subeventId]);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error("subevent delete error", err);
