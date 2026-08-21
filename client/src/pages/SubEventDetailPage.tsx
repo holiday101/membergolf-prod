@@ -13,6 +13,7 @@ type SubEventDetail = {
   amount: number | null;
   addedmoney: number | null;
   drawn_hole: number | null;
+  auto_flights: number | null;
   startinghole: number;
   numholes: number | null;
 };
@@ -177,6 +178,7 @@ export default function SubEventDetailPage() {
     amount: "",
     addedmoney: "",
     drawn_hole: "",
+    auto_flights: "",
   });
 
   useEffect(() => {
@@ -203,6 +205,7 @@ export default function SubEventDetailPage() {
           amount: detail.amount != null ? String(detail.amount) : "",
           addedmoney: detail.addedmoney != null ? String(detail.addedmoney) : "",
           drawn_hole: detail.drawn_hole != null ? String(detail.drawn_hole) : "",
+          auto_flights: detail.auto_flights != null ? String(detail.auto_flights) : "",
         });
       } catch (e: any) {
         setError(e.message ?? "Failed to load subevent");
@@ -219,6 +222,7 @@ export default function SubEventDetailPage() {
   const isPowerSkinType = typeName.includes("power skin");
   const isSkinsNetType = savedTypeName.includes("skins net");
   const isSkinsType = savedTypeName.includes("skin") && !savedTypeName.includes("power skin") && !savedTypeName.includes("skins net");
+  const isAutoFlightType = typeName.includes("auto flight");
 
   const loadSkins = async () => {
     if (!id) return;
@@ -265,6 +269,7 @@ export default function SubEventDetailPage() {
           amount: form.amount ? Number(form.amount) : null,
           addedmoney: form.addedmoney ? Number(form.addedmoney) : null,
           drawn_hole: form.drawn_hole ? Number(form.drawn_hole) : null,
+          auto_flights: form.auto_flights ? Number(form.auto_flights) : null,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -487,6 +492,17 @@ export default function SubEventDetailPage() {
                     <option key={displayHole} value={String(i + 1)}>Hole {displayHole}</option>
                   ))}
                 </select>
+              </div>
+            ) : null}
+            {isAutoFlightType ? (
+              <div className="row">
+                <div className="label">Number of Flights</div>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.auto_flights}
+                  onChange={(e) => setForm((p) => ({ ...p, auto_flights: e.target.value }))}
+                />
               </div>
             ) : null}
             <div className="actionsRow">

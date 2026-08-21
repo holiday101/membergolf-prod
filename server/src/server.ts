@@ -2607,7 +2607,10 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
     }
 
     const [subRows] = await pool.query<any[]>(
-      "SELECT subevent_id, course_id, event_id, roster_id FROM subEventMain WHERE subevent_id = ? LIMIT 1",
+      `SELECT sm.subevent_id, sm.course_id, sm.event_id, sm.roster_id, LOWER(st.eventtypename) AS eventtypename
+       FROM subEventMain sm
+       LEFT JOIN subEventType st ON st.eventtype_id = sm.eventtype_id
+       WHERE sm.subevent_id = ? LIMIT 1`,
       [subeventId]
     );
     const sub = subRows?.[0];
@@ -2615,6 +2618,13 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
     if (!isGlobal(payload) && sub.course_id !== payload.courseId) {
       return res.status(403).json({ error: "Forbidden" });
     }
+
+    // Auto-flight types don't have pre-configured hdcp ranges to bucket
+    // entrants into - flights are only known once posted (spSkinAutoFlightPick
+    // assigns them). Show cards ungrouped ("Unassigned") pre-post rather than
+    // inner-joining on a static hdcp range that may not cover everyone, same
+    // as Best Ball Auto Flight's team list before posting.
+    const isAutoFlight = (sub.eventtypename ?? "").includes("auto flight");
 
     const [rows] = await pool.query<any[]>(
       `
@@ -2645,12 +2655,12 @@ app.get("/subevents/:id/skins/cards", authMiddleware, async (req, res) => {
       FROM eventCard ec
       INNER JOIN memberMain m ON m.member_id = ec.member_id
       INNER JOIN rosterMemberLink rml ON rml.member_id = ec.member_id AND rml.roster_id = ?
-      INNER JOIN rosterFlight rf ON rf.roster_id = ? AND ec.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
+      ${isAutoFlight ? "LEFT JOIN rosterFlight rf ON 1 = 0" : "INNER JOIN rosterFlight rf ON rf.roster_id = ? AND ec.handicap BETWEEN rf.hdcp1 AND rf.hdcp2"}
       LEFT JOIN courseNine n ON n.nine_id = ec.nine_id
       WHERE ec.event_id = ?
       ORDER BY rf.hdcp1 ASC, rf.flightname ASC, m.lastname ASC, m.firstname ASC, ec.card_dt ASC, ec.card_id ASC
       `,
-      [sub.roster_id, sub.roster_id, sub.event_id]
+      isAutoFlight ? [sub.roster_id, sub.event_id] : [sub.roster_id, sub.roster_id, sub.event_id]
     );
 
     res.json(rows);
@@ -2684,6 +2694,8 @@ app.post("/subevents/:id/skins/post", authMiddleware, async (req, res) => {
 
     if (sub.eventtypename === "skins net") {
       await pool.query("CALL spNetSkin(?, ?)", [sub.event_id, subeventId]);
+    } else if (sub.eventtypename.includes("auto flight")) {
+      await pool.query("CALL spSkinAutoFlightPick(?)", [subeventId]);
     } else {
       await pool.query("CALL spSkinCodeX(?)", [subeventId]);
     }
