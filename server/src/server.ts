@@ -3330,17 +3330,14 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
         eb.handicap2,
         eb.handicap,
         eb.gross,
-        eb.net,
-        rf.flight_id,
-        rf.flightname
+        eb.net
       FROM eventBestBall eb
       LEFT JOIN memberMain m1 ON m1.member_id = eb.member1_id
       LEFT JOIN memberMain m2 ON m2.member_id = eb.member2_id
-      LEFT JOIN rosterFlight rf ON rf.roster_id = ? AND eb.handicap BETWEEN rf.hdcp1 AND rf.hdcp2
       WHERE eb.event_id = ?
-      ORDER BY rf.hdcp1 ASC, rf.flightname ASC, m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
+      ORDER BY m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
       `,
-      [sub.roster_id ?? null, sub.event_id]
+      [sub.event_id]
     );
 
     const [gross] = await pool.query<any[]>(

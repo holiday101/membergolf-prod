@@ -38,8 +38,6 @@ type PairingRow = {
   handicap: number | null;
   gross: number | null;
   net: number | null;
-  flightname: string | null;
-  flight_id: number | null;
 };
 
 type GrossRow = {
@@ -557,7 +555,6 @@ export default function SubEventBestBallPage() {
                   <div key={p.bestball_id} className="pairingTableRow">
                     <span>{pairName(p.member1_lastname, p.member1_firstname, p.member2_lastname, p.member2_firstname)}</span>
                     <span>{p.gross ?? "-"}/{p.net ?? "-"}</span>
-                    <span>{p.flightname ?? p.flight_id ?? "-"}</span>
                     <button className="btn danger" onClick={() => removePairing(p.bestball_id)} disabled={busy}>Remove</button>
                   </div>
                 ))}
@@ -672,7 +669,7 @@ export default function SubEventBestBallPage() {
         .actionsRow { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; justify-content: space-between; align-items: center; }
         .actionsLeft, .actionsRight { display: flex; gap: 8px; align-items: center; }
         .pairingRow { display:grid; grid-template-columns: 1fr 1fr auto; gap:8px; }
-        .pairingTableRow { display:grid; grid-template-columns: 1.8fr .5fr .7fr auto; gap:8px; align-items:center; border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; }
+        .pairingTableRow { display:grid; grid-template-columns: 1.8fr .5fr auto; gap:8px; align-items:center; border:1px solid #e5e7eb; border-radius:8px; padding:6px 8px; }
         .tablesWrap { display: grid; gap: 14px; }
         .tableSection { display: grid; gap: 6px; }
         .compareFlight { border: 1px solid #e5e7eb; border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
