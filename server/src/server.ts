@@ -3335,7 +3335,7 @@ app.get("/subevents/:id/bestball", authMiddleware, async (req, res) => {
       LEFT JOIN memberMain m1 ON m1.member_id = eb.member1_id
       LEFT JOIN memberMain m2 ON m2.member_id = eb.member2_id
       WHERE eb.event_id = ?
-      ORDER BY m1.lastname ASC, m1.firstname ASC, m2.lastname ASC, m2.firstname ASC, eb.bestball_id ASC
+      ORDER BY eb.bestball_id ASC
       `,
       [sub.event_id]
     );

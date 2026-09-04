@@ -130,6 +130,7 @@ export default function SubEventBestBallPage() {
   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
 
   const [pairingForm, setPairingForm] = useState({ card1_id: "", card2_id: "" });
+  const [pairingSort, setPairingSort] = useState<"entered" | "player1" | "player2">("entered");
   const [grossAmountEdits, setGrossAmountEdits] = useState<Record<number, string>>({});
   const [netAmountEdits, setNetAmountEdits] = useState<Record<number, string>>({});
 
@@ -383,6 +384,14 @@ export default function SubEventBestBallPage() {
     return name + " (" + date + " | " + String(score) + ")";
   };
 
+  const sortedPairings = useMemo(() => {
+    if (pairingSort === "entered") return pairings;
+    const key = pairingSort === "player1"
+      ? (p: PairingRow) => memberName(p.member1_lastname, p.member1_firstname).toLowerCase()
+      : (p: PairingRow) => memberName(p.member2_lastname, p.member2_firstname).toLowerCase();
+    return [...pairings].sort((a, b) => key(a).localeCompare(key(b)));
+  }, [pairings, pairingSort]);
+
   const flightComparisons = useMemo(() => {
     const flights = new Map<string, {
       flight_id: number | null;
@@ -539,7 +548,17 @@ export default function SubEventBestBallPage() {
           {isBestBallType(data.eventtypename) ? (
             <>
               <div className="card wideCard">
-                <div className="titleRow"><div className="title">Pairings</div></div>
+                <div className="titleRow">
+                  <div className="title">Pairings</div>
+                  <div className="sortRow">
+                    <span className="label">Sort</span>
+                    <select value={pairingSort} onChange={(e) => setPairingSort(e.target.value as typeof pairingSort)}>
+                      <option value="entered">Order Entered</option>
+                      <option value="player1">Player 1</option>
+                      <option value="player2">Player 2</option>
+                    </select>
+                  </div>
+                </div>
                 <div className="pairingRow">
                   <select value={pairingForm.card1_id} onChange={(e) => setPairingForm((p) => ({ ...p, card1_id: e.target.value }))}>
                     <option value="">Select player 1</option>
@@ -551,7 +570,7 @@ export default function SubEventBestBallPage() {
                   </select>
                   <button className="btn primary" onClick={addPairing} disabled={busy || bestBallLoading}>Add Pairing</button>
                 </div>
-                {pairings.map((p) => (
+                {sortedPairings.map((p) => (
                   <div key={p.bestball_id} className="pairingTableRow">
                     <span>{pairName(p.member1_lastname, p.member1_firstname, p.member2_lastname, p.member2_firstname)}</span>
                     <span>{p.gross ?? "-"}/{p.net ?? "-"}</span>
@@ -662,6 +681,8 @@ export default function SubEventBestBallPage() {
         .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; max-width: 520px; display:grid; gap:8px; }
         .wideCard { max-width: 100%; }
         .titleRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .sortRow { display: flex; align-items: center; gap: 8px; }
+        .sortRow .label { margin: 0; }
         .title { font-size: 16px; font-weight: 700; color: #111827; }
         .subTitle { font-size: 13px; font-weight: 700; color: #111827; margin-bottom: 8px; }
         .row { display:grid; grid-template-columns: 120px 1fr; gap:10px; align-items:center; }
