@@ -3538,7 +3538,7 @@ BEGIN
     ELSE
       CREATE TEMPORARY TABLE tmp_skaf_cards AS
         SELECT ec.card_id, ec.member_id, ec.handicap,
-               NTILE(v_totalflights) OVER (ORDER BY eh.rhandicap ASC, ec.card_id ASC) AS bucket
+               NTILE(v_totalflights) OVER (ORDER BY eh.rhandicap ASC, ec.member_id ASC) AS bucket
           FROM eventCard ec
           JOIN (SELECT member_id, rhandicap FROM eventHandicap WHERE event_id = v_eventid) eh
             ON ec.member_id = eh.member_id
