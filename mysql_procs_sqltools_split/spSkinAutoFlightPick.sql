@@ -1,19 +1,3 @@
--- Adds a "Skins Auto Flight" sub event type: same skins-per-hole scoring as
--- regular Skins (single outright winner per hole, no split ties), but flights
--- are auto-computed - the admin picks a flight COUNT on the sub event
--- (subEventMain.auto_flights, already added by add-bestball-auto-flight.sql)
--- instead of needing pre-existing rosterFlight hdcp ranges configured on the
--- roster. Entries (eventCard rows) are allocated evenly (NTILE) by handicap
--- across that many of the roster's flight slots, mirroring the approach used
--- for spBBAutoFlightPick.
-
-INSERT INTO subEventType (eventtypename)
-  SELECT 'Skins Auto Flight'
-   WHERE NOT EXISTS (SELECT 1 FROM subEventType WHERE eventtypename = 'Skins Auto Flight');
-
-DROP PROCEDURE IF EXISTS spSkinAutoFlightPick;
-
-DELIMITER $$
 CREATE PROCEDURE spSkinAutoFlightPick(IN p_subeventid INT)
 BEGIN
   DECLARE v_eventid INT;
@@ -248,5 +232,4 @@ BEGIN
     DROP TEMPORARY TABLE IF EXISTS tmp_skaf_flights;
     DROP TEMPORARY TABLE IF EXISTS tmp_skaf_cards;
   END IF;
-END$$
-DELIMITER ;
+END
