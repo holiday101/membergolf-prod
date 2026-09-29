@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { publicFetch } from "../../api/public";
 
+type PublicSponsor = {
+  sponsor_id: number;
+  name: string | null;
+  website: string | null;
+  logo_url: string | null;
+};
+
+const SPONSOR_SLOTS = 3;
+const SPONSOR_ROTATE_MS = 6000;
+
 export default function PublicShell() {
   const { courseId } = useParams();
   const location = useLocation();
@@ -14,6 +24,8 @@ export default function PublicShell() {
   const [userToggled, setUserToggled] = useState(false);
   const [leagueInfo, setLeagueInfo] = useState<string | null>(null);
   const [leagueInfoSidebarYn, setLeagueInfoSidebarYn] = useState(true);
+  const [sponsors, setSponsors] = useState<PublicSponsor[]>([]);
+  const [sponsorStart, setSponsorStart] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [courseName, setCourseName] = useState<string | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -89,6 +101,8 @@ export default function PublicShell() {
         const course = await publicFetch<{
           leagueinfo: string | null;
           leagueinfo_sidebar_yn?: number | null;
+          sponsors_sidebar_yn?: number | null;
+          sponsors?: PublicSponsor[];
           notice?: string | null;
           coursename?: string | null;
           logo_url?: string | null;
@@ -102,6 +116,12 @@ export default function PublicShell() {
         );
         setLeagueInfo(course?.leagueinfo ?? null);
         setLeagueInfoSidebarYn(course?.leagueinfo_sidebar_yn == null || !!course.leagueinfo_sidebar_yn);
+        setSponsors(
+          course?.sponsors_sidebar_yn
+            ? (course.sponsors ?? []).filter((sp) => sp.logo_url || sp.name)
+            : []
+        );
+        setSponsorStart(0);
         setNotice(course?.notice ?? null);
         setCourseName(course?.coursename ?? null);
         setLogoUrl(course?.logo_url ?? null);
@@ -113,6 +133,7 @@ export default function PublicShell() {
       } catch {
         setLeagueInfo(null);
         setLeagueInfoSidebarYn(true);
+        setSponsors([]);
         setNotice(null);
         setCourseName(null);
         setLogoUrl(null);
@@ -124,6 +145,20 @@ export default function PublicShell() {
       }
     })();
   }, [courseId]);
+
+  // With more than 3 sponsors, rotate the visible set of 3 every few seconds.
+  useEffect(() => {
+    if (sponsors.length <= SPONSOR_SLOTS) return;
+    const timer = window.setInterval(() => {
+      setSponsorStart((prev) => (prev + SPONSOR_SLOTS) % sponsors.length);
+    }, SPONSOR_ROTATE_MS);
+    return () => window.clearInterval(timer);
+  }, [sponsors.length]);
+
+  const visibleSponsors =
+    sponsors.length <= SPONSOR_SLOTS
+      ? sponsors
+      : Array.from({ length: SPONSOR_SLOTS }, (_, i) => sponsors[(sponsorStart + i) % sponsors.length]);
 
   useEffect(() => {
     if (!courseId || !moneyListByRoster) {
@@ -385,7 +420,36 @@ export default function PublicShell() {
           ) : null}
           </div>
 
-          {leagueInfo && leagueInfoSidebarYn ? (
+          {sponsors.length ? (
+            <div className="sidebarSponsors">
+              <div className="leagueInfoLabel">Sponsors</div>
+              <div className="sidebarSponsorList" key={sponsorStart}>
+                {visibleSponsors.map((sp) => {
+                  const body = sp.logo_url ? (
+                    <img src={sp.logo_url} alt={sp.name ?? "Sponsor"} className="sidebarSponsorLogo" />
+                  ) : (
+                    <span className="sidebarSponsorName">{sp.name}</span>
+                  );
+                  return sp.website ? (
+                    <a
+                      key={sp.sponsor_id}
+                      className="sidebarSponsor"
+                      href={/^https?:\/\//i.test(sp.website) ? sp.website : `https://${sp.website}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={sp.name ?? undefined}
+                    >
+                      {body}
+                    </a>
+                  ) : (
+                    <div key={sp.sponsor_id} className="sidebarSponsor" title={sp.name ?? undefined}>
+                      {body}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : leagueInfo && leagueInfoSidebarYn ? (
             <div className="leagueInfo">
               <div className="leagueInfoLabel">League Info</div>
               <div className="leagueInfoText" dangerouslySetInnerHTML={{ __html: leagueInfo }} />
@@ -612,6 +676,45 @@ export default function PublicShell() {
           border-radius: var(--radius);
           border: 1px solid var(--border);
         }
+        .sidebarSponsors {
+          margin-top: 10px;
+          padding: 12px;
+          background: #fff;
+          border-radius: var(--radius);
+          border: 1px solid var(--border);
+        }
+        .sidebarSponsorList {
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          animation: sponsorFade 0.6s ease;
+        }
+        .sidebarSponsor {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 64px;
+          padding: 6px;
+          border-radius: 8px;
+          text-decoration: none;
+          color: inherit;
+        }
+        a.sidebarSponsor:hover { background: #f3f4f6; }
+        .sidebarSponsorLogo {
+          max-width: 100%;
+          max-height: 80px;
+          object-fit: contain;
+        }
+        .sidebarSponsorName {
+          font-size: 14px;
+          font-weight: 600;
+          text-align: center;
+        }
+        @keyframes sponsorFade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
         .leagueInfoLabel {
           font-size: 10px;
           text-transform: uppercase;

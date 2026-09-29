@@ -7,6 +7,7 @@ type Course = {
   coursename: string | null;
   leagueinfo: string | null;
   leagueinfo_sidebar_yn: number | null;
+  sponsors_sidebar_yn: number | null;
   website: string | null;
   payout: number | null;
   cardsused: number | null;
@@ -69,6 +70,7 @@ type FormState = {
   coursename: string;
   leagueinfo: string;
   leagueinfo_sidebar_yn: string;
+  sponsors_sidebar_yn: string;
   website: string;
   payout: string;
   cardsused: string;
@@ -86,6 +88,7 @@ const emptyForm: FormState = {
   coursename: "",
   leagueinfo: "",
   leagueinfo_sidebar_yn: "1",
+  sponsors_sidebar_yn: "0",
   website: "",
   payout: "0.3",
   cardsused: "6",
@@ -131,6 +134,8 @@ export default function CourseEditorPage() {
       leagueinfo: course.leagueinfo ?? "",
       leagueinfo_sidebar_yn:
         course.leagueinfo_sidebar_yn != null ? String(course.leagueinfo_sidebar_yn) : "1",
+      sponsors_sidebar_yn:
+        course.sponsors_sidebar_yn != null ? String(course.sponsors_sidebar_yn) : "0",
       website: course.website ?? "",
       payout: course.payout != null ? String(course.payout) : "",
       cardsused: course.cardsused != null ? String(course.cardsused) : "",
@@ -231,6 +236,7 @@ export default function CourseEditorPage() {
         coursename: form.coursename.trim(),
         leagueinfo: form.leagueinfo.trim() || null,
         leagueinfo_sidebar_yn: form.leagueinfo_sidebar_yn ? Number(form.leagueinfo_sidebar_yn) : 0,
+        sponsors_sidebar_yn: form.sponsors_sidebar_yn ? Number(form.sponsors_sidebar_yn) : 0,
         website: form.website.trim() || null,
         payout: form.payout ? Number(form.payout) : null,
         cardsused: form.cardsused ? Number(form.cardsused) : null,
@@ -440,6 +446,24 @@ export default function CourseEditorPage() {
                     <span className="checkboxHint">
                       Off leaves it reachable only from the full League Info page — good for
                       long or table-heavy info that doesn't fit a narrow sidebar.
+                    </span>
+                  </span>
+                </label>
+
+                <label className="formLabel checkbox leagueInfoSidebarToggle">
+                  <input
+                    type="checkbox"
+                    checked={form.sponsors_sidebar_yn === "1"}
+                    onChange={(e) =>
+                      setField("sponsors_sidebar_yn", e.target.checked ? "1" : "0")
+                    }
+                  />
+                  <span className="checkboxLabel">
+                    Show sponsors in the sidebar
+                    <br />
+                    <span className="checkboxHint">
+                      Replaces the League Info preview with up to 3 sponsor logos, rotating
+                      through the rest. Sponsors are added under Manage Sponsors.
                     </span>
                   </span>
                 </label>
