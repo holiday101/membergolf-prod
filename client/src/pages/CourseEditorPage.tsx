@@ -8,6 +8,7 @@ type Course = {
   leagueinfo: string | null;
   leagueinfo_sidebar_yn: number | null;
   sponsors_sidebar_yn: number | null;
+  notice: string | null;
   website: string | null;
   payout: number | null;
   cardsused: number | null;
@@ -71,6 +72,7 @@ type FormState = {
   leagueinfo: string;
   leagueinfo_sidebar_yn: string;
   sponsors_sidebar_yn: string;
+  notice: string;
   website: string;
   payout: string;
   cardsused: string;
@@ -89,6 +91,7 @@ const emptyForm: FormState = {
   leagueinfo: "",
   leagueinfo_sidebar_yn: "1",
   sponsors_sidebar_yn: "0",
+  notice: "",
   website: "",
   payout: "0.3",
   cardsused: "6",
@@ -136,6 +139,7 @@ export default function CourseEditorPage() {
         course.leagueinfo_sidebar_yn != null ? String(course.leagueinfo_sidebar_yn) : "1",
       sponsors_sidebar_yn:
         course.sponsors_sidebar_yn != null ? String(course.sponsors_sidebar_yn) : "0",
+      notice: course.notice ?? "",
       website: course.website ?? "",
       payout: course.payout != null ? String(course.payout) : "",
       cardsused: course.cardsused != null ? String(course.cardsused) : "",
@@ -237,6 +241,7 @@ export default function CourseEditorPage() {
         leagueinfo: form.leagueinfo.trim() || null,
         leagueinfo_sidebar_yn: form.leagueinfo_sidebar_yn ? Number(form.leagueinfo_sidebar_yn) : 0,
         sponsors_sidebar_yn: form.sponsors_sidebar_yn ? Number(form.sponsors_sidebar_yn) : 0,
+        notice: form.notice.trim() || null,
         website: form.website.trim() || null,
         payout: form.payout ? Number(form.payout) : null,
         cardsused: form.cardsused ? Number(form.cardsused) : null,
@@ -415,6 +420,21 @@ export default function CourseEditorPage() {
                     value={form.coursename}
                     onChange={(e) => setField("coursename", e.target.value)}
                   />
+                </label>
+
+                <label className="formLabel">
+                  Notice
+                  <textarea
+                    className="noticeInput"
+                    rows={3}
+                    maxLength={500}
+                    value={form.notice}
+                    onChange={(e) => setField("notice", e.target.value)}
+                  />
+                  <span className="fieldHint">
+                    Shown in a bar under the header on the public pages. Leave blank to hide it.
+                    ({form.notice.length}/500)
+                  </span>
                 </label>
 
                 <label className="formLabel">
@@ -756,6 +776,7 @@ export default function CourseEditorPage() {
         .inputNum { width: 80px; min-width: 80px; text-align: right; }
         input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; }
         .inputNormal { font-size: 13px; }
+        .noticeInput { padding: 8px 10px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; font-family: inherit; resize: vertical; }
         .uploadRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .fileBtn {
           display: inline-flex;
