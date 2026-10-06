@@ -321,6 +321,44 @@ app.get("/api/public/:courseId/events/:eventId/winnings", async (req, res) => {
   }
 });
 
+// An event's scores are public only once at least one of its sub events has
+// been posted. There is no "posted" flag: posting a sub event writes rows into
+// the result tables below, and Unpost (spUnPost / the powerskin unpost route)
+// deletes them, so this turns back off when the sub events are unposted.
+// subEventFlight is left out on purpose - Auto Flight fills it before posting.
+let publicBestBallNetTable: string | null = null;
+async function eventHasPostedResults(eventId: number): Promise<boolean> {
+  if (!publicBestBallNetTable) publicBestBallNetTable = await resolveBestBallNetTableName();
+  const resultTables = [
+    "subEventPayGross",
+    "subEventPayNet",
+    "subEventBBPayGross",
+    publicBestBallNetTable,
+    "subEventPayChicago",
+    "eventSkin",
+    "subEventSkinNet",
+    "subEventSkinNetResults",
+  ];
+  const checks = resultTables
+    .map(
+      (table) =>
+        `EXISTS (SELECT 1 FROM \`${table}\` r JOIN subEventMain s ON s.subevent_id = r.subevent_id WHERE s.event_id = ?)`
+    )
+    .join("\n        OR ");
+  try {
+    const [rows] = await pool.query<any[]>(
+      `SELECT (\n        ${checks}\n      ) AS posted`,
+      resultTables.map(() => eventId)
+    );
+    return Number(rows?.[0]?.posted ?? 0) === 1;
+  } catch (err) {
+    // Fail closed: if the check itself breaks, keep scores hidden rather than
+    // taking the whole public event page down with a 500.
+    console.error("public event posted check error", err);
+    return false;
+  }
+}
+
 app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
   try {
     const courseId = Number(req.params.courseId);
@@ -328,6 +366,8 @@ app.get("/api/public/:courseId/events/:eventId/scores", async (req, res) => {
     if (!Number.isFinite(courseId) || !Number.isFinite(eventId)) {
       return res.status(400).json({ error: "Invalid event" });
     }
+
+    if (!(await eventHasPostedResults(eventId))) return res.json([]);
 
     const [rows] = await pool.query<any[]>(
       `
@@ -476,6 +516,8 @@ app.get("/api/public/:courseId/events/:eventId/bestball", async (req, res) => {
       return res.status(400).json({ error: "Invalid event" });
     }
 
+    if (!(await eventHasPostedResults(eventId))) return res.json([]);
+
     // Per-hole net = each player's gross stroke count for that hole minus their
     // handicap strokes for it (1 stroke on their hardest holes if handicap<=9,
     // else 2 on their hardest (handicap-9) holes and 1 on the rest), then the
@@ -580,12 +622,16 @@ app.get("/api/public/:courseId/events/:eventId/scores/exists", async (req, res) 
       return res.status(400).json({ error: "Invalid event" });
     }
 
+    // Report no scores until a sub event has been posted, so the public event
+    // page keeps its View Scores link hidden while the event is in progress.
+    if (!(await eventHasPostedResults(eventId))) return res.json({ count: 0, posted: false });
+
     const [rows] = await pool.query<any[]>(
       "SELECT COUNT(*) AS count FROM eventCard WHERE course_id = ? AND event_id = ?",
       [courseId, eventId]
     );
 
-    res.json({ count: rows?.[0]?.count ?? 0 });
+    res.json({ count: rows?.[0]?.count ?? 0, posted: true });
   } catch (err) {
     console.error("public event scores exists error", err);
     res.status(500).json({ error: "Server error" });
