@@ -485,7 +485,7 @@ export default function PublicShell() {
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; height: 100%; display: block; overflow: hidden; }
         body.public-calendar-full { overflow: hidden; }
-        .app { height: 100vh; width: 100%; background: var(--bg); color: var(--text); }
+        .app { height: 100vh; height: 100dvh; width: 100%; background: var(--bg); color: var(--text); }
         .app {
           font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
           display: grid;
@@ -751,11 +751,12 @@ export default function PublicShell() {
         }
         .leagueInfoText img { max-width: 100%; height: auto; }
 
-        .content { padding: 16px; grid-column: 2; overflow: auto; }
+        .content { padding: 16px; grid-column: 2; overflow: auto; min-height: 0; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         .content-inner { max-width: 1100px; margin: 0 auto; }
         .content.calendar-full {
           padding: 16px 0;
-          overflow: hidden;
+          overflow-x: hidden;
+          overflow-y: auto;
         }
         .content-inner.calendar-full {
           max-width: none;
