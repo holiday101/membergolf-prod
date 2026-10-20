@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
+import { parseEventDate } from "../utils/eventDate";
 
 type EventRow = {
   id: number;
@@ -417,7 +418,7 @@ export default function PublicEventDetailPage() {
             <div>
               <div className="title">{event.eventname}</div>
               <div className="meta">
-                {new Date(event.start_dt).toLocaleDateString()} - {new Date(event.end_dt).toLocaleDateString()}
+                {parseEventDate(event.start_dt).toLocaleDateString()} - {parseEventDate(event.end_dt).toLocaleDateString()}
               </div>
             </div>
             <div className="headBtns">

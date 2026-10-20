@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
+import { parseEventDate } from "../utils/eventDate";
 
 type EventRow = {
   id: number;
@@ -317,7 +318,7 @@ export default function PublicEventScoresPage() {
         <div className="card wideCard">
           <div className="title">{event.eventname}</div>
           <div className="meta">
-            {new Date(event.start_dt).toLocaleDateString()} - {new Date(event.end_dt).toLocaleDateString()}
+            {parseEventDate(event.start_dt).toLocaleDateString()} - {parseEventDate(event.end_dt).toLocaleDateString()}
           </div>
 
           {scores.length === 0 ? (

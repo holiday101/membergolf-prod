@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../auth";
 import { fetchEvents } from "../api/events";
+import { parseEventDate } from "../utils/eventDate";
 
 type EventRow = {
   id: number;
@@ -116,8 +117,8 @@ export default function EventListPage() {
     );
     if (rangeFilter === "near") {
       const now = Date.now();
-      const past = sorted.filter((e) => new Date(e.start_dt).getTime() <= now).slice(-5);
-      const future = sorted.filter((e) => new Date(e.start_dt).getTime() > now).slice(0, 5);
+      const past = sorted.filter((e) => parseEventDate(e.start_dt).getTime() <= now).slice(-5);
+      const future = sorted.filter((e) => parseEventDate(e.start_dt).getTime() > now).slice(0, 5);
       return [...past, ...future];
     }
     return sorted;
@@ -282,11 +283,11 @@ export default function EventListPage() {
                     {ev.eventname}
                   </span>
                   <span className="dateRange">
-                    {new Date(ev.start_dt).toLocaleDateString(undefined, {
+                    {parseEventDate(ev.start_dt).toLocaleDateString(undefined, {
                       ...dateFormat,
                     })}{" "}
                     -{" "}
-                    {new Date(ev.end_dt).toLocaleDateString(undefined, {
+                    {parseEventDate(ev.end_dt).toLocaleDateString(undefined, {
                       ...dateFormat,
                     })}
                   </span>

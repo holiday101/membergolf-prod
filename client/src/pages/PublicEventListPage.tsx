@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { publicFetch } from "../api/public";
 import type { CalendarEvent } from "../types/event";
+import { parseEventDate } from "../utils/eventDate";
 
 function startOfYear(d: Date) {
   return new Date(d.getFullYear(), 0, 1);
@@ -55,8 +56,8 @@ export default function PublicEventListPage() {
     );
     if (rangeFilter === "near") {
       const now = Date.now();
-      const past = sorted.filter((e) => new Date(e.start_dt).getTime() <= now).slice(-5);
-      const future = sorted.filter((e) => new Date(e.start_dt).getTime() > now).slice(0, 5);
+      const past = sorted.filter((e) => parseEventDate(e.start_dt).getTime() <= now).slice(-5);
+      const future = sorted.filter((e) => parseEventDate(e.start_dt).getTime() > now).slice(0, 5);
       return [...past, ...future];
     }
     return sorted;
@@ -97,8 +98,8 @@ export default function PublicEventListPage() {
             }}
           >
             <span>{e.eventname}</span>
-            <span>{new Date(e.start_dt).toLocaleDateString()}</span>
-            <span>{new Date(e.end_dt).toLocaleDateString()}</span>
+            <span>{parseEventDate(e.start_dt).toLocaleDateString()}</span>
+            <span>{parseEventDate(e.end_dt).toLocaleDateString()}</span>
             <span>{(e as any).ninename ?? e.nine_id ?? "—"}</span>
           </div>
         ))}
